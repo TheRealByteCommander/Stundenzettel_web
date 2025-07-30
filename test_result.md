@@ -197,3 +197,5 @@ test_plan:
 agent_communication:
     - agent: "main"
       message: "Starting investigation of Monday date bug and deletion functions. Will fix frontend date calculation issues first, then verify backend timesheet creation logic, and test deletion functionality."
+    - agent: "main"
+      message: "Completed frontend date calculation fixes: 1) Fixed getMonday function to use proper Date constructor avoiding timezone issues, 2) Fixed getWeekDates function to parse date strings correctly, 3) Fixed formatDateForInput to use local date format, 4) Updated getAvailableMondays with better ISO week calculation. Observed timesheets displaying correctly including July 7, 2025 date. Delete buttons properly hidden for sent timesheets. Ready for backend testing."
