@@ -220,8 +220,9 @@ function App() {
   };
 
   const downloadPDF = async (timesheetId, userName, weekStart) => {
+    setLoading(true);
     try {
-      const response = await axios.get(`${API}/timesheets/${timesheetId}/pdf`, {
+      const response = await axios.post(`${API}/timesheets/${timesheetId}/download-and-email`, {}, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -233,8 +234,12 @@ function App() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      
+      setSuccess('PDF heruntergeladen und Kopie an Admin gesendet!');
     } catch (error) {
       setError('Fehler beim Herunterladen des PDFs.');
+    } finally {
+      setLoading(false);
     }
   };
 
