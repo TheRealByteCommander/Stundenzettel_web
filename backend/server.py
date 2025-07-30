@@ -92,6 +92,10 @@ class TimeEntry(BaseModel):
     customer_project: str
     location: str
 
+class TimesheetUpdate(BaseModel):
+    week_start: Optional[str] = None
+    entries: Optional[List[TimeEntry]] = None
+
 class WeeklyTimesheet(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
