@@ -715,6 +715,7 @@ function App() {
                                 type="time"
                                 value={entry.start_time}
                                 onChange={(e) => updateEntry(index, 'start_time', e.target.value)}
+                                placeholder="--:--"
                               />
                             </div>
                           </div>
@@ -727,6 +728,7 @@ function App() {
                                 type="time"
                                 value={entry.end_time}
                                 onChange={(e) => updateEntry(index, 'end_time', e.target.value)}
+                                placeholder="--:--"
                               />
                             </div>
                           </div>
