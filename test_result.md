@@ -101,3 +101,87 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "User reported two critical bugs: 1) Monday Bug - When selecting a Monday (e.g., July 7, 2025) for timesheet creation, the timesheet incorrectly starts on the previous Sunday. Previous fixes worked for some dates but caused instability for July 7, 2025. 2) Deletion Function Bug - Issues with timesheet or user deletion functionality."
+
+backend:
+  - task: "Fix Monday date calculation bug in timesheet creation"
+    implemented: false
+    working: false
+    file: "server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "User reported Monday date bug - when selecting Monday July 7, 2025, timesheet shows wrong start date. Previous fixes had instability issues."
+  
+  - task: "Verify deletion functions work correctly"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Backend deletion logic appears correct with proper validation, need to test functionality"
+
+frontend:
+  - task: "Fix Monday date calculation in getMonday function"
+    implemented: false
+    working: false
+    file: "App.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "getMonday function has timezone/date calculation issues causing wrong week start dates. Screenshot shows Sa. - 13.7.2025 when Monday should be start."
+  
+  - task: "Fix date handling in getWeekDates function"
+    implemented: false
+    working: false
+    file: "App.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "getWeekDates function may have timezone issues when creating Date objects from strings"
+
+  - task: "Verify deletion UI functions work correctly"
+    implemented: true
+    working: "NA"
+    file: "App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Frontend deletion logic appears correct with confirmations and API calls, need to test functionality"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Fix Monday date calculation in getMonday function"
+    - "Fix date handling in getWeekDates function"
+    - "Fix Monday date calculation bug in timesheet creation"
+  stuck_tasks:
+    - "Fix Monday date calculation in getMonday function"
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: "Starting investigation of Monday date bug and deletion functions. Will fix frontend date calculation issues first, then verify backend timesheet creation logic, and test deletion functionality."
