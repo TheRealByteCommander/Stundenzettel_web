@@ -1,34 +1,217 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Custom styles for Schmitz Intralogistik */
+
+/* Company colors */
+:root {
+  --company-red: #e90118;
+  --company-light-gray: #b3b3b5;
+  --company-gray: #5a5a5a;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Override some default button hover states */
+.btn-primary:hover {
+  background-color: #c70115 !important;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-.App-link {
-    color: #61dafb;
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+::-webkit-scrollbar-thumb {
+  background: var(--company-light-gray);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--company-gray);
+}
+
+/* Card hover effects */
+.card:hover {
+  box-shadow: 0 8px 25px rgba(233, 1, 24, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Button focus states */
+button:focus {
+  outline: 2px solid var(--company-red);
+  outline-offset: 2px;
+}
+
+/* Input focus states */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--company-red);
+  box-shadow: 0 0 0 3px rgba(233, 1, 24, 0.1);
+}
+
+/* Table hover effects */
+.table-row:hover {
+  background-color: rgba(233, 1, 24, 0.05);
+}
+
+/* Badge styles for company branding */
+.badge-company {
+  background-color: var(--company-red);
+  color: white;
+}
+
+/* Loading animation */
+.loading-spinner {
+  border: 2px solid var(--company-light-gray);
+  border-top: 2px solid var(--company-red);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Custom alert styles */
+.alert-success {
+  border-left: 4px solid #10b981;
+  background-color: #f0fdf4;
+}
+
+.alert-error {
+  border-left: 4px solid var(--company-red);
+  background-color: #fef2f2;
+}
+
+/* Form layout improvements */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+/* Professional header styling */
+.company-header {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-bottom: 3px solid var(--company-red);
+}
+
+/* Tab styling */
+.tabs-trigger[data-state="active"] {
+  color: var(--company-red) !important;
+  border-bottom-color: var(--company-red) !important;
+}
+
+/* PDF download button special styling */
+.pdf-download-btn {
+  background: linear-gradient(135deg, var(--company-red) 0%, #c70115 100%);
+  transition: all 0.3s ease;
+}
+
+.pdf-download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(233, 1, 24, 0.3);
+}
+
+/* Time entry cards */
+.time-entry-card {
+  border-left: 4px solid var(--company-red);
+  transition: all 0.3s ease;
+}
+
+.time-entry-card:hover {
+  border-left-width: 6px;
+  transform: translateX(2px);
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .time-entry-card {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Professional typography */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--company-gray);
+  font-weight: 600;
+}
+
+/* Company logo area */
+.company-logo-area {
+  background: radial-gradient(circle at center, rgba(233, 1, 24, 0.05) 0%, transparent 70%);
+  padding: 2rem;
+  border-radius: 12px;
+}
+
+/* Status badges */
+.status-sent {
+  background-color: #10b981;
+  color: white;
+}
+
+.status-draft {
+  background-color: var(--company-light-gray);
+  color: var(--company-gray);
+}
+
+/* Enhanced table styling */
+.timesheet-table th {
+  background-color: var(--company-red);
+  color: white;
+  font-weight: 600;
+}
+
+.timesheet-table tr:nth-child(even) {
+  background-color: rgba(233, 1, 24, 0.02);
+}
+
+/* Icon styling */
+.icon-company {
+  color: var(--company-red);
+}
+
+.icon-secondary {
+  color: var(--company-gray);
+}
+
+/* Animation classes */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Success and error message styling */
+.message-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.message-error {
+  background: linear-gradient(135deg, var(--company-red) 0%, #c70115 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
 }

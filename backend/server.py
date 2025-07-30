@@ -1,15 +1,30 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Form, UploadFile, File
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import jwt
+from passlib.context import CryptContext
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.units import inch
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,40 +34,443 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+# JWT and Password settings
+SECRET_KEY = "schmitz-intralogistik-secret-key-2025"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 
-# Create a router with the /api prefix
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+# Create the main app
+app = FastAPI(title="Schmitz Intralogistik Zeiterfassung")
 api_router = APIRouter(prefix="/api")
 
+# Company Information
+COMPANY_INFO = {
+    "name": "Schmitz Intralogistik GmbH",
+    "address": "Grüner Weg 3",
+    "city": "04827 Machern",
+    "country": "Deutschland"
+}
 
-# Define Models
-class StatusCheck(BaseModel):
+# Models
+class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    email: EmailStr
+    name: str
+    is_admin: bool = False
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class UserCreate(BaseModel):
+    email: EmailStr
+    name: str
+    password: str
+    is_admin: bool = False
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
+class TimeEntry(BaseModel):
+    date: str  # YYYY-MM-DD format
+    start_time: str  # HH:MM format
+    end_time: str  # HH:MM format
+    break_minutes: int
+    tasks: str
+    customer_project: str
+    location: str
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+class WeeklyTimesheet(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_name: str
+    week_start: str  # Monday date in YYYY-MM-DD format
+    week_end: str    # Sunday date in YYYY-MM-DD format
+    entries: List[TimeEntry]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    status: str = "draft"  # draft, sent
 
-# Include the router in the main app
+class WeeklyTimesheetCreate(BaseModel):
+    week_start: str
+    entries: List[TimeEntry]
+
+class SMTPConfig(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    smtp_server: str
+    smtp_port: int
+    smtp_username: str
+    smtp_password: str
+    admin_email: str
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SMTPConfigCreate(BaseModel):
+    smtp_server: str
+    smtp_port: int
+    smtp_username: str
+    smtp_password: str
+    admin_email: str
+
+# Utility functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        
+        user = await db.users.find_one({"email": email})
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return User(**user)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+
+async def get_admin_user(current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
+    """Generate PDF for weekly timesheet"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Company colors
+    company_red = colors.Color(233/255, 1/255, 24/255)  # #e90118
+    light_gray = colors.Color(179/255, 179/255, 181/255)  # #b3b3b5
+    dark_gray = colors.Color(90/255, 90/255, 90/255)     # #5a5a5a
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Company header style
+    header_style = ParagraphStyle(
+        'CompanyHeader',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=company_red,
+        spaceAfter=6,
+        alignment=1  # Center
+    )
+    
+    # Company info style
+    info_style = ParagraphStyle(
+        'CompanyInfo',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=dark_gray,
+        alignment=1,  # Center
+        spaceAfter=20
+    )
+    
+    # Add company header
+    story.append(Paragraph(COMPANY_INFO["name"], header_style))
+    story.append(Paragraph(f"{COMPANY_INFO['address']}, {COMPANY_INFO['city']}, {COMPANY_INFO['country']}", info_style))
+    
+    # Title
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=dark_gray,
+        spaceAfter=20
+    )
+    story.append(Paragraph("WÖCHENTLICHER STUNDENZETTEL", title_style))
+    
+    # Employee and period info
+    info_data = [
+        ["Mitarbeiter:", timesheet.user_name],
+        ["Zeitraum:", f"{timesheet.week_start} bis {timesheet.week_end}"],
+        ["Erstellt am:", timesheet.created_at.strftime("%d.%m.%Y %H:%M")]
+    ]
+    
+    info_table = Table(info_data, colWidths=[2*inch, 4*inch])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), light_gray),
+        ('TEXTCOLOR', (0, 0), (-1, -1), dark_gray),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, dark_gray),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+    
+    # Time entries table
+    if timesheet.entries:
+        headers = ["Datum", "Startzeit", "Endzeit", "Pause (Min)", "Aufgaben", "Kunde/Projekt", "Ort"]
+        table_data = [headers]
+        
+        total_hours = 0
+        for entry in timesheet.entries:
+            # Calculate worked hours
+            start_parts = entry.start_time.split(':')
+            end_parts = entry.end_time.split(':')
+            start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
+            end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
+            worked_minutes = end_minutes - start_minutes - entry.break_minutes
+            total_hours += worked_minutes / 60
+            
+            table_data.append([
+                entry.date,
+                entry.start_time,
+                entry.end_time,
+                str(entry.break_minutes),
+                entry.tasks,
+                entry.customer_project,
+                entry.location
+            ])
+        
+        # Add total row
+        table_data.append(["", "", "", "", f"GESAMT: {total_hours:.2f} Stunden", "", ""])
+        
+        time_table = Table(table_data, colWidths=[1*inch, 0.8*inch, 0.8*inch, 0.8*inch, 2*inch, 1.5*inch, 1.2*inch])
+        time_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), company_red),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('BACKGROUND', (0, -1), (-1, -1), light_gray),
+            ('TEXTCOLOR', (0, -1), (-1, -1), dark_gray),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, dark_gray),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(time_table)
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+# Routes
+@api_router.post("/auth/login")
+async def login(user_login: UserLogin):
+    user = await db.users.find_one({"email": user_login.email})
+    if not user or not verify_password(user_login.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["email"]}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "is_admin": user["is_admin"]
+        }
+    }
+
+@api_router.post("/auth/register")
+async def register(user_create: UserCreate, current_user: User = Depends(get_admin_user)):
+    # Check if user exists
+    existing_user = await db.users.find_one({"email": user_create.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create user
+    hashed_password = get_password_hash(user_create.password)
+    user = User(
+        email=user_create.email,
+        name=user_create.name,
+        is_admin=user_create.is_admin,
+        hashed_password=hashed_password
+    )
+    
+    await db.users.insert_one(user.dict())
+    return {"message": "User created successfully", "user_id": user.id}
+
+@api_router.get("/users", response_model=List[Dict[str, Any]])
+async def get_users(current_user: User = Depends(get_admin_user)):
+    users = await db.users.find().to_list(1000)
+    return [{"id": user["id"], "email": user["email"], "name": user["name"], "is_admin": user["is_admin"]} for user in users]
+
+@api_router.post("/timesheets", response_model=WeeklyTimesheet)
+async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user: User = Depends(get_current_user)):
+    # Calculate week end (Sunday)
+    from datetime import datetime, timedelta
+    week_start = datetime.strptime(timesheet_create.week_start, "%Y-%m-%d")
+    week_end = week_start + timedelta(days=6)
+    
+    timesheet = WeeklyTimesheet(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        week_start=timesheet_create.week_start,
+        week_end=week_end.strftime("%Y-%m-%d"),
+        entries=timesheet_create.entries
+    )
+    
+    await db.timesheets.insert_one(timesheet.dict())
+    return timesheet
+
+@api_router.get("/timesheets", response_model=List[WeeklyTimesheet])
+async def get_timesheets(current_user: User = Depends(get_current_user)):
+    if current_user.is_admin:
+        timesheets = await db.timesheets.find().to_list(1000)
+    else:
+        timesheets = await db.timesheets.find({"user_id": current_user.id}).to_list(1000)
+    
+    return [WeeklyTimesheet(**timesheet) for timesheet in timesheets]
+
+@api_router.get("/timesheets/{timesheet_id}/pdf")
+async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_current_user)):
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    
+    # Check permissions
+    if not current_user.is_admin and timesheet["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    timesheet_obj = WeeklyTimesheet(**timesheet)
+    pdf_bytes = generate_timesheet_pdf(timesheet_obj)
+    
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf"
+        }
+    )
+
+@api_router.post("/timesheets/{timesheet_id}/send-email")
+async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(get_current_user)):
+    # Get timesheet
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    
+    # Check permissions
+    if not current_user.is_admin and timesheet["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Get SMTP config
+    smtp_config = await db.smtp_config.find_one()
+    if not smtp_config:
+        raise HTTPException(status_code=400, detail="SMTP configuration not found. Please contact admin.")
+    
+    timesheet_obj = WeeklyTimesheet(**timesheet)
+    pdf_bytes = generate_timesheet_pdf(timesheet_obj)
+    
+    # Send email
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_config["smtp_username"]
+        msg['To'] = current_user.email
+        msg['Cc'] = smtp_config["admin_email"]
+        msg['Subject'] = f"Stundenzettel - {timesheet_obj.user_name} - Woche {timesheet_obj.week_start}"
+        
+        body = f"""
+        Hallo {timesheet_obj.user_name},
+        
+        anbei finden Sie Ihren Stundenzettel für die Woche vom {timesheet_obj.week_start} bis {timesheet_obj.week_end}.
+        
+        Mit freundlichen Grüßen
+        {COMPANY_INFO["name"]}
+        """
+        
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        # Attach PDF
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header(
+            'Content-Disposition',
+            f'attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf'
+        )
+        msg.attach(part)
+        
+        # Send email
+        server = smtplib.SMTP(smtp_config["smtp_server"], smtp_config["smtp_port"])
+        server.starttls()
+        server.login(smtp_config["smtp_username"], smtp_config["smtp_password"])
+        
+        recipients = [current_user.email, smtp_config["admin_email"]]
+        text = msg.as_string()
+        server.sendmail(smtp_config["smtp_username"], recipients, text.encode('utf-8'))
+        server.quit()
+        
+        # Update timesheet status
+        await db.timesheets.update_one(
+            {"id": timesheet_id},
+            {"$set": {"status": "sent"}}
+        )
+        
+        return {"message": "Email sent successfully"}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+@api_router.post("/admin/smtp-config")
+async def update_smtp_config(smtp_config: SMTPConfigCreate, current_user: User = Depends(get_admin_user)):
+    # Delete existing config
+    await db.smtp_config.delete_many({})
+    
+    # Create new config
+    config = SMTPConfig(**smtp_config.dict())
+    await db.smtp_config.insert_one(config.dict())
+    
+    return {"message": "SMTP configuration updated successfully"}
+
+@api_router.get("/admin/smtp-config")
+async def get_smtp_config(current_user: User = Depends(get_admin_user)):
+    config = await db.smtp_config.find_one()
+    if not config:
+        return None
+    
+    # Don't return password
+    config_safe = {k: v for k, v in config.items() if k != "smtp_password"}
+    return config_safe
+
+# Initialize admin user on startup
+@app.on_event("startup")
+async def create_admin_user():
+    admin = await db.users.find_one({"email": "admin@schmitz-intralogistik.de"})
+    if not admin:
+        admin_user = User(
+            email="admin@schmitz-intralogistik.de",
+            name="Administrator",
+            is_admin=True,
+            hashed_password=get_password_hash("admin123")
+        )
+        await db.users.insert_one(admin_user.dict())
+        print("Admin user created: admin@schmitz-intralogistik.de / admin123")
+
+# Include router
 app.include_router(api_router)
 
 app.add_middleware(
