@@ -211,9 +211,11 @@ async def get_admin_user(current_user: User = Depends(get_current_user)):
     return current_user
 
 def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
-    """Generate PDF for weekly timesheet"""
+    """Generate PDF for weekly timesheet in landscape format matching company template"""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    # Use landscape orientation (A4 rotated)
+    from reportlab.lib.pagesizes import A4, landscape
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     
     # Company colors
     company_red = colors.Color(233/255, 1/255, 24/255)  # #e90118
@@ -223,110 +225,208 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
     story = []
     styles = getSampleStyleSheet()
     
-    # Company header style
-    header_style = ParagraphStyle(
+    # Create custom styles
+    company_header_style = ParagraphStyle(
         'CompanyHeader',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=company_red,
-        spaceAfter=6,
-        alignment=1  # Center
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=dark_gray,
+        alignment=2,  # Right align
+        spaceAfter=10
     )
     
-    # Company info style
-    info_style = ParagraphStyle(
-        'CompanyInfo',
-        parent=styles['Normal'],
-        fontSize=10,
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=16,
         textColor=dark_gray,
         alignment=1,  # Center
         spaceAfter=20
     )
     
-    # Add company header
-    story.append(Paragraph(COMPANY_INFO["name"], header_style))
-    story.append(Paragraph(f"{COMPANY_INFO['address']}, {COMPANY_INFO['city']}, {COMPANY_INFO['country']}", info_style))
+    # Page width for layout calculations
+    page_width = landscape(A4)[0] - 60  # minus margins
     
-    # Title
-    title_style = ParagraphStyle(
-        'Title',
-        parent=styles['Heading2'],
-        fontSize=16,
-        textColor=dark_gray,
-        spaceAfter=20
-    )
-    story.append(Paragraph("WÖCHENTLICHER STUNDENZETTEL", title_style))
+    # Top section with company info (right aligned like in image)
+    company_info = f"""
+    <b>{COMPANY_INFO["name"]}</b><br/>
+    {COMPANY_INFO["address"]}<br/>
+    {COMPANY_INFO["city"]}<br/>
+    {COMPANY_INFO["country"]}<br/>
+    Tel: +49 (0) 29242 9600<br/>
+    Grüner Weg 3, 04827 Machern<br/>
+    www.schmitz-intralogistik.com
+    """
     
-    # Employee and period info
-    info_data = [
-        ["Mitarbeiter:", timesheet.user_name],
-        ["Zeitraum:", f"{timesheet.week_start} bis {timesheet.week_end}"],
-        ["Erstellt am:", timesheet.created_at.strftime("%d.%m.%Y %H:%M")]
-    ]
-    
-    info_table = Table(info_data, colWidths=[2*inch, 4*inch])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), light_gray),
-        ('TEXTCOLOR', (0, 0), (-1, -1), dark_gray),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 1, dark_gray),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    story.append(info_table)
+    story.append(Paragraph(company_info, company_header_style))
     story.append(Spacer(1, 20))
     
-    # Time entries table
+    # Title
+    story.append(Paragraph("Gesamtstunden:", title_style))
+    story.append(Spacer(1, 20))
+    
+    # Employee info table (left side)
+    employee_info_data = [
+        ["Projekt:", ""],
+        ["Name:", timesheet.user_name],
+        ["Datum:", f"Kalenderwoche {get_calendar_week(timesheet.week_start)}"],
+        ["Unterschrift Mitarbeiter:", ""],
+        ["", ""],
+        ["Unterschrift Auftraggeber:", ""],
+    ]
+    
+    # Main timesheet table (matching the image layout)
     if timesheet.entries:
-        headers = ["Datum", "Startzeit", "Endzeit", "Pause (Min)", "Aufgaben", "Kunde/Projekt", "Ort"]
-        table_data = [headers]
-        
+        # Calculate total hours first
         total_hours = 0
-        for entry in timesheet.entries:
-            # Calculate worked hours
-            start_parts = entry.start_time.split(':')
-            end_parts = entry.end_time.split(':')
-            start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
-            end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
-            worked_minutes = end_minutes - start_minutes - entry.break_minutes
-            total_hours += worked_minutes / 60
+        table_data = []
+        
+        # Header row
+        headers = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+        dates_row = []
+        start_times_row = ["Stunden", "", "", "", "", "", ""]
+        end_times_row = ["", "", "", "", "", "", ""]
+        pause_row = ["Pause", "", "", "", "", "", ""]
+        tasks_row = ["Beschäftigung", "", "", "", "", "", ""]
+        hours_row = ["Arbeitszeit", "", "", "", "", "", ""]
+        
+        # Fill data for each day
+        entries_by_date = {entry.date: entry for entry in timesheet.entries}
+        
+        # Get week dates
+        from datetime import datetime, timedelta
+        week_start_date = datetime.strptime(timesheet.week_start, "%Y-%m-%d")
+        
+        for i in range(7):  # Monday to Sunday
+            current_date = week_start_date + timedelta(days=i)
+            date_str = current_date.strftime("%Y-%m-%d")
+            display_date = current_date.strftime("%d.%m.%Y")
             
-            table_data.append([
-                entry.date,
-                entry.start_time,
-                entry.end_time,
-                str(entry.break_minutes),
-                entry.tasks,
-                entry.customer_project,
-                entry.location
-            ])
+            dates_row.append(display_date)
+            
+            if date_str in entries_by_date:
+                entry = entries_by_date[date_str]
+                start_times_row[i+1] = entry.start_time
+                end_times_row[i+1] = entry.end_time
+                pause_row[i+1] = f"{entry.break_minutes}"
+                tasks_row[i+1] = entry.tasks[:15] + "..." if len(entry.tasks) > 15 else entry.tasks
+                
+                # Calculate daily hours
+                start_parts = entry.start_time.split(':')
+                end_parts = entry.end_time.split(':')
+                start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
+                end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
+                worked_minutes = end_minutes - start_minutes - entry.break_minutes
+                daily_hours = worked_minutes / 60
+                total_hours += daily_hours
+                hours_row[i+1] = f"{daily_hours:.2f}"
+            else:
+                start_times_row[i+1] = ""
+                end_times_row[i+1] = ""
+                pause_row[i+1] = ""
+                tasks_row[i+1] = ""
+                hours_row[i+1] = ""
         
-        # Add total row
-        table_data.append(["", "", "", "", f"GESAMT: {total_hours:.2f} Stunden", "", ""])
+        # Build table
+        table_data = [
+            headers,
+            dates_row,
+            start_times_row,
+            end_times_row,
+            pause_row,
+            tasks_row,
+            hours_row
+        ]
         
-        time_table = Table(table_data, colWidths=[1*inch, 0.8*inch, 0.8*inch, 0.8*inch, 2*inch, 1.5*inch, 1.2*inch])
-        time_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), company_red),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('BACKGROUND', (0, -1), (-1, -1), light_gray),
-            ('TEXTCOLOR', (0, -1), (-1, -1), dark_gray),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        # Create table with proper column widths
+        col_width = (page_width - 100) / 8  # 8 columns (1 label + 7 days)
+        col_widths = [100] + [col_width] * 7
+        
+        timesheet_table = Table(table_data, colWidths=col_widths)
+        
+        # Table styling to match the image
+        timesheet_table.setStyle(TableStyle([
+            # Header row (days)
+            ('BACKGROUND', (0, 0), (-1, 0), light_gray),
+            ('TEXTCOLOR', (0, 0), (-1, 0), dark_gray),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, dark_gray),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            
+            # Date row
+            ('BACKGROUND', (0, 1), (-1, 1), colors.white),
+            ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
+            
+            # Label column styling
+            ('BACKGROUND', (0, 0), (0, -1), light_gray),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            
+            # Grid
+            ('GRID', (0, 0), (-1, -1), 1, dark_gray),
+            ('LINEBELOW', (0, 0), (-1, 0), 2, company_red),
+            
+            # Padding
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
-        story.append(time_table)
+        
+        story.append(timesheet_table)
+        story.append(Spacer(1, 20))
+        
+        # Total hours section (like in the image)
+        total_data = [
+            ["Gesamtstunden:", f"{total_hours:.2f}"],
+            ["Erstellt am:", timesheet.created_at.strftime("%d.%m.%Y")]
+        ]
+        
+        total_table = Table(total_data, colWidths=[3*inch, 2*inch])
+        total_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), light_gray),
+            ('TEXTCOLOR', (0, 0), (-1, -1), dark_gray),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 1, dark_gray),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        story.append(total_table)
+    
+    # Left side - signature area (like in original)
+    story.append(Spacer(1, 30))
+    
+    signature_data = [
+        ["Unterschrift Mitarbeiter:", ""],
+        ["", ""],
+        ["Datum:", ""],
+        ["", ""],
+        ["Unterschrift Auftraggeber:", ""],
+    ]
+    
+    signature_table = Table(signature_data, colWidths=[3*inch, 3*inch])
+    signature_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        # Add lines for signatures
+        ('LINEBELOW', (1, 0), (1, 0), 1, dark_gray),
+        ('LINEBELOW', (1, 2), (1, 2), 1, dark_gray),
+        ('LINEBELOW', (1, 4), (1, 4), 1, dark_gray),
+    ]))
+    
+    story.append(signature_table)
     
     doc.build(story)
     buffer.seek(0)
