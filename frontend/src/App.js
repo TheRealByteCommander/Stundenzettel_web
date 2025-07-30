@@ -869,6 +869,7 @@ function App() {
                                 className="text-red-600 hover:text-red-800"
                                 disabled={userItem.id === user?.id} // Prevent self-deletion
                                 title={userItem.id === user?.id ? "Sie können sich nicht selbst löschen" : "Benutzer löschen"}
+                                style={{ opacity: userItem.id === user?.id ? 0.5 : 1 }}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
