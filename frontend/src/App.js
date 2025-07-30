@@ -448,6 +448,12 @@ function App() {
     return mondays;
   };
 
+  const getDayName = (dateStr) => {
+    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    const date = new Date(dateStr);
+    return days[date.getDay()];
+  };
+
   if (!token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center p-4">
