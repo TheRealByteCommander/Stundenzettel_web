@@ -668,19 +668,27 @@ function App() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="week-start">Wochenbeginn (Montag)</Label>
-                  <Input
-                    id="week-start"
-                    type="date"
+                  <Label htmlFor="week-start">Wochenbeginn (nur Montage auswählbar)</Label>
+                  <Select
                     value={newTimesheet.week_start}
-                    onChange={(e) => {
-                      const weekStart = e.target.value;
+                    onValueChange={(weekStart) => {
                       setNewTimesheet({ ...newTimesheet, week_start: weekStart });
                       if (weekStart) {
                         initializeWeekEntries(weekStart);
                       }
                     }}
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Montag auswählen..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableMondays().map((monday) => (
+                        <SelectItem key={monday.value} value={monday.value}>
+                          {monday.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {newTimesheet.entries.length > 0 && (
