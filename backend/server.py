@@ -590,6 +590,13 @@ async def delete_timesheet(timesheet_id: str, current_user: User = Depends(get_c
     if not current_user.is_admin and timesheet["user_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # Check if timesheet status allows deletion (only "draft" can be deleted)
+    if timesheet["status"] != "draft":
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete timesheet that has been sent. Only draft timesheets can be deleted."
+        )
+    
     # Delete timesheet
     await db.timesheets.delete_one({"id": timesheet_id})
     
