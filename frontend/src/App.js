@@ -632,7 +632,7 @@ function App() {
                               >
                                 <Send className="h-4 w-4" />
                               </Button>
-                              {user?.is_admin && timesheet.status === 'draft' && (
+                              {((user?.is_admin) || (timesheet.user_id === user?.id)) && timesheet.status === 'draft' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
