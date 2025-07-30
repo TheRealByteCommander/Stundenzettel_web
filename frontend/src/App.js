@@ -419,10 +419,21 @@ function App() {
 
   // Helper function to get Monday of the current week (or next Monday if it's Sunday)
   const getMonday = (date) => {
-    const d = new Date(date);
+    // Parse date string properly to avoid timezone issues
+    let d;
+    if (typeof date === 'string') {
+      const [year, month, day] = date.split('-').map(Number);
+      d = new Date(year, month - 1, day);  // month is 0-indexed
+    } else {
+      d = new Date(date);
+    }
+    
     const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Get Monday of current week
-    return new Date(d.setDate(diff));
+    
+    // Create new date with proper timezone handling
+    const monday = new Date(d.getFullYear(), d.getMonth(), diff);
+    return monday;
   };
 
   // Helper function to format date for input
