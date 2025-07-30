@@ -337,7 +337,7 @@ function App() {
   };
 
   const deleteUser = async (userId, userName) => {
-    if (!confirm(`Möchten Sie den Benutzer "${userName}" wirklich löschen?`)) {
+    if (!confirm(`Möchten Sie den Benutzer "${userName}" wirklich löschen? Alle zugehörigen Stundenzettel werden ebenfalls gelöscht.`)) {
       return;
     }
     
@@ -347,9 +347,14 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Benutzer erfolgreich gelöscht!');
-      fetchUsers();
+      fetchUsers(); // Refresh user list immediately
+      fetchTimesheets(); // Also refresh timesheets as they might be affected
     } catch (error) {
-      setError('Fehler beim Löschen des Benutzers.');
+      if (error.response?.data?.detail) {
+        setError(error.response.data.detail);
+      } else {
+        setError('Fehler beim Löschen des Benutzers.');
+      }
     } finally {
       setLoading(false);
     }
