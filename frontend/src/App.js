@@ -485,7 +485,7 @@ function App() {
             <div className="flex items-center">
               <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
               <h1 className="text-xl font-bold" style={{ color: colors.gray }}>
-                Schmitz Intralogistik - Zeiterfassung
+                Schmitz Intralogistik GmbH - Zeiterfassung
               </h1>
             </div>
             <div className="flex items-center space-x-4">
