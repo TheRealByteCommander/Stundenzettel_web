@@ -416,10 +416,36 @@ function App() {
     }
   };
 
-  const getDayName = (dateStr) => {
-    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-    const date = new Date(dateStr);
-    return days[date.getDay()];
+  // Helper function to get next Monday from a given date
+  const getNextMonday = (date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    return new Date(d.setDate(diff));
+  };
+
+  // Helper function to format date for input
+  const formatDateForInput = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Get current Monday and next few Mondays for selection
+  const getAvailableMondays = () => {
+    const mondays = [];
+    const today = new Date();
+    let monday = getNextMonday(today);
+    
+    // Go back a few weeks to allow past entries
+    for (let i = -4; i <= 8; i++) {
+      const currentMonday = new Date(monday);
+      currentMonday.setDate(monday.getDate() + (i * 7));
+      mondays.push({
+        value: formatDateForInput(currentMonday),
+        label: `${currentMonday.toLocaleDateString('de-DE')} (KW ${Math.ceil(((currentMonday - new Date(currentMonday.getFullYear(), 0, 1)) / 86400000 + 1) / 7)})`
+      });
+    }
+    
+    return mondays;
   };
 
   if (!token) {
