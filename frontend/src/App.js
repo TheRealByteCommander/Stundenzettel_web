@@ -227,10 +227,28 @@ function App() {
         responseType: 'blob'
       });
       
+      // Generate the new filename format: [Name]_[KW]_[Number]
+      const getCalendarWeek = (dateStr) => {
+        const date = new Date(dateStr);
+        const startOfYear = new Date(date.getFullYear(), 0, 1);
+        const pastDaysOfYear = (date - startOfYear) / 86400000;
+        const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+        return `KW${weekNumber.toString().padStart(2, '0')}`;
+      };
+      
+      const sanitizeName = (name) => {
+        return name.replace(/[^\w\-_.]/g, '_').replace(/_+/g, '_');
+      };
+      
+      const calendarWeek = getCalendarWeek(weekStart);
+      const cleanName = sanitizeName(userName);
+      // For now, use 001 as sequential number (backend handles the actual counting)
+      const filename = `${cleanName}_${calendarWeek}_001.pdf`;
+      
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Stundenzettel_${userName}_${weekStart}.pdf`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
