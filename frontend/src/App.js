@@ -844,31 +844,31 @@ function App() {
                         Benutzer ({users.length})
                       </h4>
                       <div className="space-y-2">
-                        {users.map((user) => (
-                          <div key={user.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border">
+                        {users.map((userItem) => (
+                          <div key={userItem.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border">
                             <div>
-                              <span className="font-medium">{user.name}</span>
+                              <span className="font-medium">{userItem.name}</span>
                               <br />
-                              <span className="text-sm text-gray-500">{user.email}</span>
+                              <span className="text-sm text-gray-500">{userItem.email}</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {user.is_admin && (
+                              {userItem.is_admin && (
                                 <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
                               )}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => editUser(user)}
+                                onClick={() => editUser(userItem)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => deleteUser(user.id, user.name)}
+                                onClick={() => deleteUser(userItem.id, userItem.name)}
                                 className="text-red-600 hover:text-red-800"
-                                disabled={user.id === user.id} // This logic needs fixing
-                                title="Benutzer löschen"
+                                disabled={userItem.id === user?.id} // Prevent self-deletion
+                                title={userItem.id === user?.id ? "Sie können sich nicht selbst löschen" : "Benutzer löschen"}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
