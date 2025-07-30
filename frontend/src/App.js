@@ -57,6 +57,25 @@ function App() {
     admin_email: ''
   });
 
+  // Edit user form
+  const [editingUser, setEditingUser] = useState(null);
+  const [editUserForm, setEditUserForm] = useState({
+    email: '',
+    name: '',
+    is_admin: false
+  });
+
+  // Edit timesheet form
+  const [editingTimesheet, setEditingTimesheet] = useState(null);
+
+  // Password change form
+  const [passwordChangeForm, setPasswordChangeForm] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
+  });
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+
   useEffect(() => {
     if (token) {
       fetchUserInfo();
