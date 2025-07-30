@@ -416,11 +416,11 @@ function App() {
     }
   };
 
-  // Helper function to get next Monday from a given date
-  const getNextMonday = (date) => {
+  // Helper function to get Monday of the current week (or next Monday if it's Sunday)
+  const getMonday = (date) => {
     const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Get Monday of current week
     return new Date(d.setDate(diff));
   };
 
@@ -433,15 +433,20 @@ function App() {
   const getAvailableMondays = () => {
     const mondays = [];
     const today = new Date();
-    let monday = getNextMonday(today);
+    const currentMonday = getMonday(today);
     
-    // Go back a few weeks to allow past entries
+    // Generate Mondays: from 4 weeks ago to 8 weeks in the future
     for (let i = -4; i <= 8; i++) {
-      const currentMonday = new Date(monday);
-      currentMonday.setDate(monday.getDate() + (i * 7));
+      const monday = new Date(currentMonday);
+      monday.setDate(currentMonday.getDate() + (i * 7));  // Add i weeks
+      
+      // Calculate correct calendar week
+      const yearStart = new Date(monday.getFullYear(), 0, 1);
+      const weekNumber = Math.ceil(((monday - yearStart) / (7 * 24 * 60 * 60 * 1000)) + 1);
+      
       mondays.push({
-        value: formatDateForInput(currentMonday),
-        label: `${currentMonday.toLocaleDateString('de-DE')} (KW ${Math.ceil(((currentMonday - new Date(currentMonday.getFullYear(), 0, 1)) / 86400000 + 1) / 7)})`
+        value: formatDateForInput(monday),
+        label: `${monday.toLocaleDateString('de-DE')} (KW ${weekNumber})`
       });
     }
     
