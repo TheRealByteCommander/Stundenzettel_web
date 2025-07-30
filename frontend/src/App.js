@@ -453,12 +453,12 @@ function App() {
     
     // Generate Mondays: from 4 weeks ago to 8 weeks in the future
     for (let i = -4; i <= 8; i++) {
-      const monday = new Date(currentMonday);
-      monday.setDate(currentMonday.getDate() + (i * 7));  // Add i weeks
+      const monday = new Date(currentMonday.getFullYear(), currentMonday.getMonth(), currentMonday.getDate() + (i * 7));
       
-      // Calculate correct calendar week
-      const yearStart = new Date(monday.getFullYear(), 0, 1);
-      const weekNumber = Math.ceil(((monday - yearStart) / (7 * 24 * 60 * 60 * 1000)) + 1);
+      // Calculate correct calendar week using ISO week calculation
+      const tempDate = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate());
+      tempDate.setDate(tempDate.getDate() + 4 - (tempDate.getDay() || 7)); // Thursday of this week
+      const weekNumber = Math.ceil((((tempDate - new Date(tempDate.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
       
       mondays.push({
         value: formatDateForInput(monday),
