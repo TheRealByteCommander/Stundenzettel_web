@@ -173,12 +173,13 @@ function App() {
   };
 
   const getWeekDates = (weekStart) => {
-    const start = new Date(weekStart);
+    // Parse date string properly to avoid timezone issues
+    const [year, month, day] = weekStart.split('-').map(Number);
+    const start = new Date(year, month - 1, day);  // month is 0-indexed
     const dates = [];
     
     for (let i = 0; i < 7; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
+      const date = new Date(year, month - 1, day + i);  // Create each date correctly
       dates.push(date.toISOString().split('T')[0]);
     }
     return dates;
