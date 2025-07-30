@@ -540,12 +540,16 @@ async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user
     week_start = datetime.strptime(timesheet_create.week_start, "%Y-%m-%d")
     week_end = week_start + timedelta(days=6)
     
+    # Filter out entries without work times (optional - allow empty entries for flexibility)
+    # valid_entries = [entry for entry in timesheet_create.entries if entry.start_time and entry.end_time]
+    # Or keep all entries as they might have tasks/notes even without times
+    
     timesheet = WeeklyTimesheet(
         user_id=current_user.id,
         user_name=current_user.name,
         week_start=timesheet_create.week_start,
         week_end=week_end.strftime("%Y-%m-%d"),
-        entries=timesheet_create.entries
+        entries=timesheet_create.entries  # Keep all entries, let PDF handle empty times
     )
     
     await db.timesheets.insert_one(timesheet.dict())
