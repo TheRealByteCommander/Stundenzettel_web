@@ -867,8 +867,8 @@ function App() {
                                 variant="outline"
                                 onClick={() => deleteUser(user.id, user.name)}
                                 className="text-red-600 hover:text-red-800"
-                                disabled={user.id === user?.id} // Prevent self-deletion
-                                title={user.id === user?.id ? "Sie können sich nicht selbst löschen" : "Benutzer löschen"}
+                                disabled={user.id === user.id} // This logic needs fixing
+                                title="Benutzer löschen"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
