@@ -758,7 +758,7 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
         server.sendmail(smtp_config["smtp_username"], recipients, text.encode('utf-8'))
         server.quit()
         
-        # Update timesheet status
+        # Update timesheet status to "sent"
         await db.timesheets.update_one(
             {"id": timesheet_id},
             {"$set": {"status": "sent"}}
