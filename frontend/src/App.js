@@ -496,6 +496,14 @@ function App() {
                   <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
                 )}
               </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowPasswordDialog(true)}
+              >
+                <Key className="h-4 w-4 mr-1" />
+                Passwort
+              </Button>
               <Button variant="outline" onClick={handleLogout}>
                 Abmelden
               </Button>
