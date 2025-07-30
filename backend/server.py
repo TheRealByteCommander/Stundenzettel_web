@@ -366,6 +366,80 @@ async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_
         }
     )
 
+@api_router.post("/timesheets/{timesheet_id}/download-and-email")
+async def download_and_email_timesheet(timesheet_id: str, current_user: User = Depends(get_current_user)):
+    """Download PDF and automatically send copy to admin"""
+    # Get timesheet
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    
+    # Check permissions
+    if not current_user.is_admin and timesheet["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    timesheet_obj = WeeklyTimesheet(**timesheet)
+    pdf_bytes = generate_timesheet_pdf(timesheet_obj)
+    
+    # Send email copy to admin (if SMTP configured)
+    try:
+        smtp_config = await db.smtp_config.find_one()
+        if smtp_config:
+            # Send email with PDF attachment
+            msg = MIMEMultipart()
+            msg['From'] = smtp_config["smtp_username"]
+            msg['To'] = current_user.email
+            msg['Cc'] = smtp_config["admin_email"]
+            msg['Subject'] = f"Stundenzettel Download - {timesheet_obj.user_name} - Woche {timesheet_obj.week_start}"
+            
+            body = f"""
+            Hallo {current_user.name},
+            
+            Sie haben den Stundenzettel für die Woche vom {timesheet_obj.week_start} bis {timesheet_obj.week_end} heruntergeladen.
+            Eine Kopie wurde automatisch an die Admin-Adresse gesendet.
+            
+            Mit freundlichen Grüßen
+            {COMPANY_INFO["name"]}
+            """
+            
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            
+            # Attach PDF
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(pdf_bytes)
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf'
+            )
+            msg.attach(part)
+            
+            # Send email
+            server = smtplib.SMTP(smtp_config["smtp_server"], smtp_config["smtp_port"])
+            server.starttls()
+            server.login(smtp_config["smtp_username"], smtp_config["smtp_password"])
+            
+            recipients = [current_user.email, smtp_config["admin_email"]]
+            text = msg.as_string()
+            server.sendmail(smtp_config["smtp_username"], recipients, text.encode('utf-8'))
+            server.quit()
+            
+            print(f"Email sent successfully to {recipients}")
+    
+    except Exception as e:
+        print(f"Email sending failed (continuing with download): {str(e)}")
+        # Continue with download even if email fails
+    
+    # Return PDF for download
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf"
+        }
+    )
+
 @api_router.post("/timesheets/{timesheet_id}/send-email")
 async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(get_current_user)):
     # Get timesheet
