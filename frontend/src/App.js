@@ -738,6 +738,7 @@ function App() {
                               value={entry.break_minutes}
                               onChange={(e) => updateEntry(index, 'break_minutes', parseInt(e.target.value) || 0)}
                               min="0"
+                              placeholder="0"
                             />
                           </div>
                           
