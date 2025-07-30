@@ -379,6 +379,65 @@ async def get_users(current_user: User = Depends(get_admin_user)):
     users = await db.users.find().to_list(1000)
     return [{"id": user["id"], "email": user["email"], "name": user["name"], "is_admin": user["is_admin"]} for user in users]
 
+@api_router.put("/users/{user_id}")
+async def update_user(user_id: str, user_update: UserUpdate, current_user: User = Depends(get_admin_user)):
+    # Find user
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prepare update data
+    update_data = {}
+    if user_update.email:
+        # Check if email already exists (except for current user)
+        existing_user = await db.users.find_one({"email": user_update.email, "id": {"$ne": user_id}})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        update_data["email"] = user_update.email
+    
+    if user_update.name:
+        update_data["name"] = user_update.name
+    
+    if user_update.is_admin is not None:
+        update_data["is_admin"] = user_update.is_admin
+    
+    if update_data:
+        await db.users.update_one({"id": user_id}, {"$set": update_data})
+    
+    return {"message": "User updated successfully"}
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: User = Depends(get_admin_user)):
+    # Prevent self-deletion
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    # Find user
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Delete user and their timesheets
+    await db.users.delete_one({"id": user_id})
+    await db.timesheets.delete_many({"user_id": user_id})
+    
+    return {"message": "User and associated timesheets deleted successfully"}
+
+@api_router.post("/auth/change-password")
+async def change_password(password_change: PasswordChange, current_user: User = Depends(get_current_user)):
+    # Verify current password
+    if not verify_password(password_change.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    new_hashed_password = get_password_hash(password_change.new_password)
+    await db.users.update_one(
+        {"id": current_user.id}, 
+        {"$set": {"hashed_password": new_hashed_password}}
+    )
+    
+    return {"message": "Password changed successfully"}
+
 @api_router.post("/timesheets", response_model=WeeklyTimesheet)
 async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user: User = Depends(get_current_user)):
     # Calculate week end (Sunday)
