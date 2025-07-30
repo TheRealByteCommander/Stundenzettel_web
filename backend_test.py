@@ -488,9 +488,11 @@ def main():
     
     tester = SchmitzTimesheetAPITester()
     
-    # Test sequence
+    # Test sequence - focusing on Monday date bug and deletion functionality
     tests = [
         ("Admin Login", tester.test_login),
+        ("Monday Date Bug Fix", tester.test_monday_date_bug),
+        ("Deletion Functionality", tester.test_deletion_functionality),
         ("Get Users List", tester.test_get_users),
         ("Create New User", tester.test_create_user),
         ("Create Weekly Timesheet", tester.test_create_timesheet),
