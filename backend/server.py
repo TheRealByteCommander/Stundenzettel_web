@@ -465,6 +465,51 @@ async def get_timesheets(current_user: User = Depends(get_current_user)):
     
     return [WeeklyTimesheet(**timesheet) for timesheet in timesheets]
 
+@api_router.put("/timesheets/{timesheet_id}")
+async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate, current_user: User = Depends(get_current_user)):
+    # Find timesheet
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    
+    # Check permissions (admin can edit any, user can edit their own)
+    if not current_user.is_admin and timesheet["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Prepare update data
+    update_data = {}
+    if timesheet_update.week_start:
+        # Calculate new week end
+        from datetime import datetime, timedelta
+        week_start = datetime.strptime(timesheet_update.week_start, "%Y-%m-%d")
+        week_end = week_start + timedelta(days=6)
+        update_data["week_start"] = timesheet_update.week_start
+        update_data["week_end"] = week_end.strftime("%Y-%m-%d")
+    
+    if timesheet_update.entries is not None:
+        update_data["entries"] = [entry.dict() for entry in timesheet_update.entries]
+    
+    if update_data:
+        await db.timesheets.update_one({"id": timesheet_id}, {"$set": update_data})
+    
+    return {"message": "Timesheet updated successfully"}
+
+@api_router.delete("/timesheets/{timesheet_id}")
+async def delete_timesheet(timesheet_id: str, current_user: User = Depends(get_current_user)):
+    # Find timesheet
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    
+    # Check permissions (admin can delete any, user can delete their own)
+    if not current_user.is_admin and timesheet["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Delete timesheet
+    await db.timesheets.delete_one({"id": timesheet_id})
+    
+    return {"message": "Timesheet deleted successfully"}
+
 @api_router.get("/timesheets/{timesheet_id}/pdf")
 async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_current_user)):
     timesheet = await db.timesheets.find_one({"id": timesheet_id})
