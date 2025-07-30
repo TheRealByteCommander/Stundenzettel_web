@@ -188,9 +188,9 @@ function App() {
     const dates = getWeekDates(weekStart);
     const entries = dates.map(date => ({
       date,
-      start_time: '08:00',
-      end_time: '17:00',
-      break_minutes: 30,
+      start_time: '',       // Leer als Default
+      end_time: '',         // Leer als Default
+      break_minutes: 0,     // 0 als Default
       tasks: '',
       customer_project: '',
       location: ''
