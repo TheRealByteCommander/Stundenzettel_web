@@ -452,8 +452,8 @@ async def get_smtp_config(current_user: User = Depends(get_admin_user)):
     if not config:
         return None
     
-    # Don't return password
-    config_safe = {k: v for k, v in config.items() if k != "smtp_password"}
+    # Don't return password and remove MongoDB ObjectId
+    config_safe = {k: v for k, v in config.items() if k not in ["smtp_password", "_id"]}
     return config_safe
 
 # Initialize admin user on startup
