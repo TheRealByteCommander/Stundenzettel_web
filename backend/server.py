@@ -130,6 +130,54 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def get_calendar_week(date_str: str) -> str:
+    """Get calendar week from date string (YYYY-MM-DD)"""
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    year, week, _ = date_obj.isocalendar()
+    return f"KW{week:02d}"
+
+def sanitize_filename(name: str) -> str:
+    """Sanitize name for filename usage"""
+    # Replace spaces with underscores and remove special characters
+    sanitized = re.sub(r'[^\w\-_.]', '_', name)
+    # Remove multiple underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    return sanitized
+
+async def generate_pdf_filename(timesheet: WeeklyTimesheet, user_name: str) -> str:
+    """Generate PDF filename: [Mitarbeiter_Name]_[Kalenderwoche]_[fortlaufende Nummer]"""
+    # Sanitize user name
+    clean_name = sanitize_filename(user_name)
+    
+    # Get calendar week
+    calendar_week = get_calendar_week(timesheet.week_start)
+    
+    # Find sequential number for this user and calendar week
+    week_start_date = datetime.strptime(timesheet.week_start, "%Y-%m-%d")
+    year = week_start_date.year
+    
+    # Count existing timesheets for this user in the same calendar week
+    existing_timesheets = await db.timesheets.find({
+        "user_id": timesheet.user_id,
+        "created_at": {
+            "$gte": datetime(year, 1, 1),
+            "$lt": datetime(year + 1, 1, 1)
+        }
+    }).to_list(1000)
+    
+    # Filter by same calendar week
+    same_week_count = 0
+    for existing in existing_timesheets:
+        existing_week = get_calendar_week(existing["week_start"])
+        if existing_week == calendar_week:
+            same_week_count += 1
+    
+    # Sequential number (current timesheet is included in count)
+    sequential_number = f"{same_week_count:03d}"
+    
+    filename = f"{clean_name}_{calendar_week}_{sequential_number}.pdf"
+    return filename
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
