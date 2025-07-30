@@ -374,6 +374,7 @@ class SchmitzTimesheetAPITester:
                 print("   ✅ Correctly prevented admin self-deletion")
             else:
                 print("   ❌ ERROR: Admin was able to delete own account")
+                print(f"   Response: {response_delete_admin}")
                 all_passed = False
         
         return all_passed
