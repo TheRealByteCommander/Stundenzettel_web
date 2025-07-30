@@ -310,6 +310,102 @@ function App() {
     }
   };
 
+  const editUser = (user) => {
+    setEditingUser(user);
+    setEditUserForm({
+      email: user.email,
+      name: user.name,
+      is_admin: user.is_admin
+    });
+  };
+
+  const updateUser = async () => {
+    setLoading(true);
+    try {
+      await axios.put(`${API}/users/${editingUser.id}`, editUserForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Benutzer erfolgreich aktualisiert!');
+      setEditingUser(null);
+      fetchUsers();
+    } catch (error) {
+      setError('Fehler beim Aktualisieren des Benutzers.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUser = async (userId, userName) => {
+    if (!confirm(`Möchten Sie den Benutzer "${userName}" wirklich löschen?`)) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await axios.delete(`${API}/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Benutzer erfolgreich gelöscht!');
+      fetchUsers();
+    } catch (error) {
+      setError('Fehler beim Löschen des Benutzers.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteTimesheet = async (timesheetId, userName, weekStart) => {
+    if (!confirm(`Möchten Sie den Stundenzettel von "${userName}" für die Woche ${weekStart} wirklich löschen?`)) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await axios.delete(`${API}/timesheets/${timesheetId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Stundenzettel erfolgreich gelöscht!');
+      fetchTimesheets();
+    } catch (error) {
+      setError('Fehler beim Löschen des Stundenzettels.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (passwordChangeForm.new_password !== passwordChangeForm.confirm_password) {
+      setError('Die neuen Passwörter stimmen nicht überein.');
+      return;
+    }
+
+    if (passwordChangeForm.new_password.length < 6) {
+      setError('Das neue Passwort muss mindestens 6 Zeichen lang sein.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/change-password`, {
+        current_password: passwordChangeForm.current_password,
+        new_password: passwordChangeForm.new_password
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Passwort erfolgreich geändert!');
+      setShowPasswordDialog(false);
+      setPasswordChangeForm({
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
+      });
+    } catch (error) {
+      setError('Fehler beim Ändern des Passworts. Überprüfen Sie Ihr aktuelles Passwort.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getDayName = (dateStr) => {
     const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
     const date = new Date(dateStr);
