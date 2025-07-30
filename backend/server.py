@@ -304,22 +304,32 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
             
             if date_str in entries_by_date:
                 entry = entries_by_date[date_str]
-                start_row.append(entry.start_time)
-                end_row.append(entry.end_time)
-                pause_row.append(f"{entry.break_minutes}'")
-                # Truncate long task descriptions
+                
+                # Nur Zeiten anzeigen und berechnen, wenn sie eingetragen wurden
+                if entry.start_time and entry.end_time:
+                    start_row.append(entry.start_time)
+                    end_row.append(entry.end_time)
+                    pause_row.append(f"{entry.break_minutes}'")
+                    
+                    # Nur bei eingetragenen Zeiten berechnen
+                    start_parts = entry.start_time.split(':')
+                    end_parts = entry.end_time.split(':')
+                    start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
+                    end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
+                    worked_minutes = end_minutes - start_minutes - entry.break_minutes
+                    daily_hours = worked_minutes / 60
+                    total_hours += daily_hours
+                    hours_row.append(f"{daily_hours:.1f}")
+                else:
+                    # Leere Felder wenn keine Zeiten eingetragen
+                    start_row.append("")
+                    end_row.append("")
+                    pause_row.append("")
+                    hours_row.append("")
+                
+                # Aufgaben immer anzeigen (auch wenn keine Zeiten)
                 task_short = entry.tasks[:12] + "..." if len(entry.tasks) > 12 else entry.tasks
                 tasks_row.append(task_short)
-                
-                # Calculate daily hours
-                start_parts = entry.start_time.split(':')
-                end_parts = entry.end_time.split(':')
-                start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
-                end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
-                worked_minutes = end_minutes - start_minutes - entry.break_minutes
-                daily_hours = worked_minutes / 60
-                total_hours += daily_hours
-                hours_row.append(f"{daily_hours:.1f}")
             else:
                 start_row.append("")
                 end_row.append("")
