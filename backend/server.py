@@ -283,12 +283,21 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
         
         # Header row
         headers = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-        dates_row = []
-        start_times_row = ["Stunden", "", "", "", "", "", ""]
-        end_times_row = ["", "", "", "", "", "", ""]
-        pause_row = ["Pause", "", "", "", "", "", ""]
-        tasks_row = ["Beschäftigung", "", "", "", "", "", ""]
-        hours_row = ["Arbeitszeit", "", "", "", "", "", ""]
+        dates_row = ["Datum"]
+        start_times_row = ["Stunden"]
+        end_times_row = [""]
+        pause_row = ["Pause"]
+        tasks_row = ["Beschäftigung"]
+        hours_row = ["Arbeitszeit"]
+        
+        # Initialize arrays with proper length
+        for i in range(7):
+            dates_row.append("")
+            start_times_row.append("")
+            end_times_row.append("")
+            pause_row.append("")
+            tasks_row.append("")
+            hours_row.append("")
         
         # Fill data for each day
         entries_by_date = {entry.date: entry for entry in timesheet.entries}
@@ -302,7 +311,7 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
             date_str = current_date.strftime("%Y-%m-%d")
             display_date = current_date.strftime("%d.%m.%Y")
             
-            dates_row.append(display_date)
+            dates_row[i+1] = display_date
             
             if date_str in entries_by_date:
                 entry = entries_by_date[date_str]
@@ -320,12 +329,6 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
                 daily_hours = worked_minutes / 60
                 total_hours += daily_hours
                 hours_row[i+1] = f"{daily_hours:.2f}"
-            else:
-                start_times_row[i+1] = ""
-                end_times_row[i+1] = ""
-                pause_row[i+1] = ""
-                tasks_row[i+1] = ""
-                hours_row[i+1] = ""
         
         # Build table
         table_data = [
