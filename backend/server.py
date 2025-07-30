@@ -535,13 +535,14 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
         
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         
-        # Attach PDF
+        # Attach PDF with new filename
+        filename = await generate_pdf_filename(timesheet_obj, timesheet_obj.user_name)
         part = MIMEBase('application', 'octet-stream')
         part.set_payload(pdf_bytes)
         encoders.encode_base64(part)
         part.add_header(
             'Content-Disposition',
-            f'attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf'
+            f'attachment; filename={filename}'
         )
         msg.attach(part)
         
