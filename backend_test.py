@@ -160,6 +160,221 @@ class SchmitzTimesheetAPITester:
         
         return success
 
+    def test_monday_date_bug(self):
+        """Test Monday date calculation bug - specifically July 7, 2025"""
+        print("\n🔍 Testing Monday Date Bug Fix...")
+        
+        # Test July 7, 2025 (Monday) - the specific date mentioned in the bug report
+        test_cases = [
+            ("2025-07-07", "2025-07-13"),  # July 7, 2025 Monday -> July 13, 2025 Sunday
+            ("2025-01-06", "2025-01-12"),  # January 6, 2025 Monday -> January 12, 2025 Sunday
+            ("2025-12-01", "2025-12-07"),  # December 1, 2025 Monday -> December 7, 2025 Sunday
+        ]
+        
+        all_passed = True
+        
+        for week_start, expected_week_end in test_cases:
+            print(f"\n   Testing Monday: {week_start} -> Expected Sunday: {expected_week_end}")
+            
+            # Create entries for the week
+            entries = []
+            start_date = datetime.strptime(week_start, "%Y-%m-%d")
+            for i in range(3):  # Monday, Tuesday, Wednesday
+                date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+                entries.append({
+                    "date": date,
+                    "start_time": "09:00",
+                    "end_time": "17:30",
+                    "break_minutes": 45,
+                    "tasks": "Intralogistik Planung",
+                    "customer_project": "Projekt Beta",
+                    "location": "Machern Hauptlager"
+                })
+            
+            timesheet_data = {
+                "week_start": week_start,
+                "entries": entries
+            }
+            
+            success, response = self.run_test(
+                f"Create Timesheet for Monday {week_start}",
+                "POST",
+                "timesheets",
+                200,
+                data=timesheet_data
+            )
+            
+            if success:
+                actual_week_start = response.get('week_start')
+                actual_week_end = response.get('week_end')
+                
+                if actual_week_start == week_start and actual_week_end == expected_week_end:
+                    print(f"   ✅ Correct: week_start={actual_week_start}, week_end={actual_week_end}")
+                else:
+                    print(f"   ❌ FAILED: Expected week_start={week_start}, week_end={expected_week_end}")
+                    print(f"              Got week_start={actual_week_start}, week_end={actual_week_end}")
+                    all_passed = False
+                
+                # Store the July 7, 2025 timesheet ID for deletion tests
+                if week_start == "2025-07-07":
+                    self.july_timesheet_id = response.get('id')
+            else:
+                all_passed = False
+        
+        return all_passed
+
+    def test_deletion_functionality(self):
+        """Test deletion functionality for timesheets and users"""
+        print("\n🔍 Testing Deletion Functionality...")
+        
+        all_passed = True
+        
+        # Test 1: Delete draft timesheet (should succeed)
+        if hasattr(self, 'july_timesheet_id') and self.july_timesheet_id:
+            print(f"\n   Testing deletion of draft timesheet: {self.july_timesheet_id}")
+            
+            success, response = self.run_test(
+                "Delete Draft Timesheet",
+                "DELETE",
+                f"timesheets/{self.july_timesheet_id}",
+                200
+            )
+            
+            if success:
+                print("   ✅ Draft timesheet deleted successfully")
+            else:
+                print("   ❌ Failed to delete draft timesheet")
+                all_passed = False
+        
+        # Test 2: Create a timesheet and mark it as sent, then try to delete (should fail)
+        # First create a new timesheet
+        week_start = "2025-07-14"  # Next Monday after July 7
+        entries = [{
+            "date": "2025-07-14",
+            "start_time": "08:00",
+            "end_time": "16:00",
+            "break_minutes": 30,
+            "tasks": "Test task",
+            "customer_project": "Test project",
+            "location": "Test location"
+        }]
+        
+        timesheet_data = {
+            "week_start": week_start,
+            "entries": entries
+        }
+        
+        success, response = self.run_test(
+            "Create Timesheet for Sent Status Test",
+            "POST",
+            "timesheets",
+            200,
+            data=timesheet_data
+        )
+        
+        if success:
+            sent_timesheet_id = response.get('id')
+            
+            # Try to send email to mark as sent (this will mark status as "sent")
+            print(f"\n   Attempting to mark timesheet {sent_timesheet_id} as sent...")
+            
+            # This will likely fail due to SMTP config, but should still mark as sent
+            self.run_test(
+                "Mark Timesheet as Sent",
+                "POST",
+                f"timesheets/{sent_timesheet_id}/send-email",
+                500  # Expected to fail due to SMTP, but status should be updated
+            )
+            
+            # Now try to delete the sent timesheet (should fail)
+            print(f"\n   Testing deletion of sent timesheet: {sent_timesheet_id}")
+            
+            success_delete, response_delete = self.run_test(
+                "Delete Sent Timesheet (Should Fail)",
+                "DELETE",
+                f"timesheets/{sent_timesheet_id}",
+                400  # Should fail with 400 status
+            )
+            
+            if not success_delete:
+                print("   ✅ Correctly prevented deletion of sent timesheet")
+            else:
+                print("   ❌ ERROR: Sent timesheet was deleted (should not be allowed)")
+                all_passed = False
+        
+        # Test 3: Test user deletion functionality
+        print(f"\n   Testing user deletion functionality...")
+        
+        # First create a test user to delete
+        test_user_data = {
+            "email": f"delete_test_{datetime.now().strftime('%H%M%S')}@schmitz-intralogistik.de",
+            "name": "Delete Test User",
+            "password": "DeleteTest123!",
+            "is_admin": False
+        }
+        
+        success, response = self.run_test(
+            "Create User for Deletion Test",
+            "POST",
+            "auth/register",
+            200,
+            data=test_user_data
+        )
+        
+        if success:
+            # Get the user ID by fetching users list
+            success_users, users_response = self.run_test(
+                "Get Users for Deletion Test",
+                "GET",
+                "users",
+                200
+            )
+            
+            if success_users:
+                # Find the test user
+                test_user_id = None
+                for user in users_response:
+                    if user.get('email') == test_user_data['email']:
+                        test_user_id = user.get('id')
+                        break
+                
+                if test_user_id:
+                    # Try to delete the test user
+                    success_delete_user, response_delete_user = self.run_test(
+                        "Delete Test User",
+                        "DELETE",
+                        f"users/{test_user_id}",
+                        200
+                    )
+                    
+                    if success_delete_user:
+                        print("   ✅ Test user deleted successfully")
+                    else:
+                        print("   ❌ Failed to delete test user")
+                        all_passed = False
+        
+        # Test 4: Try to delete admin user (should fail - cannot delete last admin)
+        print(f"\n   Testing admin user deletion protection...")
+        
+        # Get current admin user ID
+        if self.user_info and self.user_info.get('id'):
+            admin_id = self.user_info.get('id')
+            
+            success_delete_admin, response_delete_admin = self.run_test(
+                "Delete Admin User (Should Fail)",
+                "DELETE",
+                f"users/{admin_id}",
+                400  # Should fail - cannot delete own account
+            )
+            
+            if not success_delete_admin:
+                print("   ✅ Correctly prevented admin self-deletion")
+            else:
+                print("   ❌ ERROR: Admin was able to delete own account")
+                all_passed = False
+        
+        return all_passed
+
     def test_get_timesheets(self):
         """Test getting timesheets list"""
         success, response = self.run_test(
