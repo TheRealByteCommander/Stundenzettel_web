@@ -406,12 +406,15 @@ async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_
     timesheet_obj = WeeklyTimesheet(**timesheet)
     pdf_bytes = generate_timesheet_pdf(timesheet_obj)
     
+    # Generate new filename format
+    filename = await generate_pdf_filename(timesheet_obj, timesheet_obj.user_name)
+    
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf"
+            "Content-Disposition": f"attachment; filename={filename}"
         }
     )
 
