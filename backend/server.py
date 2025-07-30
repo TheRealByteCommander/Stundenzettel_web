@@ -684,6 +684,12 @@ async def download_and_email_timesheet(timesheet_id: str, current_user: User = D
             server.quit()
             
             print(f"Email sent successfully to {recipients}")
+            
+            # Update timesheet status to "sent" after successful email
+            await db.timesheets.update_one(
+                {"id": timesheet_id},
+                {"$set": {"status": "sent"}}
+            )
     
     except Exception as e:
         print(f"Email sending failed (continuing with download): {str(e)}")
