@@ -371,9 +371,13 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Stundenzettel erfolgreich gelöscht!');
-      fetchTimesheets();
+      fetchTimesheets(); // Refresh timesheet list immediately
     } catch (error) {
-      setError('Fehler beim Löschen des Stundenzettels.');
+      if (error.response?.data?.detail) {
+        setError(error.response.data.detail);
+      } else {
+        setError('Fehler beim Löschen des Stundenzettels.');
+      }
     } finally {
       setLoading(false);
     }
