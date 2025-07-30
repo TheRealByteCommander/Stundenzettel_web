@@ -74,6 +74,15 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    is_admin: Optional[bool] = None
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
 class TimeEntry(BaseModel):
     date: str  # YYYY-MM-DD format
     start_time: str  # HH:MM format
