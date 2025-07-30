@@ -273,6 +273,7 @@ function App() {
       link.remove();
       
       setSuccess('PDF heruntergeladen und Kopie an Admin gesendet!');
+      fetchTimesheets(); // Refresh to show updated status
     } catch (error) {
       setError('Fehler beim Herunterladen des PDFs.');
     } finally {
