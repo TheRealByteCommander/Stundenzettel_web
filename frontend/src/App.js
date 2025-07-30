@@ -878,6 +878,113 @@ function App() {
           )}
         </Tabs>
       </main>
+
+      {/* Password Change Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Passwort ändern</DialogTitle>
+            <DialogDescription>
+              Geben Sie Ihr aktuelles und neues Passwort ein.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Aktuelles Passwort</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={passwordChangeForm.current_password}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, current_password: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Neues Passwort</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordChangeForm.new_password}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, new_password: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Neues Passwort bestätigen</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordChangeForm.confirm_password}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirm_password: e.target.value })}
+              />
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                onClick={changePassword}
+                disabled={loading}
+                style={{ backgroundColor: colors.primary }}
+              >
+                {loading ? 'Ändere...' : 'Passwort ändern'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                Abbrechen
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      {editingUser && (
+        <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Benutzer bearbeiten</DialogTitle>
+              <DialogDescription>
+                Bearbeiten Sie die Benutzerdaten von {editingUser.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">E-Mail</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name</Label>
+                <Input
+                  id="edit-name"
+                  value={editUserForm.name}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="edit-is-admin"
+                  checked={editUserForm.is_admin}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, is_admin: e.target.checked })}
+                />
+                <Label htmlFor="edit-is-admin">Administrator</Label>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  onClick={updateUser}
+                  disabled={loading}
+                  style={{ backgroundColor: colors.primary }}
+                >
+                  {loading ? 'Speichere...' : 'Speichern'}
+                </Button>
+                <Button variant="outline" onClick={() => setEditingUser(null)}>
+                  Abbrechen
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
