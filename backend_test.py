@@ -302,6 +302,7 @@ class SchmitzTimesheetAPITester:
                 print("   ✅ Correctly prevented deletion of sent timesheet")
             else:
                 print("   ❌ ERROR: Sent timesheet was deleted (should not be allowed)")
+                print(f"   Response: {response_delete}")
                 all_passed = False
         
         # Test 3: Test user deletion functionality
