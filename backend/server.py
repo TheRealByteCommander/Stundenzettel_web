@@ -487,10 +487,20 @@ async def delete_user(user_id: str, current_user: User = Depends(get_admin_user)
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
     
-    # Find user
+    # Find user to delete
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if this is an admin user
+    if user["is_admin"]:
+        # Count total number of admin users
+        admin_count = await db.users.count_documents({"is_admin": True})
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot delete the last admin user. At least one admin must remain in the system."
+            )
     
     # Delete user and their timesheets
     await db.users.delete_one({"id": user_id})
