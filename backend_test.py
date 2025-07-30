@@ -298,10 +298,12 @@ class SchmitzTimesheetAPITester:
                 400  # Should fail with 400 status
             )
             
-            if not success_delete:
+            # The test should FAIL (success_delete should be False) because we expect 400 status
+            # But our run_test method returns True when we get the expected status code
+            if success_delete:  # This means we got the expected 400 status
                 print("   ✅ Correctly prevented deletion of sent timesheet")
             else:
-                print("   ❌ ERROR: Sent timesheet was deleted (should not be allowed)")
+                print("   ❌ ERROR: Expected 400 status but got different response")
                 print(f"   Response: {response_delete}")
                 all_passed = False
         
