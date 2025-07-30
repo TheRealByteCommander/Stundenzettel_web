@@ -230,7 +230,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Stundenzettel wurde erfolgreich per E-Mail versendet!');
-      fetchTimesheets();
+      fetchTimesheets(); // Refresh to show updated status
     } catch (error) {
       setError('Fehler beim Senden der E-Mail. Bitte überprüfen Sie die SMTP-Konfiguration.');
     } finally {
