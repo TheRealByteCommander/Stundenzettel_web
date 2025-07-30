@@ -471,7 +471,9 @@ function App() {
 
   const getDayName = (dateStr) => {
     const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-    const date = new Date(dateStr);
+    // Parse date string properly to avoid timezone issues
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);  // month is 0-indexed
     return days[date.getDay()];
   };
 
