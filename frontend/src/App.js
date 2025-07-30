@@ -10,7 +10,7 @@ import { Textarea } from './components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
 import { Badge } from './components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table';
-import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
 import './App.css';
 
