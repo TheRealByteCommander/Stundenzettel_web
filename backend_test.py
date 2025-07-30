@@ -372,10 +372,11 @@ class SchmitzTimesheetAPITester:
                 400  # Should fail - cannot delete own account
             )
             
-            if not success_delete_admin:
+            # The test should return True because we expect 400 status
+            if success_delete_admin:  # This means we got the expected 400 status
                 print("   ✅ Correctly prevented admin self-deletion")
             else:
-                print("   ❌ ERROR: Admin was able to delete own account")
+                print("   ❌ ERROR: Expected 400 status but got different response")
                 print(f"   Response: {response_delete_admin}")
                 all_passed = False
         
