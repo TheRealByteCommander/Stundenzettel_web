@@ -107,11 +107,11 @@ user_problem_statement: "User reported two critical bugs: 1) Monday Bug - When s
 backend:
   - task: "Fix Monday date calculation bug in timesheet creation"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: false
           agent: "main"
@@ -119,18 +119,24 @@ backend:
         - working: "NA"
           agent: "main"
           comment: "Fixed frontend date calculation functions to avoid timezone issues. Need to test backend timesheet creation with corrected dates."
+        - working: true
+          agent: "testing"
+          comment: "COMPREHENSIVE TESTING COMPLETED: ✅ Monday date calculation is working correctly. Tested July 7, 2025 (2025-07-07 -> 2025-07-13), January 6, 2025 (2025-01-06 -> 2025-01-12), December 1, 2025 (2025-12-01 -> 2025-12-07). All edge cases including cross-month boundaries (June 30->July 6, March 31->April 6, Dec 29 2025->Jan 4 2026, Feb 24->March 2) passed. Backend correctly calculates week_end as Monday + 6 days (Sunday)."
   
   - task: "Verify deletion functions work correctly"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Backend deletion logic appears correct with proper validation, need to test functionality"
+        - working: true
+          agent: "testing"
+          comment: "DELETION FUNCTIONALITY VERIFIED: ✅ Draft timesheet deletion works correctly (200 status). ✅ Sent timesheet deletion properly blocked with 400 status and error message 'Cannot delete timesheet that has been sent. Only draft timesheets can be deleted.' ✅ User deletion works for non-admin users. ✅ Admin self-deletion correctly prevented with 400 status. ✅ Authentication properly enforced (403 for unauthenticated, 401 for invalid token)."
 
 frontend:
   - task: "Fix Monday date calculation in getMonday function"
