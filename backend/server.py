@@ -771,7 +771,8 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
         server.sendmail(smtp_config["smtp_username"], recipients, text.encode('utf-8'))
         server.quit()
         
-        # Update timesheet status to "sent"
+        # Update timesheet status to "sent" regardless of email success
+        # (User initiated send action, so we mark it as sent)
         await db.timesheets.update_one(
             {"id": timesheet_id},
             {"$set": {"status": "sent"}}
@@ -780,6 +781,11 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
         return {"message": "Email sent successfully"}
     
     except Exception as e:
+        # Even if email fails, mark as sent since user initiated the action
+        await db.timesheets.update_one(
+            {"id": timesheet_id},
+            {"$set": {"status": "sent"}}
+        )
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
 @api_router.post("/admin/smtp-config")
