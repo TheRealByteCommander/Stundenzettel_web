@@ -433,6 +433,9 @@ async def download_and_email_timesheet(timesheet_id: str, current_user: User = D
     timesheet_obj = WeeklyTimesheet(**timesheet)
     pdf_bytes = generate_timesheet_pdf(timesheet_obj)
     
+    # Generate new filename format
+    filename = await generate_pdf_filename(timesheet_obj, timesheet_obj.user_name)
+    
     # Send email copy to admin (if SMTP configured)
     try:
         smtp_config = await db.smtp_config.find_one()
@@ -442,7 +445,7 @@ async def download_and_email_timesheet(timesheet_id: str, current_user: User = D
             msg['From'] = smtp_config["smtp_username"]
             msg['To'] = current_user.email
             msg['Cc'] = smtp_config["admin_email"]
-            msg['Subject'] = f"Stundenzettel Download - {timesheet_obj.user_name} - Woche {timesheet_obj.week_start}"
+            msg['Subject'] = f"Stundenzettel Download - {timesheet_obj.user_name} - {get_calendar_week(timesheet_obj.week_start)}"
             
             body = f"""
             Hallo {current_user.name},
@@ -450,19 +453,21 @@ async def download_and_email_timesheet(timesheet_id: str, current_user: User = D
             Sie haben den Stundenzettel für die Woche vom {timesheet_obj.week_start} bis {timesheet_obj.week_end} heruntergeladen.
             Eine Kopie wurde automatisch an die Admin-Adresse gesendet.
             
+            Dateiname: {filename}
+            
             Mit freundlichen Grüßen
             {COMPANY_INFO["name"]}
             """
             
             msg.attach(MIMEText(body, 'plain', 'utf-8'))
             
-            # Attach PDF
+            # Attach PDF with new filename
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(pdf_bytes)
             encoders.encode_base64(part)
             part.add_header(
                 'Content-Disposition',
-                f'attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf'
+                f'attachment; filename={filename}'
             )
             msg.attach(part)
             
@@ -482,13 +487,13 @@ async def download_and_email_timesheet(timesheet_id: str, current_user: User = D
         print(f"Email sending failed (continuing with download): {str(e)}")
         # Continue with download even if email fails
     
-    # Return PDF for download
+    # Return PDF for download with new filename
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename=Stundenzettel_{timesheet_obj.user_name}_{timesheet_obj.week_start}.pdf"
+            "Content-Disposition": f"attachment; filename={filename}"
         }
     )
 
