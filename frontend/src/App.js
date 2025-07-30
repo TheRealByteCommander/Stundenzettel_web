@@ -794,11 +794,33 @@ function App() {
                       </h4>
                       <div className="space-y-2">
                         {users.map((user) => (
-                          <div key={user.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                            <span>{user.name} ({user.email})</span>
-                            {user.is_admin && (
-                              <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
-                            )}
+                          <div key={user.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border">
+                            <div>
+                              <span className="font-medium">{user.name}</span>
+                              <br />
+                              <span className="text-sm text-gray-500">{user.email}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {user.is_admin && (
+                                <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => editUser(user)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteUser(user.id, user.name)}
+                                className="text-red-600 hover:text-red-800"
+                                disabled={user.id === user?.id} // Prevent self-deletion
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
