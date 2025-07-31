@@ -1,9 +1,9 @@
 <?php
 class Database {
     private $host = 'localhost';
-    private $database = 'schmitz_timesheet';
-    private $username = 'root';
-    private $password = '';
+    private $database = 'd04464c7';
+    private $username = 'd04464c7';
+    private $password = 'mAh4Raeder!';
     private $conn;
 
     public function getConnection() {
@@ -26,17 +26,7 @@ class Database {
 
     public function initializeDatabase() {
         try {
-            // Create database if it doesn't exist
-            $conn = new PDO(
-                "mysql:host=" . $this->host . ";charset=utf8",
-                $this->username,
-                $this->password
-            );
-            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            
-            $conn->exec("CREATE DATABASE IF NOT EXISTS " . $this->database . " CHARACTER SET utf8 COLLATE utf8_general_ci");
-            
-            // Now connect to the specific database
+            // Connect to the specific database
             $this->conn = $this->getConnection();
             
             // Create tables
@@ -75,7 +65,9 @@ class Database {
                 status ENUM('draft', 'sent') DEFAULT 'draft',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                INDEX idx_user_date (user_id, week_start),
+                INDEX idx_status (status),
+                INDEX idx_created (created_at)
             )
         ";
 
