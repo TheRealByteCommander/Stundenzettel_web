@@ -1,11 +1,14 @@
-# Simplified .htaccess for basic functionality
+# Schmitz Intralogistik Zeiterfassung - Production .htaccess
+# Optimized for ai.byte-commander.de
+
+# Enable rewrite engine
 RewriteEngine On
 
-# Prevent access to sensitive files
-<Files ~ "^\.">
-    Order allow,deny
+# Security: Block access to sensitive files
+<FilesMatch "\.(env|ini|json|log|md|sh)$">
+    Order deny,allow
     Deny from all
-</Files>
+</FilesMatch>
 
 # Block access to config and sensitive directories
 <Directory "api/config">
@@ -13,11 +16,49 @@ RewriteEngine On
     Deny from all
 </Directory>
 
+<Directory "api/utils/tcpdf">
+    Order deny,allow
+    Deny from all
+</Directory>
+
+# API Routes - redirect to api/index.php
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
 # Single Page App - redirect all non-file requests to index.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_URI} !^/api/
 RewriteRule ^(.*)$ index.html [QSA,L]
 
-# Simple error handling
+# Security Headers (if mod_headers available)
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options SAMEORIGIN
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # CORS for API
+    <LocationMatch "^/api/">
+        Header always set Access-Control-Allow-Origin "*"
+        Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+    </LocationMatch>
+</IfModule>
+
+# Compression (if mod_deflate available)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+# Cache static files (if mod_expires available)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+</IfModule>
+
+# Error handling
 ErrorDocument 404 /index.html
