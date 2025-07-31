@@ -94,18 +94,18 @@ function App() {
 
   const fetchUserInfo = async () => {
     try {
-      // Mock user info based on token - in real app, decode JWT
-      const mockUser = {
-        id: '1',
-        email: 'admin@schmitz-intralogistik.de',
-        name: 'Administrator',
-        is_admin: true
-      };
-      setUser(mockUser);
+      const response = await axios.get(`${API}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(response.data);
     } catch (error) {
       console.error('Failed to fetch user info:', error);
-      localStorage.removeItem('token');
-      setToken(null);
+      // Only clear token if it's an authentication error (401)
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+      }
     }
   };
 
