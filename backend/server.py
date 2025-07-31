@@ -398,6 +398,16 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
     return buffer.getvalue()
 
 # Routes
+@api_router.get("/auth/me")
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current user information"""
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "is_admin": current_user.is_admin
+    }
+
 @api_router.post("/auth/login")
 async def login(user_login: UserLogin):
     user = await db.users.find_one({"email": user_login.email})
