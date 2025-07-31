@@ -249,13 +249,13 @@ class TimesheetController {
             $timesheet['entries'] = json_decode($timesheet['entries'], true);
 
             $pdfGenerator = new PDFGenerator();
-            $htmlContent = $pdfGenerator->generateTimesheetPDF($timesheet);
+            $pdfContent = $pdfGenerator->generateTimesheetPDF($timesheet);
             $filename = $pdfGenerator->generateFilename($timesheet);
 
             // Try to send email
             try {
                 $emailService = new EmailService($this->db);
-                $emailService->sendTimesheetPDF($currentUser, $timesheet, $htmlContent, $filename);
+                $emailService->sendTimesheetPDF($currentUser, $timesheet, $pdfContent, $filename);
                 
                 // Update status to sent
                 $stmt = $this->db->prepare("UPDATE timesheets SET status = 'sent' WHERE id = ?");
@@ -265,13 +265,14 @@ class TimesheetController {
                 error_log("Email sending failed: " . $e->getMessage());
             }
 
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($pdfContent));
             
-            echo $htmlContent;
+            echo $pdfContent;
         } catch (Exception $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Download and email failed']);
+            echo json_encode(['success' => false, 'message' => 'Download and email failed: ' . $e->getMessage()]);
         }
     }
 
