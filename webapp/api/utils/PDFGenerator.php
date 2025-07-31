@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/../vendor/autoload.php';
-
-use Dompdf\Dompdf;
-use Dompdf\Options;
+// Simple PDF generation using FPDF (included)
+require_once __DIR__ . '/fpdf.php';
 
 class PDFGenerator {
     private $companyInfo = [
@@ -13,33 +11,61 @@ class PDFGenerator {
     ];
 
     public function generateTimesheetPDF($timesheet) {
-        $options = new Options();
-        $options->set('defaultFont', 'Arial');
-        $options->set('isRemoteEnabled', true);
-
-        $dompdf = new Dompdf($options);
+        $pdf = new FPDF('L', 'mm', 'A4'); // Landscape A4
+        $pdf->AddPage();
+        $pdf->SetFont('Arial', '', 12);
         
-        $html = $this->generateHTML($timesheet);
-        $dompdf->loadHtml($html);
+        // Company header (right aligned)
+        $pdf->SetXY(200, 10);
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->Cell(0, 4, $this->companyInfo['name'], 0, 1, 'R');
+        $pdf->SetXY(200, 14);
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->Cell(0, 4, $this->companyInfo['address'], 0, 1, 'R');
+        $pdf->SetXY(200, 18);
+        $pdf->Cell(0, 4, $this->companyInfo['city'] . ', ' . $this->companyInfo['country'], 0, 1, 'R');
         
-        // Set paper size to A4 landscape
-        $dompdf->setPaper('A4', 'landscape');
+        // Title
+        $pdf->SetXY(10, 30);
+        $pdf->SetFont('Arial', 'B', 18);
+        $pdf->Cell(0, 10, 'STUNDENZETTEL', 0, 1, 'C');
         
-        $dompdf->render();
-        
-        return $dompdf->output();
-    }
-
-    private function generateHTML($timesheet) {
+        // Project/Customer info
         $entries = $timesheet['entries'];
-        $dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+        $projectInfo = '';
+        $customerInfo = '';
+        if (!empty($entries)) {
+            $firstEntry = $entries[0];
+            $projectInfo = !empty($firstEntry['customer_project']) ? $firstEntry['customer_project'] : '';
+            $customerInfo = $projectInfo;
+        }
         
-        // Calculate total hours
+        $pdf->SetXY(10, 50);
+        $pdf->SetFont('Arial', '', 10);
+        $pdf->Cell(130, 6, 'Projekt: ' . $projectInfo, 0, 0, 'L');
+        $pdf->Cell(130, 6, 'Kunde: ' . $customerInfo, 0, 1, 'L');
+        
+        // Table header
+        $pdf->SetXY(10, 65);
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetFillColor(179, 179, 181); // Light gray
+        
+        $colWidths = [35, 25, 25, 20, 80, 25];
+        $headers = ['Datum', 'Startzeit', 'Endzeit', 'Pause', 'Beschreibung', 'Arbeitszeit'];
+        
+        for ($i = 0; $i < count($headers); $i++) {
+            $pdf->Cell($colWidths[$i], 8, $headers[$i], 1, 0, 'C', true);
+        }
+        $pdf->Ln();
+        
+        // Table data
+        $pdf->SetFont('Arial', '', 9);
+        $pdf->SetFillColor(255, 255, 255); // White
+        
+        $dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
         $totalHours = 0;
         $weekStart = new DateTime($timesheet['week_start']);
         
-        // Build table rows
-        $tableRows = '';
         for ($i = 0; $i < 7; $i++) {
             $currentDate = clone $weekStart;
             $currentDate->add(new DateInterval("P{$i}D"));
@@ -70,143 +96,37 @@ class PDFGenerator {
                         $totalHours += $dailyHours;
                         $workHours = number_format($dailyHours, 1) . 'h';
                     }
-                    $description = !empty($entry['tasks']) ? $entry['tasks'] : '';
+                    $description = !empty($entry['tasks']) ? substr($entry['tasks'], 0, 40) : '';
                     break;
                 }
             }
             
-            $tableRows .= "
-                <tr>
-                    <td style='padding: 8px; border: 1px solid #000; text-align: center; font-weight: bold;'>{$dayName}</td>
-                    <td style='padding: 8px; border: 1px solid #000; text-align: center;'>{$startTime}</td>
-                    <td style='padding: 8px; border: 1px solid #000; text-align: center;'>{$endTime}</td>
-                    <td style='padding: 8px; border: 1px solid #000; text-align: center;'>{$breakMinutes}</td>
-                    <td style='padding: 8px; border: 1px solid #000; font-size: 10px;'>{$description}</td>
-                    <td style='padding: 8px; border: 1px solid #000; text-align: center;'>{$workHours}</td>
-                </tr>
-            ";
+            $pdf->Cell($colWidths[0], 8, $dayName, 1, 0, 'C');
+            $pdf->Cell($colWidths[1], 8, $startTime, 1, 0, 'C');
+            $pdf->Cell($colWidths[2], 8, $endTime, 1, 0, 'C');
+            $pdf->Cell($colWidths[3], 8, $breakMinutes, 1, 0, 'C');
+            $pdf->Cell($colWidths[4], 8, $description, 1, 0, 'L');
+            $pdf->Cell($colWidths[5], 8, $workHours, 1, 1, 'C');
         }
         
-        // Get project and customer info from first entry
-        $projectInfo = '';
-        $customerInfo = '';
-        if (!empty($entries)) {
-            $firstEntry = $entries[0];
-            $projectInfo = !empty($firstEntry['customer_project']) ? $firstEntry['customer_project'] : '';
-            $customerInfo = $projectInfo; // Same for now
-        }
+        // Total row
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetFillColor(179, 179, 181); // Light gray
+        $pdf->Cell($colWidths[0] + $colWidths[1] + $colWidths[2] + $colWidths[3], 8, '', 1, 0, 'C', true);
+        $pdf->Cell($colWidths[4], 8, 'Gesamtstunden:', 1, 0, 'C', true);
+        $pdf->Cell($colWidths[5], 8, number_format($totalHours, 1) . 'h', 1, 1, 'C', true);
         
+        // Signatures
+        $pdf->SetXY(10, 170);
+        $pdf->SetFont('Arial', '', 10);
         $createdAt = new DateTime($timesheet['created_at']);
-        $totalHoursFormatted = number_format($totalHours, 1);
-
-        return "
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset='UTF-8'>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
-                    font-size: 11px;
-                    color: #5a5a5a;
-                }
-                .header {
-                    text-align: center;
-                    margin-bottom: 20px;
-                }
-                .company-info {
-                    text-align: right;
-                    font-size: 9px;
-                    margin-bottom: 20px;
-                }
-                .project-info {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-bottom: 20px;
-                    font-size: 11px;
-                }
-                .project-info div {
-                    flex: 1;
-                }
-                .timesheet-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 20px;
-                }
-                .timesheet-table th {
-                    background-color: #b3b3b5;
-                    padding: 10px;
-                    border: 1px solid #000;
-                    text-align: center;
-                    font-weight: bold;
-                }
-                .total-row {
-                    background-color: #b3b3b5;
-                    font-weight: bold;
-                }
-                .signatures {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-top: 30px;
-                }
-                .signature-field {
-                    flex: 1;
-                    margin: 0 20px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class='company-info'>
-                <strong>Schmitz Intralogistik GmbH</strong><br>
-                Grüner Weg 3<br>
-                04827 Machern, Deutschland
-            </div>
-
-            <div class='header'>
-                <h1 style='font-size: 20px; margin: 0; color: #5a5a5a;'>STUNDENZETTEL</h1>
-            </div>
-
-            <div class='project-info'>
-                <div><strong>Projekt:</strong> {$projectInfo}</div>
-                <div><strong>Kunde:</strong> {$customerInfo}</div>
-            </div>
-
-            <table class='timesheet-table'>
-                <thead>
-                    <tr>
-                        <th style='width: 15%;'>Datum</th>
-                        <th style='width: 15%;'>Startzeit</th>
-                        <th style='width: 15%;'>Endzeit</th>
-                        <th style='width: 10%;'>Pause</th>
-                        <th style='width: 30%;'>Beschreibung</th>
-                        <th style='width: 15%;'>Arbeitszeit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {$tableRows}
-                    <tr class='total-row'>
-                        <td colspan='4' style='padding: 10px; border: 1px solid #000; text-align: center;'></td>
-                        <td style='padding: 10px; border: 1px solid #000; text-align: center; font-weight: bold;'>Gesamtstunden:</td>
-                        <td style='padding: 10px; border: 1px solid #000; text-align: center; font-weight: bold;'>{$totalHoursFormatted}h</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class='signatures'>
-                <div class='signature-field'>
-                    <strong>Datum:</strong> {$createdAt->format('d.m.Y')}<br><br>
-                    <strong>Mitarbeiter:</strong> {$timesheet['user_name']}<br><br>
-                    <strong>Unterschrift Mitarbeiter:</strong> ______________________________
-                </div>
-                <div class='signature-field'>
-                    <br><br><br><br>
-                    <strong>Unterschrift Kunde:</strong> ______________________________
-                </div>
-            </div>
-        </body>
-        </html>
-        ";
+        $pdf->Cell(130, 6, 'Datum: ' . $createdAt->format('d.m.Y'), 0, 1, 'L');
+        $pdf->Cell(130, 6, 'Mitarbeiter: ' . $timesheet['user_name'], 0, 1, 'L');
+        $pdf->Ln(5);
+        $pdf->Cell(130, 6, 'Unterschrift Mitarbeiter: ______________________________', 0, 0, 'L');
+        $pdf->Cell(130, 6, 'Unterschrift Kunde: ______________________________', 0, 1, 'L');
+        
+        return $pdf->Output('S'); // Return as string
     }
 
     public function generateFilename($timesheet) {
@@ -215,8 +135,6 @@ class PDFGenerator {
         $cleanName = preg_replace('/[^\w\-_.]/', '_', $timesheet['user_name']);
         $cleanName = preg_replace('/_+/', '_', $cleanName);
         
-        // For sequential number, we'll use 001 for now
-        // In a full implementation, you'd query the database for existing timesheets
         $sequentialNumber = '001';
         
         return "{$cleanName}_KW" . str_pad($weekNumber, 2, '0', STR_PAD_LEFT) . "_{$sequentialNumber}.pdf";
