@@ -1,0 +1,82 @@
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+<TITLE>Image</TITLE>
+<LINK TYPE="text/css" REL="stylesheet" HREF="../fpdf.css">
+</HEAD>
+<BODY>
+<H2>Image</H2>
+<TT>Image(<B>string</B> file, <B>double</B> x, <B>double</B> y, <B>double</B> w [, <B>double</B> h [, <B>string</B> type]])</TT>
+<H4>Version</H4>
+1.1
+<H4>Beschreibung</H4>
+Gibt ein Bild in der Seite aus. Die linke obere Ecke und die Breite und/oder H&ouml;he m&uuml;ssen
+definiert werden. Die H&ouml;he kann automatisch berechnet werden, um die Bildproportionen zu
+erhalten; dasselbe f&uuml;r die Breite.
+<BR>
+<BR>
+Unterst&uuml;tzt werden JPEG- und PNG-Dateien.
+<BR>
+<BR>
+Folgende JPEG-Typen werden unterst&uuml;tzt:
+<UL>
+<LI>Graustufen
+<LI>RGB (24 Bit)
+<LI>CMYK (32 Bit)
+</UL>
+Folgende PNG-Typen werden unterst&uuml;tzt:
+<UL>
+<LI>Graustufen mit h&ouml;chsten 8 Bit Farbtiefe (256 Abstufungen)
+<LI>indizierte Farben
+<LI>RGB (24 Bit)
+</UL>
+nicht unterst&uuml;tzte Eigenschaften:
+<UL>
+<LI>Interlacing
+<LI>Alpha-Kanal
+</UL>
+Wenn eine transparente Farbe definiert wurde, wird diese &uuml;bernommen, kann
+allerdings erst von Acrobat&nbsp;4 oder h&ouml;her dargestellt werden.
+<BR>
+<BR>
+Das Format (JPEG oder PNG) kann wahlweise explizit angegeben werden oder anhand
+der Dateiendung ermittelt werden.
+<BR>
+<BR>
+Findet ein Bild mehrfach Verwendung, wird nur eine einzige Kopie in das PDF-Dokument
+eingebettet.
+<H4>Parameter</H4>
+<TT><U>file</U></TT>
+<BLOCKQUOTE>
+Name der Bilddatei.
+</BLOCKQUOTE>
+<TT><U>x</U></TT>
+<BLOCKQUOTE>
+Waagerechte Position der linken oberen Ecke.
+</BLOCKQUOTE>
+<TT><U>y</U></TT>
+<BLOCKQUOTE>
+Senkrechte Position der linken oberen Ecke.
+</BLOCKQUOTE>
+<TT><U>w</U></TT>
+<BLOCKQUOTE>
+Breite, in der das Bild im Dokument dargestellt werden soll. Wird <tt>0</tt> angegeben,
+erfolgt eine automatische Berechnung der Breite unter Beibehaltung der Bildproportionen.
+</BLOCKQUOTE>
+<TT><U>h</U></TT>
+<BLOCKQUOTE>
+H&ouml;he, in der das Bild im Dokument dargestellt werden soll. Wird kein Wert oder
+<tt>0</tt> angegeben, erfolgt eine automatische Berechnung der H&ouml;he unter
+Beibehaltung der Bildproportionen.
+</BLOCKQUOTE>
+<TT><U>type</U></TT>
+<BLOCKQUOTE>
+Das Bildformat. M&ouml;gliche Werte (Gro&szlig;-/Kleinschreibung wird nicht beachtet):
+<TT>JPG</TT>, <TT>JPEG</TT>, <TT>PNG</TT>. Wenn nicht angegeben, wird versucht, den Typ
+anhand der Dateiendung zu ermitteln.
+</BLOCKQUOTE>
+<H6></H6>
+<HR>
+<DIV ALIGN="CENTER"><A HREF="index.htm">Index</A></DIV>
+</BODY>
+</HTML>

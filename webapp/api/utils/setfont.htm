@@ -1,0 +1,103 @@
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+<TITLE>SetFont</TITLE>
+<LINK TYPE="text/css" REL="stylesheet" HREF="../fpdf.css">
+</HEAD>
+<BODY>
+<H2>SetFont</H2>
+<TT>SetFont(<B>string</B> family [, <B>string</B> style [, <B>double</B> size]])</TT>
+<H4>Beschreibung</H4>
+Bestimmt die Schriftart, die bei der Ausgabe von Zeichen vorgegeben wird. Es ist
+erforderlich diese Methode mindestens einmal vor der Ausgabe von Text aufzurufen,
+da das resultierende Dokument sonst ung&uuml;ltig sein wird.
+<BR>
+Der verwendete Zeichensatz ist Windows-1252 (westeurop&auml;isch).
+<BR>
+Die Methode kann vor der ersten Seite angewendet werden, die definierte Schrift bleibt
+von Seite zu Seite erhalten.
+<BR>
+Wenn lediglich die Schriftgr&ouml;&szlig;e ver&auml;ndert werden soll, ist der
+Gebrauch von SetFontSize() einfacher.
+<BR>
+<BR>
+<B>Achtung: </B>Damit die Methode erfolgreich abgearbeitet werden kann, muss Zugriff
+auf die Schriften-Metrik-Dateien bestehen. Hierzu bestehen drei M&ouml;glichkeiten:
+<BR>
+<BR>
+<UL>
+<LI>Die Metrik-Dateien sind im selben Verzeichnis wie das Skript bzw. in dem Verzeichnis,
+in dem sich das Skript zur Laufzeit befindet.
+<BR>
+<LI>Sie liegen in einem der durch den <TT>include_path</TT> Parameter definierten Verzeichnisse.
+<BR>
+<LI>Sie befinden sich in dem Verzeichnis, das &uuml;ber die <TT>FPDF_FONTPATH</TT>-Konstante
+angegeben ist.
+</UL>
+Beispiel f&uuml;r den zuletzt genannten Fall (bitte den abschlie&szlig;enden Schr&auml;gstrich
+beachten):
+<BR>
+<BR>
+<TABLE WIDTH="100%" BGCOLOR="#E0E0E0"><TR><TD>
+<TT>
+define('FPDF_FONTPATH','/home/www/font/');<BR>
+require('fpdf.php');
+</TT>
+</TD></TR></TABLE><BR>
+Wird die zu der angegebenen Schrift genannte Metrik-Datei nicht gefunden, wird die
+Fehlermeldung "Could not include font metric file" generiert.
+<H4>Parameter</H4>
+<TT><U>family</U></TT>
+<BLOCKQUOTE>
+Die gew&uuml;nschte Schriftenfamilie. M&ouml;gliche Werte (Gro&szlig;-/Kleinschreibung wird
+nicht beachtet):
+<UL>
+<LI><TT>Courier</TT> (Festbreitenschrift)
+<LI><TT>Helvetica<TT> oder </TT>Arial</TT> (serifenlose Schrift)
+<LI><TT>Times</TT> (Serifenschrift)
+<LI><TT>Symbol</TT> (Symbole)
+<LI><TT>ZapfDingbats</TT> (Symbole)
+</UL>
+Es it ebenso m&ouml;glich, eine leere Zeichenfolge anzugeben. In diesem Fall wird die zuvor
+verwendete Schrift beibehalten.
+</BLOCKQUOTE>
+<TT><U>style</U></TT>
+<BLOCKQUOTE>
+Der Schriftstil. M&ouml;gliche Werte (Gro&szlig;-/Kleinschreibung wird nicht beachtet):
+<UL>
+<LI>leere Zeichenfolge: normal (Standardwert)
+<LI><TT>B</TT>: fett
+<LI><TT>I</TT>: kursiv
+<LI><TT>BI</TT> oder <TT>IB</TT>: fett und kursiv
+</UL>
+Schriftenstile haben keinen Einfluss auf die Symbolschriften (<TT>Symbol</TT> und
+<TT>ZapfDingbats</TT>)
+</BLOCKQUOTE>
+<TT><U>size</U></TT>
+<BLOCKQUOTE>
+Schriftengr&ouml;&szlig;e in Punkte. Der Standardwert ist die zuvor verwendete
+Gr&ouml;&szlig;e. Wenn die Gr&ouml;&szlig;e seit dem Start des Dokumentes noch nicht
+definiert wurde, wird der Wert 12 verwendet.
+</BLOCKQUOTE>
+<H4>Beispiel</H4>
+<TABLE WIDTH="100%" BGCOLOR="#E0E0E0"><TR><TD>
+<TT>
+//Times normal 12<BR>
+$pdf-&gt;SetFont('Times');<BR>
+//Arial fett 14<BR>
+$pdf-&gt;SetFont('Arial','B',14);<BR>
+//Schriftestil fett entfernen<BR>
+$pdf-&gt;SetFont('');<BR>
+//Times normal 14<BR>
+$pdf-&gt;SetFont('Times');
+</TT>
+</TD></TR></TABLE><BR>
+<H4>Siehe auch</H4>
+<A HREF="setfontsize.htm">SetFontSize()</A>,
+<A HREF="cell.htm">Cell()</A>,
+<A HREF="multicell.htm">MultiCell()</A>.
+<H6></H6>
+<HR>
+<DIV ALIGN="CENTER"><A HREF="index.htm">Index</A></DIV>
+</BODY>
+</HTML>

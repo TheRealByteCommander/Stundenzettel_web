@@ -1,0 +1,104 @@
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+<TITLE>Cell</TITLE>
+<LINK TYPE="text/css" REL="stylesheet" HREF="../fpdf.css">
+</HEAD>
+<BODY>
+<H2>Cell</H2>
+<TT>Cell(<B>double</B> w [, <B>double</B> h [, <B>string</B> txt [, <B>mixed</B> border [, <B>int</B> ln [, <B>string</B> align [, <B>int</B> fill]]]]]])</TT>
+<H4>Beschreibung</H4>
+Erzeugt eine Zelle (rechteckiger Bereich) mit einer optionalen Umrandung, einer
+Hintergrundfarbe und einem Ausgabetext. Die linke obere Ecke der Zelle entspricht
+der aktuellen Position. Der Text kann linksb&uuml;ndig, rechtsb&uuml;ndig oder
+zentriert ausgerichtet werden. Nach dem Aufruf springt die aktuelle Position nach
+rechts oder in die n&auml;chste Zeile.
+<BR>
+Wenn der automatische Seitenumbruch aktiviert ist und eine Zelle den Seitenrand
+&uuml;berschreitet, wird vor der Ausgabe ein Seitenumbruch durchgef&uuml;hrt.
+<H4>Parameter</H4>
+<TT><U>w</U></TT>
+<BLOCKQUOTE>
+Zellenweite. Ist der Wert <TT>0</TT>, dehnt sich die Zelle bis zum rechten Rand aus (die
+Breite des rechten Randes entspricht der des linken).
+</BLOCKQUOTE>
+<TT><U>h</U></TT>
+<BLOCKQUOTE>
+Zellenh&ouml;he. Standardwert: <TT>0</TT>.
+</BLOCKQUOTE>
+<TT><U>txt</U></TT>
+<BLOCKQUOTE>
+Ausgabetext. Standardwert: leere Zeichenfolge.
+</BLOCKQUOTE>
+<TT><U>border</U></TT>
+<BLOCKQUOTE>
+Gibt an, ob die Zelle mit Randlinien versehen werden soll. Die Werte k&ouml;nnen wahlweise
+eine Ziffer:
+<UL>
+<LI><TT>0</TT>: keine Umrandung
+<LI><TT>1</TT>: Rahmen
+</UL>
+oder eine Zeichfolge sein, die die folgenden Buchstaben in beliebiger Reihenfolge und
+Kombination enth&auml;lt:
+<UL>
+<LI><TT>L</TT>: links
+<LI><TT>T</TT>: oben
+<LI><TT>R</TT>: rechts
+<LI><TT>B</TT>: unten
+</UL>
+Standardwert: <TT>0</TT>.
+</BLOCKQUOTE>
+<TT><U>ln</U></TT>
+<BLOCKQUOTE>
+Legt fest, an welche Stelle die aktuelle Position nach dem Aufruf gesetzt werden soll.
+M&ouml;gliche Werte:
+<UL>
+<LI><TT>0</TT>: nach rechts
+<LI><TT>1</TT>: an den Anfang der n&auml;chsten Zeile
+<LI><TT>2</TT>: darunter
+</UL>
+Die Verwendung des Wertes <TT>1</TT> entspricht dem Gebrauch von <TT>0</TT> und dem
+Aufruf von Ln() unmittelbar nach Cell().
+Standardwert: <TT>0</TT>.
+</BLOCKQUOTE>
+<TT><U>align</U></TT>
+<BLOCKQUOTE>
+Erm&ouml;glicht die Ausrichtung des Textes. M&ouml;gliche Werte:
+<UL>
+<LI><TT>L</TT> oder keine Angabe: linksb&uuml;ndig (Standard)
+<LI><TT>C</TT>: zentriert
+<LI><TT>R</TT>: rechtsb&uuml;ndig
+</UL>
+</BLOCKQUOTE>
+<TT><U>fill</U></TT>
+<BLOCKQUOTE>
+Definiert, ob der Zellenhintergrund gef&uuml;llt wird (<TT>1</TT>) oder transparent
+bleibt (<TT>0</TT>).
+Standardwert: <TT>0</TT>.
+</BLOCKQUOTE>
+<H4>Beispiel</H4>
+<TABLE WIDTH="100%" BGCOLOR="#E0E0E0"><TR><TD>
+<TT>
+//Schrift bestimmen<BR>
+$pdf-&gt;SetFont('Arial','B',16);<BR>
+//8 cm breite Zelle erstellen<BR>
+$pdf-&gt;Cell(80);<BR>
+//rechts daneben, zentrierter Text in einer umrandeten<BR>
+//20*10 mm Zelle, die aktuelle Position in n&auml;chster Zeile<BR>
+$pdf-&gt;Cell(20,10,'Titel',1,1,'C');
+</TT>
+</TD></TR></TABLE><BR>
+<H4>Siehe auch</H4>
+<A HREF="setfont.htm">SetFont()</A>,
+<A HREF="setdrawcolor.htm">SetDrawColor()</A>,
+<A HREF="setfillcolor.htm">SetFillColor()</A>,
+<A HREF="settextcolor.htm">SetTextColor()</A>,
+<A HREF="setlinewidth.htm">SetLineWidth()</A>,
+<A HREF="ln.htm">Ln()</A>,
+<A HREF="multicell.htm">MultiCell()</A>,
+<A HREF="setautopagebreak.htm">SetAutoPageBreak()</A>.
+<H6></H6>
+<HR>
+<DIV ALIGN="CENTER"><A HREF="index.htm">Index</A></DIV>
+</BODY>
+</HTML>
