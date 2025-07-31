@@ -141,11 +141,11 @@ backend:
 frontend:
   - task: "Fix Monday date calculation in getMonday function"
     implemented: true
-    working: "NA"
+    working: true
     file: "App.js"
     stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: false
           agent: "main"
@@ -153,14 +153,17 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Fixed getMonday function to avoid timezone issues by using proper Date constructor with year, month, day parameters instead of string parsing."
+        - working: true
+          agent: "testing"
+          comment: "COMPREHENSIVE TESTING COMPLETED: ✅ Monday date calculation is WORKING CORRECTLY. Successfully tested July 7, 2025 selection - dropdown opens properly, July 7, 2025 option is available and selectable, NO REDIRECT to login occurs, weekly timesheet form generates successfully. The critical Monday bug reported by user is FIXED. All 7 days (Mo-So) are displayed correctly in the weekly form. UI remains stable throughout the process."
   
   - task: "Fix date handling in getWeekDates function"
     implemented: true
-    working: "NA"
+    working: true
     file: "App.js"
     stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: false
           agent: "main"
@@ -168,14 +171,17 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Fixed getWeekDates function to properly parse date strings and avoid timezone issues."
+        - working: true
+          agent: "testing"
+          comment: "✅ Date handling in getWeekDates function is working correctly. Tested with July 7, 2025 and other dates - proper week generation with correct Monday-Sunday sequence. No timezone issues observed. Weekly form displays correct dates for all 7 days of the selected week."
 
   - task: "Verify deletion UI functions work correctly"
     implemented: true
-    working: "NA"
+    working: true
     file: "App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
@@ -183,6 +189,9 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Observed that delete buttons are correctly hidden for sent timesheets, only showing for draft timesheets as intended."
+        - working: true
+          agent: "testing"
+          comment: "✅ Deletion UI functionality is working correctly. VERIFIED: Delete buttons (trash icons) are visible ONLY for draft timesheets with 'Entwurf' status. Sent timesheets with 'Versendet' status correctly have NO delete buttons. The UI properly distinguishes between draft and sent timesheets. Deletion confirmation dialogs work as expected. Frontend deletion logic is functioning as designed."
 
 metadata:
   created_by: "main_agent"
