@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "User reported two critical bugs: 1) Monday Bug - When selecting a Monday (e.g., July 7, 2025) for timesheet creation, the timesheet incorrectly starts on the previous Sunday. Previous fixes worked for some dates but caused instability for July 7, 2025. 2) Deletion Function Bug - Issues with timesheet or user deletion functionality."
+user_problem_statement: "User reported two critical bugs: 1) Monday Bug - When selecting a Monday (e.g., July 7, 2025) for timesheet creation, the timesheet incorrectly starts on the previous Sunday. Previous fixes worked for some dates but caused instability for July 7, 2025. 2) Deletion Function Bug - Issues with timesheet or user deletion functionality. LATEST REQUEST: Test the updated PDF timesheet layout to verify it matches the user's template requirements including single page DIN A4 landscape format, German day names, proper table structure, and all required fields."
 
 backend:
   - task: "Fix Monday date calculation bug in timesheet creation"
@@ -137,6 +137,21 @@ backend:
         - working: true
           agent: "testing"
           comment: "DELETION FUNCTIONALITY VERIFIED: ✅ Draft timesheet deletion works correctly (200 status). ✅ Sent timesheet deletion properly blocked with 400 status and error message 'Cannot delete timesheet that has been sent. Only draft timesheets can be deleted.' ✅ User deletion works for non-admin users. ✅ Admin self-deletion correctly prevented with 400 status. ✅ Authentication properly enforced (403 for unauthenticated, 401 for invalid token)."
+
+  - task: "PDF timesheet layout verification and template compliance"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "User requested comprehensive testing of PDF timesheet layout to verify it matches template requirements including DIN A4 landscape format, German day names, proper table structure, and all required fields."
+        - working: true
+          agent: "testing"
+          comment: "PDF LAYOUT COMPREHENSIVE TESTING COMPLETED: ✅ ALL TEMPLATE REQUIREMENTS VERIFIED SUCCESSFULLY! Created test timesheet for July 7, 2025 with mixed data (some days with entries, some empty). PDF generation working perfectly: ✅ Single page DIN A4 landscape format ✅ Header shows 'STUNDENZETTEL' title ✅ Company info (Schmitz Intralogistik GmbH, Grüner Weg 3, 04827 Machern, Deutschland) in top right ✅ Project and Customer fields present ✅ Table structure matches template with all columns (Datum, Startzeit, Endzeit, Pause, Beschreibung, Arbeitszeit) ✅ German day names (Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag) ✅ Total hours calculation working (29.5h total from 8.0h+8.2h+5.5h+7.8h) ✅ Signature fields for customer and employee ✅ Mixed data handling (entries with times, entries with only tasks, empty days) ✅ PDF filename generation working. The PDF layout perfectly matches the user's template requirements."
 
 frontend:
   - task: "Fix Monday date calculation in getMonday function"
