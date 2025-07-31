@@ -1,14 +1,13 @@
 <?php
-require_once __DIR__ . '/../vendor/autoload.php';
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+require_once __DIR__ . '/../utils/SimpleJWT.php';
 
 class AuthMiddleware {
     private $db;
-    private $secretKey = 'schmitz-intralogistik-secret-key-2025';
+    private $jwt;
 
     public function __construct($db) {
         $this->db = $db;
+        $this->jwt = new SimpleJWT();
     }
 
     public function requireAuth() {
@@ -25,11 +24,11 @@ class AuthMiddleware {
         $token = $matches[1];
 
         try {
-            $decoded = JWT::decode($token, new Key($this->secretKey, 'HS256'));
+            $decoded = $this->jwt->decode($token);
             
             // Get user from database
             $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ?");
-            $stmt->execute([$decoded->sub]);
+            $stmt->execute([$decoded['sub']]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$user) {
@@ -61,7 +60,7 @@ class AuthMiddleware {
             'exp' => time() + (24 * 60 * 60) // 24 hours
         ];
 
-        return JWT::encode($payload, $this->secretKey, 'HS256');
+        return $this->jwt->encode($payload);
     }
 }
 ?>
