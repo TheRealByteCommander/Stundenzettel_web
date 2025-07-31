@@ -727,13 +727,15 @@ class SchmitzTimesheetAPITester:
 
 def main():
     print("🚀 Starting Schmitz Intralogistik Timesheet API Tests")
+    print("🎯 FOCUS: PDF Timesheet Layout Verification")
     print("=" * 60)
     
     tester = SchmitzTimesheetAPITester()
     
-    # Test sequence - focusing on Monday date bug and deletion functionality
+    # Test sequence - focusing on PDF layout verification as requested
     tests = [
         ("Admin Login", tester.test_login),
+        ("PDF Layout Comprehensive Test", tester.test_pdf_layout_comprehensive),
         ("Monday Date Bug Fix", tester.test_monday_date_bug),
         ("Deletion Functionality", tester.test_deletion_functionality),
         ("Get Users List", tester.test_get_users),
