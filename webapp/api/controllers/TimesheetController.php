@@ -296,11 +296,11 @@ class TimesheetController {
             $timesheet['entries'] = json_decode($timesheet['entries'], true);
 
             $pdfGenerator = new PDFGenerator();
-            $pdfContent = $pdfGenerator->generateTimesheetPDF($timesheet);
+            $htmlContent = $pdfGenerator->generateTimesheetPDF($timesheet);
             $filename = $pdfGenerator->generateFilename($timesheet);
 
             $emailService = new EmailService($this->db);
-            $emailService->sendTimesheetPDF($currentUser, $timesheet, $pdfContent, $filename);
+            $emailService->sendTimesheetPDF($currentUser, $timesheet, $htmlContent, $filename);
 
             // Update status to sent
             $stmt = $this->db->prepare("UPDATE timesheets SET status = 'sent' WHERE id = ?");
