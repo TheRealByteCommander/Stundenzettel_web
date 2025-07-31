@@ -213,16 +213,17 @@ class TimesheetController {
             $timesheet['entries'] = json_decode($timesheet['entries'], true);
             
             $pdfGenerator = new PDFGenerator();
-            $htmlContent = $pdfGenerator->generateTimesheetPDF($timesheet);
+            $pdfContent = $pdfGenerator->generateTimesheetPDF($timesheet);
             $filename = $pdfGenerator->generateFilename($timesheet);
 
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($pdfContent));
             
-            echo $htmlContent;
+            echo $pdfContent;
         } catch (Exception $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'PDF generation failed']);
+            echo json_encode(['success' => false, 'message' => 'PDF generation failed: ' . $e->getMessage()]);
         }
     }
 
