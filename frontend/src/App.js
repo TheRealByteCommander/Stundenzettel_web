@@ -14,7 +14,7 @@ import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings
 import { Alert, AlertDescription } from './components/ui/alert';
 import './App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000');
 const API = `${BACKEND_URL}/api`;
 
 // Company colors
@@ -33,6 +33,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // 2FA state
+  const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [tempToken, setTempToken] = useState('');
 
   // New timesheet form
   const [newTimesheet, setNewTimesheet] = useState({
@@ -151,6 +155,12 @@ function App() {
 
     try {
       const response = await axios.post(`${API}/auth/login`, loginForm);
+      if (response.data?.requires_2fa) {
+        setTempToken(response.data.temp_token);
+        setShowOtpDialog(true);
+        setSuccess('Bitte geben Sie den 2FA-Code aus Ihrer Authenticator-App ein.');
+        return;
+      }
       const { access_token, user: userData } = response.data;
       
       localStorage.setItem('token', access_token);
@@ -159,6 +169,27 @@ function App() {
       setSuccess('Erfolgreich angemeldet!');
     } catch (error) {
       setError('Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Daten.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (!otpCode) return;
+    setLoading(true);
+    setError('');
+    try {
+      const response = await axios.post(`${API}/auth/2fa/verify`, { otp: otpCode, temp_token: tempToken });
+      const { access_token, user: userData } = response.data;
+      localStorage.setItem('token', access_token);
+      setToken(access_token);
+      setUser(userData);
+      setShowOtpDialog(false);
+      setOtpCode('');
+      setTempToken('');
+      setSuccess('2FA erfolgreich verifiziert!');
+    } catch (error) {
+      setError('Ungültiger 2FA-Code. Bitte erneut versuchen.');
     } finally {
       setLoading(false);
     }
@@ -246,25 +277,16 @@ function App() {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
-      
-      // Generate the new filename format: [Name]_[KW]_[Number]
-      const getCalendarWeek = (dateStr) => {
-        const date = new Date(dateStr);
-        const startOfYear = new Date(date.getFullYear(), 0, 1);
-        const pastDaysOfYear = (date - startOfYear) / 86400000;
-        const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
-        return `KW${weekNumber.toString().padStart(2, '0')}`;
-      };
-      
-      const sanitizeName = (name) => {
-        return name.replace(/[^\w\-_.]/g, '_').replace(/_+/g, '_');
-      };
-      
-      const calendarWeek = getCalendarWeek(weekStart);
-      const cleanName = sanitizeName(userName);
-      // For now, use 001 as sequential number (backend handles the actual counting)
-      const filename = `${cleanName}_${calendarWeek}_001.pdf`;
-      
+      // Try to read filename from Content-Disposition header if provided by backend
+      let filename = 'stundenzettel.pdf';
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+        if (match) {
+          filename = decodeURIComponent(match[1] || match[2]);
+        }
+      }
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -1006,6 +1028,37 @@ function App() {
               <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
                 Abbrechen
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* OTP Dialog */}
+      <Dialog open={showOtpDialog} onOpenChange={setShowOtpDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>2FA-Verifizierung</DialogTitle>
+            <DialogDescription>
+              Bitte geben Sie den 6-stelligen Code aus Ihrer Google Authenticator App ein.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="otp-code">2FA Code</Label>
+              <Input
+                id="otp-code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+              />
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={verifyOtp} disabled={loading} style={{ backgroundColor: colors.primary }}>
+                {loading ? 'Prüfe...' : 'Bestätigen'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowOtpDialog(false)}>Abbrechen</Button>
             </div>
           </div>
         </DialogContent>

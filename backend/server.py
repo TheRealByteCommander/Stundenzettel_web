@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta
 import jwt
+import pyotp
 from passlib.context import CryptContext
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -31,12 +32,12 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.getenv('DB_NAME', 'stundenzettel')]
 
 # JWT and Password settings
-SECRET_KEY = "schmitz-intralogistik-secret-key-2025"
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 
@@ -62,6 +63,8 @@ class User(BaseModel):
     name: str
     is_admin: bool = False
     hashed_password: str
+    two_fa_enabled: bool = False
+    two_fa_secret: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class UserCreate(BaseModel):
@@ -73,6 +76,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    otp: Optional[str] = None
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
@@ -82,6 +86,14 @@ class UserUpdate(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+class TwoFAVerify(BaseModel):
+    otp: str
+    temp_token: str
+
+class TwoFASetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
 
 class TimeEntry(BaseModel):
     date: str  # YYYY-MM-DD format
@@ -201,8 +213,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user = await db.users.find_one({"email": email})
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
+        # Remove MongoDB internal id
+        user.pop("_id", None)
         return User(**user)
-    except jwt.PyJWTError:
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 async def get_admin_user(current_user: User = Depends(get_current_user)):
@@ -414,6 +428,19 @@ async def login(user_login: UserLogin):
     if not user or not verify_password(user_login.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     
+    # 2FA flow
+    if user.get("two_fa_enabled") and user.get("two_fa_secret"):
+        # If OTP provided directly, verify it, else return challenge
+        if not user_login.otp:
+            temp_token = create_access_token(
+                data={"sub": user["email"], "scope": "2fa"}, expires_delta=timedelta(minutes=5)
+            )
+            return {"requires_2fa": True, "temp_token": temp_token}
+        # Verify provided OTP
+        totp = pyotp.TOTP(user["two_fa_secret"])
+        if not totp.verify(user_login.otp, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid 2FA code")
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["email"]}, expires_delta=access_token_expires
@@ -446,7 +473,7 @@ async def register(user_create: UserCreate, current_user: User = Depends(get_adm
         hashed_password=hashed_password
     )
     
-    await db.users.insert_one(user.dict())
+    await db.users.insert_one(user.model_dump())
     return {"message": "User created successfully", "user_id": user.id}
 
 @api_router.get("/users", response_model=List[Dict[str, Any]])
@@ -523,6 +550,66 @@ async def change_password(password_change: PasswordChange, current_user: User = 
     
     return {"message": "Password changed successfully"}
 
+# 2FA endpoints
+@api_router.post("/auth/2fa/verify")
+async def verify_two_fa(payload: TwoFAVerify):
+    # Validate temp token
+    try:
+        data = jwt.decode(payload.temp_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if data.get("scope") != "2fa":
+            raise HTTPException(status_code=400, detail="Invalid 2FA token")
+        email = data.get("sub")
+        user = await db.users.find_one({"email": email})
+        if not user or not user.get("two_fa_enabled") or not user.get("two_fa_secret"):
+            raise HTTPException(status_code=400, detail="2FA not enabled for user")
+        totp = pyotp.TOTP(user["two_fa_secret"])
+        if not totp.verify(payload.otp, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid 2FA code")
+
+        # On success, issue normal access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user["email"]}, expires_delta=access_token_expires
+        )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user["id"],
+                "email": user["email"],
+                "name": user["name"],
+                "is_admin": user["is_admin"]
+            }
+        }
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired 2FA token")
+
+@api_router.post("/auth/2fa/setup", response_model=TwoFASetupResponse)
+async def setup_two_fa(current_user: User = Depends(get_current_user)):
+    # Generate secret and store temporarily for the user
+    secret = pyotp.random_base32()
+    await db.users.update_one({"id": current_user.id}, {"$set": {"two_fa_secret": secret}})
+    issuer = COMPANY_INFO["name"]
+    otpauth_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name=issuer)
+    return {"secret": secret, "otpauth_uri": otpauth_uri}
+
+@api_router.post("/auth/2fa/enable")
+async def enable_two_fa(verification: TwoFAVerify, current_user: User = Depends(get_current_user)):
+    # Use current user's stored secret and verify code, then enable
+    user = await db.users.find_one({"id": current_user.id})
+    if not user or not user.get("two_fa_secret"):
+        raise HTTPException(status_code=400, detail="2FA setup required first")
+    totp = pyotp.TOTP(user["two_fa_secret"])
+    if not totp.verify(verification.otp, valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid 2FA code")
+    await db.users.update_one({"id": current_user.id}, {"$set": {"two_fa_enabled": True}})
+    return {"message": "2FA enabled"}
+
+@api_router.post("/auth/2fa/disable")
+async def disable_two_fa(current_user: User = Depends(get_current_user)):
+    await db.users.update_one({"id": current_user.id}, {"$set": {"two_fa_enabled": False, "two_fa_secret": None}})
+    return {"message": "2FA disabled"}
+
 @api_router.post("/timesheets", response_model=WeeklyTimesheet)
 async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user: User = Depends(get_current_user)):
     # Calculate week end (Sunday)
@@ -552,7 +639,12 @@ async def get_timesheets(current_user: User = Depends(get_current_user)):
     else:
         timesheets = await db.timesheets.find({"user_id": current_user.id}).to_list(1000)
     
-    return [WeeklyTimesheet(**timesheet) for timesheet in timesheets]
+    # Remove Mongo _id and build models
+    sanitized = []
+    for t in timesheets:
+        t.pop("_id", None)
+        sanitized.append(WeeklyTimesheet(**t))
+    return sanitized
 
 @api_router.put("/timesheets/{timesheet_id}")
 async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate, current_user: User = Depends(get_current_user)):
@@ -576,7 +668,7 @@ async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate,
         update_data["week_end"] = week_end.strftime("%Y-%m-%d")
     
     if timesheet_update.entries is not None:
-        update_data["entries"] = [entry.dict() for entry in timesheet_update.entries]
+        update_data["entries"] = [entry.model_dump() for entry in timesheet_update.entries]
     
     if update_data:
         await db.timesheets.update_one({"id": timesheet_id}, {"$set": update_data})
@@ -616,6 +708,8 @@ async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_
     if not current_user.is_admin and timesheet["user_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # Remove MongoDB internal id for model creation
+    timesheet.pop("_id", None)
     timesheet_obj = WeeklyTimesheet(**timesheet)
     pdf_bytes = generate_timesheet_pdf(timesheet_obj)
     
@@ -732,6 +826,7 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
     if not smtp_config:
         raise HTTPException(status_code=400, detail="SMTP configuration not found. Please contact admin.")
     
+    timesheet.pop("_id", None)
     timesheet_obj = WeeklyTimesheet(**timesheet)
     pdf_bytes = generate_timesheet_pdf(timesheet_obj)
     
@@ -832,7 +927,7 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
