@@ -39,6 +39,8 @@ function App() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [monthlyStats, setMonthlyStats] = useState([]);
+  const [myRank, setMyRank] = useState(null);
+  const [rankTotalUsers, setRankTotalUsers] = useState(null);
   // 2FA state
   const [showOtpDialog, setShowOtpDialog] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -101,6 +103,7 @@ function App() {
       }
       // preload stats for current month
       fetchMonthlyStats(statsMonth);
+      fetchMonthlyRank(statsMonth);
     }
   }, [user]);
 
@@ -179,6 +182,21 @@ function App() {
     } catch (error) {
       console.error('Failed to fetch monthly stats:', error);
       setMonthlyStats([]);
+    }
+  };
+
+  const fetchMonthlyRank = async (month) => {
+    try {
+      const response = await axios.get(`${API}/stats/monthly/rank`, {
+        params: { month },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMyRank(response.data?.rank ?? null);
+      setRankTotalUsers(response.data?.total_users ?? null);
+    } catch (error) {
+      console.error('Failed to fetch monthly rank:', error);
+      setMyRank(null);
+      setRankTotalUsers(null);
     }
   };
 
@@ -1041,6 +1059,7 @@ function App() {
                     onValueChange={(val) => {
                       setStatsMonth(val);
                       fetchMonthlyStats(val);
+                      fetchMonthlyRank(val);
                     }}
                   >
                     <SelectTrigger>
@@ -1053,6 +1072,15 @@ function App() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Rang-Anzeige (keine Offenlegung anderer Zahlen) */}
+                {(myRank !== null && rankTotalUsers !== null) && (
+                  <div className="p-3 rounded border bg-gray-50">
+                    <span className="font-medium" style={{ color: colors.gray }}>
+                      Ihre Platzierung: {myRank}. von {rankTotalUsers}
+                    </span>
+                  </div>
+                )}
 
                 {monthlyStats.length === 0 ? (
                   <p style={{ color: colors.gray }}>Keine Daten für diesen Monat vorhanden.</p>

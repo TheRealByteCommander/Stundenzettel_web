@@ -108,6 +108,11 @@ class MonthlyStatsResponse(BaseModel):
     month: str
     stats: List[MonthlyUserStat]
 
+class MonthlyRankResponse(BaseModel):
+    month: str
+    rank: int
+    total_users: int
+
 class TimeEntry(BaseModel):
     date: str  # YYYY-MM-DD format
     start_time: str  # HH:MM format
@@ -694,6 +699,60 @@ async def get_monthly_stats(month: str, current_user: User = Depends(get_current
     # Sort by user_name
     stats.sort(key=lambda s: s.user_name.lower())
     return MonthlyStatsResponse(month=month, stats=stats)
+
+# Rank of current user among all users for given month (based on sent timesheets)
+@api_router.get("/stats/monthly/rank", response_model=MonthlyRankResponse)
+async def get_monthly_rank(month: str, current_user: User = Depends(get_current_user)):
+    # Validate month format
+    try:
+        year, mon = map(int, month.split("-"))
+        _ = datetime(year, mon, 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
+
+    # All sent timesheets
+    ts = await db.timesheets.find({"status": "sent"}).to_list(5000)
+
+    # Aggregate totals per user
+    totals: Dict[str, float] = {}
+    names: Dict[str, str] = {}
+    for t in ts:
+        uid = t.get("user_id")
+        names[uid] = t.get("user_name", names.get(uid, ""))
+        entries = t.get("entries", [])
+        hours = 0.0
+        for e in entries:
+            try:
+                e_date = e.get("date") if isinstance(e, dict) else e.date
+                if _date_in_year_month(e_date, year, mon):
+                    entry_obj = e if isinstance(e, dict) else e.model_dump()
+                    te = TimeEntry(**entry_obj)
+                    hours += _entry_hours(te)
+            except Exception:
+                continue
+        if hours > 0:
+            totals[uid] = totals.get(uid, 0.0) + hours
+
+    # Ensure current user present (with 0 if none)
+    seen_users = set(totals.keys())
+    seen_users.add(current_user.id)
+
+    # Build sorted ranking list (descending by hours)
+    ranking = sorted([(uid, totals.get(uid, 0.0)) for uid in seen_users], key=lambda x: x[1], reverse=True)
+
+    # Determine 1-based rank of current user (handle ties: same hours -> same rank, standard competition ranking)
+    rank = 1
+    last_hours = None
+    last_rank = 0
+    for idx, (uid, hrs) in enumerate(ranking, start=1):
+        if last_hours is None or hrs < last_hours:
+            last_rank = idx
+            last_hours = hrs
+        if uid == current_user.id:
+            rank = last_rank
+            break
+
+    return MonthlyRankResponse(month=month, rank=rank, total_users=len(seen_users))
 
 @api_router.post("/timesheets", response_model=WeeklyTimesheet)
 async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user: User = Depends(get_current_user)):
