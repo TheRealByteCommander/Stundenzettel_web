@@ -95,6 +95,19 @@ class TwoFASetupResponse(BaseModel):
     secret: str
     otpauth_uri: str
 
+class MonthlyStatsRequest(BaseModel):
+    month: str  # YYYY-MM
+
+class MonthlyUserStat(BaseModel):
+    user_id: str
+    user_name: str
+    month: str
+    total_hours: float
+
+class MonthlyStatsResponse(BaseModel):
+    month: str
+    stats: List[MonthlyUserStat]
+
 class TimeEntry(BaseModel):
     date: str  # YYYY-MM-DD format
     start_time: str  # HH:MM format
@@ -168,6 +181,26 @@ def sanitize_filename(name: str) -> str:
     # Remove multiple underscores
     sanitized = re.sub(r'_+', '_', sanitized)
     return sanitized
+
+def _date_in_year_month(date_str: str, year: int, month: int) -> bool:
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        return d.year == year and d.month == month
+    except Exception:
+        return False
+
+def _entry_hours(entry: TimeEntry) -> float:
+    if not entry.start_time or not entry.end_time:
+        return 0.0
+    try:
+        sh, sm = map(int, entry.start_time.split(":"))
+        eh, em = map(int, entry.end_time.split(":"))
+        start = sh * 60 + sm
+        end = eh * 60 + em
+        worked = max(0, end - start - int(entry.break_minutes))
+        return max(0.0, worked / 60.0)
+    except Exception:
+        return 0.0
 
 async def generate_pdf_filename(timesheet: WeeklyTimesheet, user_name: str) -> str:
     """Generate PDF filename: [Mitarbeiter_Name]_[Kalenderwoche]_[fortlaufende Nummer]"""
@@ -609,6 +642,58 @@ async def enable_two_fa(verification: TwoFAVerify, current_user: User = Depends(
 async def disable_two_fa(current_user: User = Depends(get_current_user)):
     await db.users.update_one({"id": current_user.id}, {"$set": {"two_fa_enabled": False, "two_fa_secret": None}})
     return {"message": "2FA disabled"}
+
+# Stats: total sent hours per user per month (YYYY-MM)
+@api_router.get("/stats/monthly", response_model=MonthlyStatsResponse)
+async def get_monthly_stats(month: str, current_user: User = Depends(get_current_user)):
+    # Validate month format
+    try:
+        year, mon = map(int, month.split("-"))
+        _ = datetime(year, mon, 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
+
+    # Query only sent timesheets
+    query = {"status": "sent"}
+    if not current_user.is_admin:
+        query["user_id"] = current_user.id
+
+    ts = await db.timesheets.find(query).to_list(5000)
+
+    # Aggregate hours per user for the given month, counting only entries within that month
+    user_totals: Dict[str, Dict[str, Any]] = {}
+    for t in ts:
+        user_id = t.get("user_id")
+        user_name = t.get("user_name", "")
+        entries = t.get("entries", [])
+        monthly_hours = 0.0
+        for e in entries:
+            try:
+                # Works with dict entries or already validated
+                e_date = e.get("date") if isinstance(e, dict) else e.date
+                if _date_in_year_month(e_date, year, mon):
+                    entry_obj = e if isinstance(e, dict) else e.model_dump()
+                    te = TimeEntry(**entry_obj)
+                    monthly_hours += _entry_hours(te)
+            except Exception:
+                continue
+        if monthly_hours <= 0:
+            continue
+        if user_id not in user_totals:
+            user_totals[user_id] = {"user_name": user_name, "total_hours": 0.0}
+        user_totals[user_id]["total_hours"] += monthly_hours
+
+    stats: List[MonthlyUserStat] = []
+    for uid, data in user_totals.items():
+        stats.append(MonthlyUserStat(user_id=uid, user_name=data["user_name"], month=month, total_hours=round(data["total_hours"], 2)))
+
+    # For non-admins, ensure at least their user appears with 0 if none found
+    if not current_user.is_admin and not stats:
+        stats.append(MonthlyUserStat(user_id=current_user.id, user_name=current_user.name, month=month, total_hours=0.0))
+
+    # Sort by user_name
+    stats.sort(key=lambda s: s.user_name.lower())
+    return MonthlyStatsResponse(month=month, stats=stats)
 
 @api_router.post("/timesheets", response_model=WeeklyTimesheet)
 async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user: User = Depends(get_current_user)):

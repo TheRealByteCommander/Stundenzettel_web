@@ -33,6 +33,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // Stats state
+  const [statsMonth, setStatsMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [monthlyStats, setMonthlyStats] = useState([]);
   // 2FA state
   const [showOtpDialog, setShowOtpDialog] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -93,6 +99,8 @@ function App() {
         fetchUsers();
         fetchSmtpConfig();
       }
+      // preload stats for current month
+      fetchMonthlyStats(statsMonth);
     }
   }, [user]);
 
@@ -145,6 +153,32 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to fetch SMTP config:', error);
+    }
+  };
+
+  const getLast12Months = () => {
+    const list = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      list.push({
+        value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleDateString('de-DE', { year: 'numeric', month: 'long' })
+      });
+    }
+    return list;
+  };
+
+  const fetchMonthlyStats = async (month) => {
+    try {
+      const response = await axios.get(`${API}/stats/monthly`, {
+        params: { month },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMonthlyStats(response.data?.stats || []);
+    } catch (error) {
+      console.error('Failed to fetch monthly stats:', error);
+      setMonthlyStats([]);
     }
   };
 
@@ -613,11 +647,20 @@ function App() {
         )}
 
         <Tabs defaultValue="timesheets" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
-            <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
-            {user?.is_admin && <TabsTrigger value="admin">Admin</TabsTrigger>}
-          </TabsList>
+          {user?.is_admin ? (
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
+              <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
+              <TabsTrigger value="stats">Statistiken</TabsTrigger>
+              <TabsTrigger value="admin">Admin</TabsTrigger>
+            </TabsList>
+          ) : (
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
+              <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
+              <TabsTrigger value="stats">Statistiken</TabsTrigger>
+            </TabsList>
+          )}
 
           {/* Timesheets Tab */}
           <TabsContent value="timesheets">
@@ -977,6 +1020,65 @@ function App() {
               </div>
             </TabsContent>
           )}
+
+          {/* Stats Tab */}
+          <TabsContent value="stats">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2" style={{ color: colors.primary }} />
+                  Monatsstatistik (versendete Stunden)
+                </CardTitle>
+                <CardDescription>
+                  Übersicht der Gesamtstunden pro Nutzer im ausgewählten Monat
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-w-xs">
+                  <Label>Monat auswählen</Label>
+                  <Select
+                    value={statsMonth}
+                    onValueChange={(val) => {
+                      setStatsMonth(val);
+                      fetchMonthlyStats(val);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Monat auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getLast12Months().map((m) => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {monthlyStats.length === 0 ? (
+                  <p style={{ color: colors.gray }}>Keine Daten für diesen Monat vorhanden.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nutzer</TableHead>
+                        <TableHead>Monat</TableHead>
+                        <TableHead className="text-right">Gesamtstunden</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {monthlyStats.map((row) => (
+                        <TableRow key={row.user_id}>
+                          <TableCell>{row.user_name}</TableCell>
+                          <TableCell>{row.month}</TableCell>
+                          <TableCell className="text-right">{row.total_hours.toFixed(2)} h</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
 
