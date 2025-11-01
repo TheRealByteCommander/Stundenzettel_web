@@ -4,12 +4,27 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 
 ## Features
 
+### Stundenzettel-App
 - ✅ Wochenbasierte Zeiterfassung
 - ✅ PDF-Generierung für Stundenzettel
 - ✅ E-Mail-Versand mit PDF-Anhang
-- ✅ Benutzer- und Adminverwaltung
-- ✅ 2FA (Google Authenticator) Unterstützung
+- ✅ Urlaub, Krankheit, Feiertag-Tracking
+- ✅ Fahrzeit-Erfassung mit optionaler Weiterberechnung
 - ✅ Monatsstatistiken und Rang-System
+- ✅ Stundenzettel-Genehmigung durch Buchhaltung
+
+### Reisekosten-App
+- ✅ Automatische Befüllung aus genehmigten Stundenzetteln
+- ✅ PDF-Beleg-Upload (lokale Speicherung)
+- ✅ Monatsbasierte Abrechnungen (aktueller + 2 Monate zurück)
+- ✅ Chat-System für Rückfragen mit Agenten
+- ✅ Status-Management (Entwurf, In Prüfung, Genehmigt)
+- ⏳ Automatische Prüfung mit Ollama LLM (in Entwicklung)
+
+### Weitere Features
+- ✅ Benutzer- und Adminverwaltung mit Rollen (User, Admin, Buchhaltung)
+- ✅ Obligatorische 2FA (Google Authenticator)
+- ✅ Ankündigungen/News-System mit Bildern
 - ✅ Responsive Web-Interface
 
 ## Installation auf All-Inkl.com Webserver
@@ -253,6 +268,36 @@ Bei Problemen:
 3. Überprüfen Sie Dateiberechtigungen
 4. Kontaktieren Sie bei Bedarf den All-Inkl Support
 
+## Konfiguration für Reisekosten-App
+
+### Lokaler Speicherpfad für Belege
+
+Die Reisekosten-App speichert PDF-Belege **nicht auf dem Webserver**, sondern auf einem lokalen Bürorechner.
+
+Konfigurieren Sie den Pfad in der `.env` Datei des Backends:
+
+```env
+LOCAL_RECEIPTS_PATH=C:/Reisekosten_Belege
+```
+
+**Wichtig:** 
+- Dieser Pfad muss auf dem Rechner existieren, auf dem der Backend-Server läuft
+- Der Server benötigt Schreibrechte auf diesem Verzeichnis
+- Unter Windows: Verwenden Sie absolute Pfade mit Laufwerksbuchstaben (z.B. `C:/Reisekosten_Belege`)
+- Unter Linux: Verwenden Sie absolute Pfade (z.B. `/var/receipts`)
+
+### Ollama LLM Integration (in Entwicklung)
+
+Für die automatische Prüfung von Reisekostenabrechnungen:
+
+```env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+```
+
+**Hinweis:** Die LLM-Integration ist derzeit noch nicht vollständig implementiert.
+
 ## Weitere Informationen
 
 Detaillierte Installationsanleitung für andere Server: Siehe `webapp/INSTALLATION.md`
+Änderungshistorie: Siehe `CHANGELOG.md`

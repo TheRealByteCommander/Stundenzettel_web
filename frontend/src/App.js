@@ -10,7 +10,8 @@ import { Textarea } from './components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
 import { Badge } from './components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table';
-import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key } from 'lucide-react';
+import { Checkbox } from './components/ui/checkbox';
+import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
 import './App.css';
 
@@ -27,6 +28,7 @@ const colors = {
 function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
+  const [selectedApp, setSelectedApp] = useState(null); // null, 'timesheets', 'expenses'
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [timesheets, setTimesheets] = useState([]);
   const [users, setUsers] = useState([]);
@@ -43,8 +45,11 @@ function App() {
   const [rankTotalUsers, setRankTotalUsers] = useState(null);
   // 2FA state
   const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [show2FASetupDialog, setShow2FASetupDialog] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [tempToken, setTempToken] = useState('');
+  const [setupToken, setSetupToken] = useState('');
+  const [qrCodeUri, setQrCodeUri] = useState('');
 
   // New timesheet form
   const [newTimesheet, setNewTimesheet] = useState({
@@ -57,8 +62,16 @@ function App() {
     email: '',
     name: '',
     password: '',
-    is_admin: false
+    role: 'user',  // 'user', 'admin', 'accounting'
+    weekly_hours: 40
   });
+  
+  // Accounting stats
+  const [accountingMonth, setAccountingMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [accountingStats, setAccountingStats] = useState([]);
 
   // SMTP config form
   const [smtpConfig, setSmtpConfig] = useState({
@@ -69,12 +82,25 @@ function App() {
     admin_email: ''
   });
 
+  // Announcements
+  const [announcements, setAnnouncements] = useState([]);
+  const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    content: '',
+    image_url: null,
+    image_filename: null,
+    active: true
+  });
+
   // Edit user form
   const [editingUser, setEditingUser] = useState(null);
   const [editUserForm, setEditUserForm] = useState({
     email: '',
     name: '',
-    is_admin: false
+    role: 'user',
+    weekly_hours: 40
   });
 
   // Edit timesheet form
@@ -97,15 +123,212 @@ function App() {
   useEffect(() => {
     if (user) {
       fetchTimesheets();
-      if (user.is_admin) {
+      if (user.is_admin || user.role === 'admin') {
         fetchUsers();
         fetchSmtpConfig();
+      }
+      if (user.is_admin || user.role === 'admin' || user.role === 'accounting') {
+        fetchAccountingStats(accountingMonth);
       }
       // preload stats for current month
       fetchMonthlyStats(statsMonth);
       fetchMonthlyRank(statsMonth);
     }
-  }, [user]);
+    // Always fetch active announcements (even if not logged in fully)
+    if (token && user) {
+      // For logged in users, fetch active announcements for display
+      fetchAnnouncements(true);
+      // Fetch available months for expense reports
+      if (selectedApp === 'expenses') {
+        fetchAvailableMonths();
+      }
+    } else {
+      // For non-logged in users, still fetch active announcements
+      fetchAnnouncements(true);
+    }
+  }, [user, selectedApp]);
+
+  const fetchAnnouncements = async (activeOnly = true) => {
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.get(`${API}/announcements`, {
+        params: { active_only: activeOnly },
+        headers
+      });
+      setAnnouncements(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch announcements:', error);
+    }
+  };
+
+  // Expense Report Functions
+  const fetchAvailableMonths = async () => {
+    try {
+      const response = await axios.get(`${API}/travel-expense-reports/available-months`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAvailableMonths(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch available months:', error);
+      setAvailableMonths([]);
+    }
+  };
+
+  const initializeExpenseReport = async (month) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await axios.post(
+        `${API}/travel-expense-reports/initialize/${month}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCurrentExpenseReport(response.data);
+      // Also fetch reports list
+      const reportsResponse = await axios.get(`${API}/travel-expense-reports`, {
+        params: { month },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setExpenseReports(reportsResponse.data || []);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Initialisieren der Abrechnung.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateExpenseReport = async (reportId, updateData) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await axios.put(
+        `${API}/travel-expense-reports/${reportId}`,
+        updateData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCurrentExpenseReport(response.data);
+      setSuccess('Abrechnung erfolgreich aktualisiert!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Aktualisieren der Abrechnung.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitExpenseReport = async (reportId) => {
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post(
+        `${API}/travel-expense-reports/${reportId}/submit`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSuccess('Abrechnung erfolgreich abgeschlossen und zur Prüfung eingereicht!');
+      setTimeout(() => setSuccess(''), 3000);
+      // Reload report
+      const response = await axios.get(`${API}/travel-expense-reports/${reportId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCurrentExpenseReport(response.data);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Abschließen der Abrechnung.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const uploadReceipt = async (reportId, file) => {
+    setLoading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await axios.post(
+        `${API}/travel-expense-reports/${reportId}/upload-receipt`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      setSuccess('Beleg erfolgreich hochgeladen!');
+      setTimeout(() => setSuccess(''), 3000);
+      // Reload report
+      const response = await axios.get(`${API}/travel-expense-reports/${reportId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCurrentExpenseReport(response.data);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Hochladen des Beleges.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteReceipt = async (reportId, receiptId) => {
+    if (!window.confirm('Möchten Sie diesen Beleg wirklich löschen?')) return;
+    setLoading(true);
+    setError('');
+    try {
+      await axios.delete(
+        `${API}/travel-expense-reports/${reportId}/receipts/${receiptId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSuccess('Beleg erfolgreich gelöscht!');
+      setTimeout(() => setSuccess(''), 3000);
+      // Reload report
+      const response = await axios.get(`${API}/travel-expense-reports/${reportId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCurrentExpenseReport(response.data);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Löschen des Beleges.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchChatMessages = async (reportId) => {
+    try {
+      const response = await axios.get(
+        `${API}/travel-expense-reports/${reportId}/chat`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setChatMessages(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch chat messages:', error);
+      setChatMessages([]);
+    }
+  };
+
+  const sendChatMessage = async (reportId, message) => {
+    if (!message || !message.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post(
+        `${API}/travel-expense-reports/${reportId}/chat`,
+        `message=${encodeURIComponent(message)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      setNewChatMessage('');
+      // Reload chat messages
+      await fetchChatMessages(reportId);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Senden der Nachricht.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchUserInfo = async () => {
     try {
@@ -207,6 +430,18 @@ function App() {
 
     try {
       const response = await axios.post(`${API}/auth/login`, loginForm);
+      if (response.data?.requires_2fa_setup) {
+        // User needs to setup 2FA first
+        setSetupToken(response.data.setup_token);
+        // Fetch QR code
+        const qrResponse = await axios.get(`${API}/auth/2fa/setup-qr`, {
+          params: { setup_token: response.data.setup_token }
+        });
+        setQrCodeUri(qrResponse.data.otpauth_uri);
+        setShow2FASetupDialog(true);
+        setSuccess('Bitte richten Sie 2FA ein, indem Sie den QR-Code mit Google Authenticator scannen.');
+        return;
+      }
       if (response.data?.requires_2fa) {
         setTempToken(response.data.temp_token);
         setShowOtpDialog(true);
@@ -251,6 +486,7 @@ function App() {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
+    setSelectedApp(null);
     setTimesheets([]);
     setUsers([]);
   };
@@ -277,7 +513,10 @@ function App() {
       break_minutes: 0,     // 0 als Default
       tasks: '',
       customer_project: '',
-      location: ''
+      location: '',
+      absence_type: null,   // null, "urlaub", "krankheit", "feiertag"
+      travel_time_minutes: 0,  // Fahrzeit in Minuten
+      include_travel_time: false  // Checkbox "Weiterberechnen"
     }));
     
     setNewTimesheet({ week_start: weekStart, entries });
@@ -363,7 +602,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Benutzer erfolgreich erstellt!');
-      setNewUser({ email: '', name: '', password: '', is_admin: false });
+      setNewUser({ email: '', name: '', password: '', role: 'user', weekly_hours: 40 });
       fetchUsers();
     } catch (error) {
       setError('Fehler beim Erstellen des Benutzers.');
@@ -385,13 +624,91 @@ function App() {
       setLoading(false);
     }
   };
+  
+  const fetchAccountingStats = async (month) => {
+    try {
+      const response = await axios.get(`${API}/accounting/monthly-stats`, {
+        params: { month },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAccountingStats(response.data?.stats || []);
+    } catch (error) {
+      console.error('Failed to fetch accounting stats:', error);
+      setAccountingStats([]);
+    }
+  };
+  
+  const downloadAccountingReport = async (month) => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/accounting/monthly-report-pdf`, {
+        params: { month },
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const monthDate = new Date(`${month}-01`);
+      const monthName = monthDate.toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit' });
+      link.setAttribute('download', `Buchhaltungsbericht_${monthName}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setSuccess('Buchhaltungsbericht heruntergeladen!');
+    } catch (error) {
+      setError('Fehler beim Herunterladen des Buchhaltungsberichts.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const approveTimesheet = async (timesheetId) => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/timesheets/${timesheetId}/approve`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Stundenzettel erfolgreich genehmigt!');
+      fetchTimesheets();
+      if (user?.role === 'accounting' || user?.role === 'admin' || user?.is_admin) {
+        fetchAccountingStats(accountingMonth);
+      }
+    } catch (error) {
+      setError('Fehler beim Genehmigen des Stundenzettels.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const rejectTimesheet = async (timesheetId) => {
+    if (!confirm('Möchten Sie die Genehmigung für diesen Stundenzettel wirklich zurückziehen?')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.post(`${API}/timesheets/${timesheetId}/reject`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Genehmigung zurückgezogen!');
+      fetchTimesheets();
+      if (user?.role === 'accounting' || user?.role === 'admin' || user?.is_admin) {
+        fetchAccountingStats(accountingMonth);
+      }
+    } catch (error) {
+      setError('Fehler beim Zurückziehen der Genehmigung.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const editUser = (user) => {
-    setEditingUser(user);
+  const editUser = (userItem) => {
+    setEditingUser(userItem);
     setEditUserForm({
-      email: user.email,
-      name: user.name,
-      is_admin: user.is_admin
+      email: userItem.email,
+      name: userItem.name,
+      role: userItem.role || (userItem.is_admin ? 'admin' : 'user'),
+      weekly_hours: userItem.weekly_hours || 40
     });
   };
 
@@ -551,6 +868,118 @@ function App() {
     return days[date.getDay()];
   };
 
+  // Show app selection if logged in but no app selected
+  if (token && user && !selectedApp) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center mb-4">
+              <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
+              <CardTitle className="text-2xl font-bold" style={{ color: colors.gray }}>
+                Schmitz Intralogistik
+              </CardTitle>
+            </div>
+            <CardDescription>Bitte wählen Sie eine Anwendung</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Announcements Display */}
+            {announcements.length > 0 && (
+              <div className="mb-6 space-y-4">
+                {announcements.map((announcement) => (
+                  <Card key={announcement.id} className="bg-blue-50 border-blue-200">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{announcement.title}</CardTitle>
+                      {announcement.image_url && (
+                        <div className="mt-3">
+                          <img 
+                            src={announcement.image_url} 
+                            alt={announcement.image_filename || 'Ankündigung'} 
+                            className="max-w-full h-auto rounded"
+                            style={{ maxHeight: '300px' }}
+                          />
+                        </div>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: announcement.content }}
+                        className="prose prose-sm max-w-none"
+                      />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* App Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setSelectedApp('timesheets')}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="h-6 w-6 mr-2" style={{ color: colors.primary }} />
+                    Stundenzettel App
+                  </CardTitle>
+                  <CardDescription>
+                    Wöchentliche Zeiterfassung und Stundenzettel-Verwaltung
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setSelectedApp('expenses')}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <MapPin className="h-6 w-6 mr-2" style={{ color: colors.primary }} />
+                    Reisekosten App
+                  </CardTitle>
+                  <CardDescription>
+                    Reisekosten-Erfassung und -Verwaltung
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+            
+            <div className="mt-6 flex justify-between items-center">
+              {(user?.is_admin || user?.role === 'admin') && (
+                <Button 
+                  variant="outline"
+                  onClick={async () => {
+                    // Fetch all announcements for admin
+                    await fetchAnnouncements(false);
+                    setEditingAnnouncement(null);
+                    setAnnouncementForm({
+                      title: '',
+                      content: '',
+                      image_url: null,
+                      image_filename: null,
+                      active: true
+                    });
+                    setShowAnnouncementDialog(true);
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Ankündigungen verwalten
+                </Button>
+              )}
+              <Button 
+                variant="outline"
+                onClick={handleLogout}
+              >
+                Abmelden
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center p-4">
@@ -615,41 +1044,53 @@ function App() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
-              <h1 className="text-xl font-bold" style={{ color: colors.gray }}>
-                Schmitz Intralogistik GmbH - Zeiterfassung
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <User className="h-4 w-4" style={{ color: colors.gray }} />
-                <span style={{ color: colors.gray }}>{user?.name}</span>
-                {user?.is_admin && (
-                  <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
-                )}
+  // Show timesheets app
+  if (selectedApp === 'timesheets') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
+                <h1 className="text-xl font-bold" style={{ color: colors.gray }}>
+                  Schmitz Intralogistik GmbH - Zeiterfassung
+                </h1>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowPasswordDialog(true)}
-              >
-                <Key className="h-4 w-4 mr-1" />
-                Passwort
-              </Button>
-              <Button variant="outline" onClick={handleLogout}>
-                Abmelden
-              </Button>
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedApp(null)}
+                >
+                  App wechseln
+                </Button>
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4" style={{ color: colors.gray }} />
+                  <span style={{ color: colors.gray }}>{user?.name}</span>
+                  {user?.is_admin && (
+                    <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
+                  )}
+                  {user?.role === 'accounting' && (
+                    <Badge style={{ backgroundColor: '#10b981' }}>Buchhaltung</Badge>
+                  )}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowPasswordDialog(true)}
+                >
+                  <Key className="h-4 w-4 mr-1" />
+                  Passwort
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>
+                  Abmelden
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -665,12 +1106,17 @@ function App() {
         )}
 
         <Tabs defaultValue="timesheets" className="space-y-6">
-          {user?.is_admin ? (
+          {user?.is_admin || user?.role === 'admin' ? (
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
               <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
               <TabsTrigger value="stats">Statistiken</TabsTrigger>
               <TabsTrigger value="admin">Admin</TabsTrigger>
+            </TabsList>
+          ) : user?.role === 'accounting' ? (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="timesheets">Alle Stundenzettel</TabsTrigger>
+              <TabsTrigger value="accounting">Buchhaltung</TabsTrigger>
             </TabsList>
           ) : (
             <TabsList className="grid w-full grid-cols-3">
@@ -717,8 +1163,17 @@ function App() {
                             {new Date(timesheet.created_at).toLocaleDateString('de-DE')}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={timesheet.status === 'sent' ? 'default' : 'secondary'}>
-                              {timesheet.status === 'sent' ? 'Versendet' : 'Entwurf'}
+                            <Badge 
+                              variant={
+                                timesheet.status === 'approved' ? 'default' : 
+                                timesheet.status === 'sent' ? 'secondary' : 'outline'
+                              }
+                              style={
+                                timesheet.status === 'approved' ? { backgroundColor: '#10b981' } : {}
+                              }
+                            >
+                              {timesheet.status === 'approved' ? 'Genehmigt' : 
+                               timesheet.status === 'sent' ? 'Versendet' : 'Entwurf'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -734,11 +1189,39 @@ function App() {
                                 size="sm"
                                 onClick={() => sendTimesheetEmail(timesheet.id)}
                                 style={{ backgroundColor: colors.primary }}
-                                disabled={loading}
+                                disabled={loading || timesheet.status === 'approved'}
+                                title={timesheet.status === 'approved' ? 'Stundenzettel bereits genehmigt' : ''}
                               >
                                 <Send className="h-4 w-4" />
                               </Button>
-                              {((user?.is_admin) || (timesheet.user_id === user?.id)) && timesheet.status === 'draft' && (
+                              {(user?.role === 'accounting' || user?.role === 'admin' || user?.is_admin) && (
+                                <>
+                                  {timesheet.status !== 'approved' && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => approveTimesheet(timesheet.id)}
+                                      style={{ backgroundColor: '#10b981' }}
+                                      disabled={loading}
+                                      title="Stundenzettel genehmigen"
+                                    >
+                                      ✓ Genehmigen
+                                    </Button>
+                                  )}
+                                  {timesheet.status === 'approved' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => rejectTimesheet(timesheet.id)}
+                                      disabled={loading}
+                                      title="Genehmigung zurückziehen"
+                                      className="text-orange-600 hover:text-orange-800"
+                                    >
+                                      ✗ Ablehnen
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                              {((user?.is_admin || user?.role === 'admin') || (timesheet.user_id === user?.id)) && timesheet.status === 'draft' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -803,88 +1286,144 @@ function App() {
                       Wöchentliche Zeiterfassung
                     </h3>
                     
-                    {newTimesheet.entries.map((entry, index) => (
-                      <Card key={index} className="p-4">
-                        <div className="flex items-center mb-3">
-                          <Calendar className="h-4 w-4 mr-2" style={{ color: colors.primary }} />
-                          <span className="font-medium" style={{ color: colors.gray }}>
-                            {getDayName(entry.date)} - {new Date(entry.date).toLocaleDateString('de-DE')}
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          <div className="space-y-2">
-                            <Label>Startzeit</Label>
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-2" style={{ color: colors.gray }} />
+                    {newTimesheet.entries.map((entry, index) => {
+                      const hasAbsence = entry.absence_type && entry.absence_type !== '';
+                      return (
+                        <Card key={index} className="p-4">
+                          <div className="flex items-center mb-3">
+                            <Calendar className="h-4 w-4 mr-2" style={{ color: colors.primary }} />
+                            <span className="font-medium" style={{ color: colors.gray }}>
+                              {getDayName(entry.date)} - {new Date(entry.date).toLocaleDateString('de-DE')}
+                            </span>
+                          </div>
+                          
+                          {/* Abwesenheitstyp Dropdown */}
+                          <div className="space-y-2 mb-4">
+                            <Label>Abwesenheitstyp</Label>
+                            <Select
+                              value={entry.absence_type || ''}
+                              onValueChange={(value) => updateEntry(index, 'absence_type', value === '' ? null : value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Keine Abwesenheit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">Keine Abwesenheit</SelectItem>
+                                <SelectItem value="urlaub">Urlaub</SelectItem>
+                                <SelectItem value="krankheit">Krankheit</SelectItem>
+                                <SelectItem value="feiertag">Feiertag</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {/* Zeiten - nur anzeigen wenn keine Abwesenheit */}
+                          {!hasAbsence && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label>Startzeit</Label>
+                                <div className="flex items-center">
+                                  <Clock className="h-4 w-4 mr-2" style={{ color: colors.gray }} />
+                                  <Input
+                                    type="time"
+                                    value={entry.start_time}
+                                    onChange={(e) => updateEntry(index, 'start_time', e.target.value)}
+                                    placeholder="--:--"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label>Endzeit</Label>
+                                <div className="flex items-center">
+                                  <Clock className="h-4 w-4 mr-2" style={{ color: colors.gray }} />
+                                  <Input
+                                    type="time"
+                                    value={entry.end_time}
+                                    onChange={(e) => updateEntry(index, 'end_time', e.target.value)}
+                                    placeholder="--:--"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label>Pause (Minuten)</Label>
+                                <Input
+                                  type="number"
+                                  value={entry.break_minutes}
+                                  onChange={(e) => updateEntry(index, 'break_minutes', parseInt(e.target.value) || 0)}
+                                  min="0"
+                                  placeholder="0"
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label>Ort</Label>
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2" style={{ color: colors.gray }} />
+                                  <Input
+                                    value={entry.location}
+                                    onChange={(e) => updateEntry(index, 'location', e.target.value)}
+                                    placeholder="Arbeitsort"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Fahrzeit - nur anzeigen wenn keine Abwesenheit */}
+                          {!hasAbsence && (
+                            <div className="space-y-4 mt-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Fahrzeit (Minuten)</Label>
+                                  <Input
+                                    type="number"
+                                    value={entry.travel_time_minutes || 0}
+                                    onChange={(e) => updateEntry(index, 'travel_time_minutes', parseInt(e.target.value) || 0)}
+                                    min="0"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2 flex items-end">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`include_travel_${index}`}
+                                      checked={entry.include_travel_time || false}
+                                      onCheckedChange={(checked) => updateEntry(index, 'include_travel_time', checked)}
+                                    />
+                                    <Label htmlFor={`include_travel_${index}`} className="cursor-pointer">
+                                      Weiterberechnen
+                                    </Label>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-2">
+                              <Label>Kunde/Projekt</Label>
                               <Input
-                                type="time"
-                                value={entry.start_time}
-                                onChange={(e) => updateEntry(index, 'start_time', e.target.value)}
-                                placeholder="--:--"
+                                value={entry.customer_project}
+                                onChange={(e) => updateEntry(index, 'customer_project', e.target.value)}
+                                placeholder="Kunde oder Projekt"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Aufgaben</Label>
+                              <Textarea
+                                value={entry.tasks}
+                                onChange={(e) => updateEntry(index, 'tasks', e.target.value)}
+                                placeholder="Erledigte Aufgaben"
+                                className="h-20"
                               />
                             </div>
                           </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Endzeit</Label>
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-2" style={{ color: colors.gray }} />
-                              <Input
-                                type="time"
-                                value={entry.end_time}
-                                onChange={(e) => updateEntry(index, 'end_time', e.target.value)}
-                                placeholder="--:--"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Pause (Minuten)</Label>
-                            <Input
-                              type="number"
-                              value={entry.break_minutes}
-                              onChange={(e) => updateEntry(index, 'break_minutes', parseInt(e.target.value) || 0)}
-                              min="0"
-                              placeholder="0"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Ort</Label>
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-2" style={{ color: colors.gray }} />
-                              <Input
-                                value={entry.location}
-                                onChange={(e) => updateEntry(index, 'location', e.target.value)}
-                                placeholder="Arbeitsort"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                          <div className="space-y-2">
-                            <Label>Kunde/Projekt</Label>
-                            <Input
-                              value={entry.customer_project}
-                              onChange={(e) => updateEntry(index, 'customer_project', e.target.value)}
-                              placeholder="Kunde oder Projekt"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Aufgaben</Label>
-                            <Textarea
-                              value={entry.tasks}
-                              onChange={(e) => updateEntry(index, 'tasks', e.target.value)}
-                              placeholder="Erledigte Aufgaben"
-                              className="h-20"
-                            />
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      );
+                    })}
                     
                     <Button
                       onClick={submitTimesheet}
@@ -930,14 +1469,33 @@ function App() {
                         value={newUser.password}
                         onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                       />
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="is-admin"
-                          checked={newUser.is_admin}
-                          onChange={(e) => setNewUser({ ...newUser, is_admin: e.target.checked })}
+                      <div className="space-y-2">
+                        <Label>Rolle</Label>
+                        <Select
+                          value={newUser.role}
+                          onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">Mitarbeiter</SelectItem>
+                            <SelectItem value="admin">Administrator</SelectItem>
+                            <SelectItem value="accounting">Buchhaltung</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Wochenstundenzahl</Label>
+                        <Input
+                          type="number"
+                          value={newUser.weekly_hours || 40}
+                          onChange={(e) => setNewUser({ ...newUser, weekly_hours: parseFloat(e.target.value) || 40 })}
+                          min="1"
+                          max="60"
+                          step="0.5"
+                          placeholder="40"
                         />
-                        <Label htmlFor="is-admin">Administrator</Label>
                       </div>
                       <Button
                         onClick={createUser}
@@ -961,8 +1519,11 @@ function App() {
                               <span className="text-sm text-gray-500">{userItem.email}</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {userItem.is_admin && (
+                              {userItem.role === 'admin' || userItem.is_admin ? (
                                 <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
+                              ) : null}
+                              {userItem.role === 'accounting' && (
+                                <Badge style={{ backgroundColor: '#10b981' }}>Buchhaltung</Badge>
                               )}
                               <Button
                                 size="sm"
@@ -1107,6 +1668,99 @@ function App() {
               </CardContent>
             </Card>
           </TabsContent>
+          
+          {/* Accounting Tab */}
+          {(user?.role === 'accounting' || user?.role === 'admin' || user?.is_admin) && (
+            <TabsContent value="accounting">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" style={{ color: colors.primary }} />
+                    Buchhaltungsstatistiken
+                  </CardTitle>
+                  <CardDescription>
+                    Detaillierte Monatsstatistiken für die Buchhaltung
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="max-w-xs">
+                      <Label>Monat auswählen</Label>
+                      <Select
+                        value={accountingMonth}
+                        onValueChange={(val) => {
+                          setAccountingMonth(val);
+                          fetchAccountingStats(val);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Monat auswählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getLast12Months().map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={() => downloadAccountingReport(accountingMonth)}
+                      disabled={loading}
+                      style={{ backgroundColor: colors.primary }}
+                      className="mt-6"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      PDF Bericht herunterladen
+                    </Button>
+                  </div>
+
+                  {accountingStats.length === 0 ? (
+                    <p style={{ color: colors.gray }}>Keine Daten für diesen Monat vorhanden.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Mitarbeiter</TableHead>
+                            <TableHead className="text-right">Monatsgesamt-stunden*</TableHead>
+                            <TableHead className="text-right">Stunden auf Stundenzetteln</TableHead>
+                            <TableHead className="text-right">Fahrzeit gesamt</TableHead>
+                            <TableHead className="text-right">Fahrzeit auf Stundenzetteln</TableHead>
+                            <TableHead className="text-right">Kilometer</TableHead>
+                            <TableHead className="text-right">Reisekosten (€)</TableHead>
+                            <TableHead className="text-right">Anzahl Stundenzettel</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {accountingStats.map((stat) => (
+                            <TableRow key={stat.user_id}>
+                              <TableCell>{stat.user_name}</TableCell>
+                              <TableCell className="text-right">{stat.total_hours.toFixed(2)} h</TableCell>
+                              <TableCell className="text-right">{stat.hours_on_timesheets.toFixed(2)} h</TableCell>
+                              <TableCell className="text-right">{stat.travel_hours.toFixed(2)} h</TableCell>
+                              <TableCell className="text-right">{stat.travel_hours_on_timesheets.toFixed(2)} h</TableCell>
+                              <TableCell className="text-right">{stat.travel_kilometers > 0 ? stat.travel_kilometers.toFixed(1) + ' km' : '-'}</TableCell>
+                              <TableCell className="text-right">{stat.travel_expenses > 0 ? stat.travel_expenses.toFixed(2) + ' €' : '-'}</TableCell>
+                              <TableCell className="text-right">{stat.timesheets_count}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <div className="text-sm" style={{ color: colors.gray }}>
+                        <p><b>Erklärung:</b></p>
+                        <p>• <b>Monatsgesamtstunden:</b> Alle Stunden inkl. Fahrzeit (wie in Datenbank gespeichert)</p>
+                        <p>• <b>Stunden auf Stundenzetteln:</b> Stunden die tatsächlich auf den Stundenzettel-PDFs erscheinen</p>
+                        <p>• <b>Fahrzeit gesamt:</b> Gesamte erfasste Fahrzeit (unabhängig von "Weiterberechnen")</p>
+                        <p>• <b>Fahrzeit auf Stundenzetteln:</b> Fahrzeit die auf den Stundenzettel-PDFs erscheint (nur wenn "Weiterberechnen" angehakt)</p>
+                        <p>• <b>Kilometer:</b> Gesamtkilometer für Reisekosten</p>
+                        <p>• <b>Reisekosten:</b> Gesamte Reisekosten in Euro (Spesen, Bahntickets, etc.)</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
@@ -1163,6 +1817,87 @@ function App() {
         </DialogContent>
       </Dialog>
 
+      {/* 2FA Setup Dialog */}
+      <Dialog open={show2FASetupDialog} onOpenChange={setShow2FASetupDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>2FA Einrichtung (Pflicht)</DialogTitle>
+            <DialogDescription>
+              Für Ihre Sicherheit ist 2FA obligatorisch. Bitte scannen Sie den QR-Code mit Google Authenticator.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {qrCodeUri && (
+              <div className="flex justify-center">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeUri)}`}
+                  alt="2FA QR Code"
+                  className="border rounded"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="setup-otp-code">2FA Code aus Google Authenticator</Label>
+              <Input
+                id="setup-otp-code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="000000"
+              />
+              <p className="text-sm text-gray-600">
+                1. Öffnen Sie Google Authenticator auf Ihrem Smartphone<br/>
+                2. Scannen Sie den QR-Code oben<br/>
+                3. Geben Sie den 6-stelligen Code ein
+              </p>
+            </div>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={async () => {
+                  if (!otpCode || otpCode.length !== 6) {
+                    setError('Bitte geben Sie einen 6-stelligen Code ein.');
+                    return;
+                  }
+                  setLoading(true);
+                  setError('');
+                  try {
+                    const response = await axios.post(`${API}/auth/2fa/initial-setup`, {
+                      otp: otpCode,
+                      temp_token: setupToken
+                    });
+                    const { access_token, user: userData } = response.data;
+                    localStorage.setItem('token', access_token);
+                    setToken(access_token);
+                    setUser(userData);
+                    setShow2FASetupDialog(false);
+                    setOtpCode('');
+                    setSetupToken('');
+                    setQrCodeUri('');
+                    setSuccess('2FA erfolgreich eingerichtet!');
+                  } catch (error) {
+                    setError(error.response?.data?.detail || 'Ungültiger 2FA-Code. Bitte erneut versuchen.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }} 
+                disabled={loading || !otpCode || otpCode.length !== 6} 
+                style={{ backgroundColor: colors.primary }}
+              >
+                {loading ? 'Richte ein...' : '2FA aktivieren'}
+              </Button>
+              <Button variant="outline" onClick={() => {
+                setShow2FASetupDialog(false);
+                setOtpCode('');
+                setSetupToken('');
+                setQrCodeUri('');
+              }}>Abbrechen</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* OTP Dialog */}
       <Dialog open={showOtpDialog} onOpenChange={setShowOtpDialog}>
         <DialogContent>
@@ -1190,6 +1925,258 @@ function App() {
               </Button>
               <Button variant="outline" onClick={() => setShowOtpDialog(false)}>Abbrechen</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Announcements Management Dialog */}
+      <Dialog open={showAnnouncementDialog} onOpenChange={setShowAnnouncementDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ankündigungen verwalten</DialogTitle>
+            <DialogDescription>
+              Erstellen und bearbeiten Sie Ankündigungen für die Startseite
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* List of announcements */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold">Bestehende Ankündigungen</h3>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingAnnouncement(null);
+                    setAnnouncementForm({
+                      title: '',
+                      content: '',
+                      image_url: null,
+                      image_filename: null,
+                      active: true
+                    });
+                  }}
+                  style={{ backgroundColor: colors.primary }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Neue Ankündigung
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {announcements.map((ann) => (
+                  <Card key={ann.id} className="p-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{ann.title}</span>
+                          {ann.active ? (
+                            <Badge style={{ backgroundColor: '#10b981' }}>Aktiv</Badge>
+                          ) : (
+                            <Badge variant="outline">Inaktiv</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: ann.content }} />
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingAnnouncement(ann);
+                            setAnnouncementForm({
+                              title: ann.title,
+                              content: ann.content,
+                              image_url: ann.image_url,
+                              image_filename: ann.image_filename,
+                              active: ann.active
+                            });
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            if (window.confirm('Ankündigung wirklich löschen?')) {
+                              try {
+                                await axios.delete(`${API}/announcements/${ann.id}`, {
+                                  headers: { Authorization: `Bearer ${token}` }
+                                });
+                                await fetchAnnouncements(false); // Fetch all for admin view
+                                setSuccess('Ankündigung gelöscht');
+                              } catch (error) {
+                                setError('Fehler beim Löschen');
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+                {announcements.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">Keine Ankündigungen vorhanden</p>
+                )}
+              </div>
+            </div>
+
+            {/* Edit/Create Form */}
+            {(editingAnnouncement !== null || (announcementForm.title || announcementForm.content)) && (
+              <div className="border-t pt-4 space-y-4">
+                <h3 className="font-semibold">
+                  {editingAnnouncement ? 'Ankündigung bearbeiten' : 'Neue Ankündigung'}
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Titel</Label>
+                    <Input
+                      value={announcementForm.title}
+                      onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+                      placeholder="Titel der Ankündigung"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Inhalt (HTML möglich)</Label>
+                    <Textarea
+                      value={announcementForm.content}
+                      onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
+                      placeholder="Inhalt der Ankündigung (HTML-Tags möglich)"
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bild (optional)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setLoading(true);
+                            try {
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              const response = await axios.post(`${API}/announcements/upload-image`, formData, {
+                                headers: {
+                                  Authorization: `Bearer ${token}`,
+                                  'Content-Type': 'multipart/form-data'
+                                }
+                              });
+                              setAnnouncementForm({
+                                ...announcementForm,
+                                image_url: response.data.image_url,
+                                image_filename: response.data.image_filename
+                              });
+                              setSuccess('Bild hochgeladen');
+                            } catch (error) {
+                              setError('Fehler beim Hochladen des Bildes');
+                            } finally {
+                              setLoading(false);
+                            }
+                          }
+                        }}
+                      />
+                      {announcementForm.image_url && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAnnouncementForm({
+                              ...announcementForm,
+                              image_url: null,
+                              image_filename: null
+                            });
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {announcementForm.image_url && (
+                      <div className="mt-2">
+                        <img 
+                          src={announcementForm.image_url} 
+                          alt="Preview" 
+                          className="max-w-xs h-auto rounded border"
+                          style={{ maxHeight: '200px' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="announcement-active"
+                      checked={announcementForm.active}
+                      onCheckedChange={(checked) => setAnnouncementForm({ ...announcementForm, active: checked })}
+                    />
+                    <Label htmlFor="announcement-active" className="cursor-pointer">
+                      Ankündigung aktiv
+                    </Label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={async () => {
+                        if (!announcementForm.title || !announcementForm.content) {
+                          setError('Titel und Inhalt sind erforderlich');
+                          return;
+                        }
+                        setLoading(true);
+                        try {
+                          if (editingAnnouncement) {
+                            await axios.put(`${API}/announcements/${editingAnnouncement.id}`, announcementForm, {
+                              headers: { Authorization: `Bearer ${token}` }
+                            });
+                            setSuccess('Ankündigung aktualisiert');
+                          } else {
+                            await axios.post(`${API}/announcements`, announcementForm, {
+                              headers: { Authorization: `Bearer ${token}` }
+                            });
+                            setSuccess('Ankündigung erstellt');
+                          }
+                          await fetchAnnouncements();
+                          setEditingAnnouncement(null);
+                          setAnnouncementForm({
+                            title: '',
+                            content: '',
+                            image_url: null,
+                            image_filename: null,
+                            active: true
+                          });
+                        } catch (error) {
+                          setError(error.response?.data?.detail || 'Fehler beim Speichern');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      disabled={loading}
+                      style={{ backgroundColor: colors.primary }}
+                    >
+                      {loading ? 'Speichere...' : editingAnnouncement ? 'Aktualisieren' : 'Erstellen'}
+                    </Button>
+                    {editingAnnouncement && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEditingAnnouncement(null);
+                          setAnnouncementForm({
+                            title: '',
+                            content: '',
+                            image_url: null,
+                            image_filename: null,
+                            active: true
+                          });
+                        }}
+                      >
+                        Abbrechen
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1222,14 +2209,33 @@ function App() {
                   onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="edit-is-admin"
-                  checked={editUserForm.is_admin}
-                  onChange={(e) => setEditUserForm({ ...editUserForm, is_admin: e.target.checked })}
+              <div className="space-y-2">
+                <Label>Rolle</Label>
+                <Select
+                  value={editUserForm.role}
+                  onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Mitarbeiter</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                    <SelectItem value="accounting">Buchhaltung</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Wochenstundenzahl</Label>
+                <Input
+                  type="number"
+                  value={editUserForm.weekly_hours || 40}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, weekly_hours: parseFloat(e.target.value) || 40 })}
+                  min="1"
+                  max="60"
+                  step="0.5"
+                  placeholder="40"
                 />
-                <Label htmlFor="edit-is-admin">Administrator</Label>
               </div>
               <div className="flex space-x-2">
                 <Button
@@ -1247,8 +2253,341 @@ function App() {
           </DialogContent>
         </Dialog>
       )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  // Expenses app state
+  const [expenseReportMonth, setExpenseReportMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [expenseReports, setExpenseReports] = useState([]);
+  const [currentExpenseReport, setCurrentExpenseReport] = useState(null);
+  const [availableMonths, setAvailableMonths] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [newChatMessage, setNewChatMessage] = useState('');
+  const [showChatDialog, setShowChatDialog] = useState(false);
+
+  // Show expenses app
+  if (selectedApp === 'expenses') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
+                <h1 className="text-xl font-bold" style={{ color: colors.gray }}>
+                  Schmitz Intralogistik GmbH - Reisekosten
+                </h1>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedApp(null)}
+                >
+                  App wechseln
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>
+                  Abmelden
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {error && (
+            <Alert className="mb-6" variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {success && (
+            <Alert className="mb-6">
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Reisekostenabrechnung</CardTitle>
+              <CardDescription>
+                Erstellen Sie eine Reisekostenabrechnung für einen Monat
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Month Selection */}
+              <div className="space-y-2">
+                <Label>Monat auswählen</Label>
+                <Select
+                  value={expenseReportMonth}
+                  onValueChange={async (month) => {
+                    setExpenseReportMonth(month);
+                    await initializeExpenseReport(month);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Monat auswählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMonths.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Current Report */}
+              {currentExpenseReport && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-semibold">Abrechnung für {currentExpenseReport.month}</h3>
+                      <Badge 
+                        variant={
+                          currentExpenseReport.status === 'approved' ? 'default' :
+                          currentExpenseReport.status === 'in_review' ? 'secondary' :
+                          'outline'
+                        }
+                        style={
+                          currentExpenseReport.status === 'approved' ? { backgroundColor: '#10b981' } :
+                          currentExpenseReport.status === 'in_review' ? { backgroundColor: '#f59e0b' } : {}
+                        }
+                      >
+                        {currentExpenseReport.status === 'approved' ? 'Genehmigt' :
+                         currentExpenseReport.status === 'in_review' ? 'In Prüfung' :
+                         currentExpenseReport.status === 'submitted' ? 'Abgeschlossen' :
+                         'Entwurf'}
+                      </Badge>
+                    </div>
+                    {currentExpenseReport.status === 'draft' && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowChatDialog(true)}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Chat
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            if (window.confirm('Möchten Sie diese Abrechnung wirklich abschließen? Danach können Sie sie nicht mehr bearbeiten.')) {
+                              await submitExpenseReport(currentExpenseReport.id);
+                            }
+                          }}
+                          style={{ backgroundColor: colors.primary }}
+                        >
+                          Abrechnung abschließen
+                        </Button>
+                      </div>
+                    )}
+                    {currentExpenseReport.status === 'in_review' && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowChatDialog(true)}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Chat (Agenten-Rückfragen)
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Entries from Timesheets */}
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Einträge aus Stundenzetteln (automatisch)</h4>
+                    {currentExpenseReport.entries && currentExpenseReport.entries.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Datum</TableHead>
+                            <TableHead>Ort</TableHead>
+                            <TableHead>Kunde/Projekt</TableHead>
+                            <TableHead>Fahrzeit</TableHead>
+                            <TableHead>Tage</TableHead>
+                            {currentExpenseReport.status === 'draft' && <TableHead>Aktionen</TableHead>}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {currentExpenseReport.entries.map((entry, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{new Date(entry.date).toLocaleDateString('de-DE')}</TableCell>
+                              <TableCell>{entry.location || '-'}</TableCell>
+                              <TableCell>{entry.customer_project || '-'}</TableCell>
+                              <TableCell>{entry.travel_time_minutes} Min</TableCell>
+                              <TableCell>{entry.days_count}</TableCell>
+                              {currentExpenseReport.status === 'draft' && (
+                                <TableCell>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={async () => {
+                                      const updatedEntries = currentExpenseReport.entries.filter((_, i) => i !== idx);
+                                      await updateExpenseReport(currentExpenseReport.id, { entries: updatedEntries });
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-sm text-gray-500">Keine Einträge aus genehmigten Stundenzetteln gefunden.</p>
+                    )}
+                  </div>
+
+                  {/* Receipts */}
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Belege (PDFs)</h4>
+                    {currentExpenseReport.status === 'draft' && (
+                      <div className="mb-4">
+                        <Input
+                          type="file"
+                          accept=".pdf"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              await uploadReceipt(currentExpenseReport.id, file);
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Nur PDF-Dateien möglich</p>
+                      </div>
+                    )}
+                    {currentExpenseReport.receipts && currentExpenseReport.receipts.length > 0 ? (
+                      <div className="space-y-2">
+                        {currentExpenseReport.receipts.map((receipt) => (
+                          <Card key={receipt.id} className="p-3">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <span className="font-medium">{receipt.filename}</span>
+                                <span className="text-sm text-gray-500 ml-2">
+                                  ({Math.round(receipt.file_size / 1024)} KB)
+                                </span>
+                              </div>
+                              {currentExpenseReport.status === 'draft' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    await deleteReceipt(currentExpenseReport.id, receipt.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Noch keine Belege hochgeladen</p>
+                    )}
+                  </div>
+
+                  {/* Review Notes */}
+                  {currentExpenseReport.review_notes && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>Prüfnotizen:</strong><br/>
+                        {currentExpenseReport.review_notes}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              {/* No Report Yet */}
+              {!currentExpenseReport && expenseReportMonth && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">Noch keine Abrechnung für diesen Monat vorhanden</p>
+                  <Button
+                    onClick={() => initializeExpenseReport(expenseReportMonth)}
+                    style={{ backgroundColor: colors.primary }}
+                  >
+                    Abrechnung initialisieren
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+
+        {/* Chat Dialog */}
+        <Dialog open={showChatDialog} onOpenChange={(open) => {
+          setShowChatDialog(open);
+          if (open && currentExpenseReport) {
+            fetchChatMessages(currentExpenseReport.id);
+          }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Chat mit Agenten</DialogTitle>
+              <DialogDescription>
+                Klären Sie Rückfragen zur Reisekostenabrechnung
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Chat Messages */}
+              <div className="border rounded-lg p-4 h-96 overflow-y-auto space-y-2">
+                {chatMessages.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Noch keine Nachrichten</p>
+                )}
+                {chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`p-2 rounded ${
+                      msg.sender === 'user' 
+                        ? 'bg-blue-100 ml-8' 
+                        : 'bg-gray-100 mr-8'
+                    }`}
+                  >
+                    <div className="text-xs font-medium mb-1">
+                      {msg.sender === 'user' ? 'Sie' : 'Agent'}
+                    </div>
+                    <div>{msg.message}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {new Date(msg.created_at).toLocaleString('de-DE')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Send Message */}
+              <div className="flex gap-2">
+                <Input
+                  value={newChatMessage}
+                  onChange={(e) => setNewChatMessage(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && newChatMessage.trim()) {
+                      sendChatMessage(currentExpenseReport.id, newChatMessage);
+                    }
+                  }}
+                  placeholder="Nachricht eingeben..."
+                />
+                <Button
+                  onClick={() => {
+                    if (newChatMessage.trim()) {
+                      sendChatMessage(currentExpenseReport.id, newChatMessage);
+                    }
+                  }}
+                  disabled={!newChatMessage.trim()}
+                  style={{ backgroundColor: colors.primary }}
+                >
+                  Senden
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default App;
