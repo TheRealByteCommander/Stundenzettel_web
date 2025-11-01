@@ -3,6 +3,15 @@
 ## 🚀 Express-Installation (5 Minuten)
 
 ### **Voraussetzungen installieren:**
+
+**Windows:**
+- Installieren Sie von den offiziellen Websites:
+  - **Python:** https://www.python.org/downloads/ (Python 3.11+)
+  - **Node.js:** https://nodejs.org/ (Node.js 18.x oder höher)
+  - **MongoDB:** https://www.mongodb.com/try/download/community
+  - **Git:** https://git-scm.com/downloads
+
+**Linux/Mac:**
 ```bash
 # Ubuntu/Debian
 sudo apt update
@@ -11,71 +20,149 @@ sudo apt install python3 python3-pip nodejs npm mongodb git
 # CentOS/RHEL
 sudo yum install python3 python3-pip nodejs npm mongodb-org git
 
-# Windows: Installieren Sie von den offiziellen Websites:
-# - Python: https://www.python.org/downloads/
-# - Node.js: https://nodejs.org/
-# - MongoDB: https://www.mongodb.com/try/download/community
-# - Git: https://git-scm.com/downloads
+# macOS (mit Homebrew)
+brew install python3 node mongodb-community git
 ```
 
 ### **1. Projekt klonen und einrichten:**
+
+**Windows (PowerShell):**
+```powershell
+git clone <REPOSITORY_URL>
+cd Stundenzettel_web
+
+# Backend setup
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1  # PowerShell
+# Oder: venv\Scripts\activate.bat  # CMD
+pip install -r requirements.txt
+
+# Frontend setup
+cd ..\frontend
+npm install -g yarn
+npm install --legacy-peer-deps
+```
+
+**Linux/Mac:**
 ```bash
 git clone <REPOSITORY_URL>
-cd schmitz-zeiterfassung
+cd Stundenzettel_web
 
 # Backend setup
 cd backend
 python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+source venv/bin/activate
 pip install -r requirements.txt
 
 # Frontend setup
 cd ../frontend
 npm install -g yarn
-yarn install
+npm install --legacy-peer-deps
 ```
 
 ### **2. Konfigurationsdateien erstellen:**
 
-**Backend (.env):**
-```bash
-cd ../backend
-echo "MONGO_URL=mongodb://localhost:27017" > .env
-echo "DB_NAME=schmitz_zeiterfassung" >> .env
+**Windows (PowerShell) - Backend (.env):**
+```powershell
+cd backend
+Set-Content .env "MONGO_URL=mongodb://localhost:27017"
+Add-Content .env "DB_NAME=stundenzettel"
 ```
 
-**Frontend (.env):**
+**Windows (CMD) - Backend (.env):**
+```cmd
+cd backend
+echo MONGO_URL=mongodb://localhost:27017 > .env
+echo DB_NAME=stundenzettel >> .env
+```
+
+**Linux/Mac - Backend (.env):**
 ```bash
+cd backend
+echo "MONGO_URL=mongodb://localhost:27017" > .env
+echo "DB_NAME=stundenzettel" >> .env
+```
+
+**Frontend (.env) - Alle Plattformen:**
+```powershell
+# Windows PowerShell
+cd ..\frontend
+Set-Content .env "REACT_APP_BACKEND_URL=http://localhost:8000"
+```
+
+```bash
+# Linux/Mac
 cd ../frontend
-echo "REACT_APP_BACKEND_URL=http://localhost:8001" > .env
+echo "REACT_APP_BACKEND_URL=http://localhost:8000" > .env
 ```
 
 ### **3. MongoDB starten:**
-```bash
-# Linux
-sudo systemctl start mongod
 
-# Windows
+**Windows:**
+```powershell
+# Als Administrator in PowerShell:
 net start MongoDB
 
-# Docker (Alternative)
+# Oder als Service:
+Start-Service MongoDB
+```
+
+**Linux:**
+```bash
+sudo systemctl start mongod
+```
+
+**Mac:**
+```bash
+brew services start mongodb-community
+```
+
+**Docker (Alternative - Alle Plattformen):**
+```powershell
+# Windows PowerShell
+docker run -d --name mongodb -p 27017:27017 mongo:6.0
+```
+
+```bash
+# Linux/Mac
 docker run -d --name mongodb -p 27017:27017 mongo:6.0
 ```
 
 ### **4. Anwendung starten:**
 
-**Terminal 1 - Backend:**
+**Windows (PowerShell) - Terminal 1 (Backend):**
+```powershell
+cd backend
+.\venv\Scripts\Activate.ps1
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Windows (CMD) - Terminal 1 (Backend):**
+```cmd
+cd backend
+venv\Scripts\activate
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Linux/Mac - Terminal 1 (Backend):**
 ```bash
 cd backend
 source venv/bin/activate
-uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Terminal 2 - Frontend:**
-```bash
+**Terminal 2 (Frontend) - Alle Plattformen:**
+```powershell
+# Windows PowerShell
 cd frontend
-yarn start
+npm start
+```
+
+```bash
+# Linux/Mac
+cd frontend
+npm start
 ```
 
 ### **5. Erste Anmeldung:**
