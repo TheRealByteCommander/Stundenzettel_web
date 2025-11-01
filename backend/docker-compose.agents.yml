@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # Agent Service für Proxmox Deployment
+  # Läuft in Proxmox Container/VM, kommuniziert mit Ollama auf GMKTec evo x2
+  agents:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+    container_name: stundenzettel-agents
+    restart: unless-stopped
+    environment:
+      # MongoDB (auf Proxmox oder remote)
+      - MONGO_URL=${MONGO_URL:-mongodb://localhost:27017}
+      - DB_NAME=${DB_NAME:-stundenzettel}
+      
+      # Ollama auf GMKTec evo x2 (Netzwerk-IP)
+      # WICHTIG: Ersetzen Sie 192.168.1.100 mit der tatsächlichen IP des GMKTec-Servers
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.100:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-300}
+      - OLLAMA_MAX_RETRIES=${OLLAMA_MAX_RETRIES:-3}
+      - OLLAMA_RETRY_DELAY=${OLLAMA_RETRY_DELAY:-2.0}
+      
+      # Lokaler Speicher für Belege (auf Proxmox-Host gemountet)
+      - LOCAL_RECEIPTS_PATH=/data/receipts
+      
+      # Encryption (für DSGVO-Compliance)
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      # Mount lokaler Speicher vom Proxmox-Host
+      - /path/to/proxmox/receipts:/data/receipts:rw
+      # Optional: Prompts-Verzeichnis
+      - ./prompts:/app/prompts:ro
+    networks:
+      - agents_network
+    depends_on:
+      - healthcheck
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Health Check Service (prüft Ollama-Verbindung)
+  healthcheck:
+    image: curlimages/curl:latest
+    container_name: agents-healthcheck
+    command: >
+      sh -c "
+        while true; do
+          echo 'Checking Ollama connection...'
+          curl -f ${OLLAMA_BASE_URL:-http://192.168.1.100:11434}/api/tags || echo 'Ollama not reachable'
+          sleep 60
+        done
+      "
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.100:11434}
+    networks:
+      - agents_network
+    restart: unless-stopped
+
+networks:
+  agents_network:
+    driver: bridge
+    # Für Netzwerk-Zugriff zum GMKTec-Server
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+

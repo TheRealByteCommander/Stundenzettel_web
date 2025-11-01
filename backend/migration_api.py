@@ -82,7 +82,7 @@ async def run_migration_async(request: MigrationRequest):
 @migration_router.post("/start")
 async def start_migration(
     request: MigrationRequest
-    # current_user: User = Depends(get_admin_user)  # TODO: Import get_admin_user
+    # current_user: User = Depends(get_admin_user)  # TODO: Import get_admin_user aus server.py
 ):
     """
     Startet Datenbank-Migration
@@ -112,8 +112,8 @@ async def get_migration_status():
 
 @migration_router.post("/test-connection")
 async def test_source_connection(
-    source: SourceConfig,
-    current_user = None  # TODO: get_admin_user dependency
+    source: SourceConfig
+    # current_user: User = Depends(get_admin_user)  # TODO: Import get_admin_user aus server.py
 ):
     """Teste Verbindung zur Source-Datenbank (read-only)"""
     try:

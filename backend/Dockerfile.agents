@@ -1,0 +1,39 @@
+# Dockerfile für Agent-Service (Proxmox Deployment)
+# Agents laufen auf Proxmox, kommunizieren mit Ollama auf GMKTec evo x2
+
+FROM python:3.11-slim
+
+# Arbeitsverzeichnis
+WORKDIR /app
+
+# System-Abhängigkeiten
+RUN apt-get update && apt-get install -y \
+    curl \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python-Abhängigkeiten kopieren und installieren
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Application-Code kopieren
+COPY agents.py .
+COPY compliance.py .
+COPY prompts/ ./prompts/
+
+# Healthcheck-Endpoint-Script
+COPY healthcheck.py .
+
+# Non-root User erstellen
+RUN useradd -m -u 1000 agentuser && \
+    chown -R agentuser:agentuser /app
+
+USER agentuser
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python healthcheck.py
+
+# Start Command (kann durch systemd/service ersetzt werden)
+CMD ["python", "-m", "uvicorn", "agents:app", "--host", "0.0.0.0", "--port", "8000"]
+

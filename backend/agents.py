@@ -31,8 +31,14 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 # Ollama configuration
+# For Proxmox deployment: LLMs run on GMKTec evo x2 in local network
+# Default: http://localhost:11434 (local)
+# Network: http://GMKTEC_IP:11434 (e.g. http://192.168.1.100:11434)
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
+OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '300'))  # 5 minutes default
+OLLAMA_MAX_RETRIES = int(os.getenv('OLLAMA_MAX_RETRIES', '3'))
+OLLAMA_RETRY_DELAY = float(os.getenv('OLLAMA_RETRY_DELAY', '2.0'))  # seconds
 
 # Prompt directory
 PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -153,41 +159,127 @@ class AgentResponse(BaseModel):
     next_agent: Optional[str] = None
 
 class OllamaLLM:
-    """Wrapper for Ollama LLM API"""
+    """Wrapper for Ollama LLM API
+    
+    Supports remote Ollama server on GMKTec evo x2 in local network.
+    Handles network connectivity, timeouts, and retries for Proxmox deployment.
+    """
     
     def __init__(self, base_url: str = OLLAMA_BASE_URL, model: str = OLLAMA_MODEL):
-        self.base_url = base_url
+        self.base_url = base_url.rstrip('/')
         self.model = model
+        self.timeout = OLLAMA_TIMEOUT
+        self.max_retries = OLLAMA_MAX_RETRIES
+        self.retry_delay = OLLAMA_RETRY_DELAY
+        self._session = None
+        logger.info(f"OllamaLLM initialized: {self.base_url}, model={self.model}")
+    
+    async def _get_session(self):
+        """Get or create aiohttp session with connection pooling"""
+        if self._session is None or self._session.closed:
+            # Create session with connection pooling for better performance
+            connector = aiohttp.TCPConnector(
+                limit=10,  # Max connections
+                limit_per_host=5,  # Max connections per host
+                ttl_dns_cache=300,  # DNS cache TTL
+                force_close=False,  # Reuse connections
+                enable_cleanup_closed=True
+            )
+            timeout = aiohttp.ClientTimeout(
+                total=self.timeout,
+                connect=10,  # Connection timeout
+                sock_read=self.timeout  # Read timeout
+            )
+            self._session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=timeout
+            )
+        return self._session
+    
+    async def health_check(self) -> bool:
+        """Check if Ollama server is reachable"""
+        try:
+            session = await self._get_session()
+            async with session.get(
+                f"{self.base_url}/api/tags",
+                timeout=aiohttp.ClientTimeout(total=5)
+            ) as response:
+                if response.status == 200:
+                    logger.info(f"Ollama health check OK: {self.base_url}")
+                    return True
+                else:
+                    logger.warning(f"Ollama health check failed: {response.status}")
+                    return False
+        except Exception as e:
+            logger.warning(f"Ollama health check error: {e}")
+            return False
     
     async def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
-        """Send chat messages to Ollama and get response"""
-        try:
-            # Prepare messages with system prompt
-            formatted_messages = []
-            if system_prompt:
-                formatted_messages.append({"role": "system", "content": system_prompt})
-            formatted_messages.extend(messages)
-            
-            async with aiohttp.ClientSession() as session:
+        """Send chat messages to Ollama and get response with retry logic"""
+        # Prepare messages with system prompt
+        formatted_messages = []
+        if system_prompt:
+            formatted_messages.append({"role": "system", "content": system_prompt})
+        formatted_messages.extend(messages)
+        
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                session = await self._get_session()
                 async with session.post(
                     f"{self.base_url}/api/chat",
                     json={
                         "model": self.model,
                         "messages": formatted_messages,
-                        "stream": False
-                    },
-                    timeout=aiohttp.ClientTimeout(total=120)
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.7,
+                            "num_predict": 4096  # Max tokens
+                        }
+                    }
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
-                        return result.get("message", {}).get("content", "")
+                        content = result.get("message", {}).get("content", "")
+                        if content:
+                            logger.debug(f"Ollama response received (attempt {attempt + 1})")
+                            return content
+                        else:
+                            logger.warning(f"Empty response from Ollama (attempt {attempt + 1})")
+                            last_error = "Empty response from LLM"
                     else:
                         error_text = await response.text()
-                        logger.error(f"Ollama API error: {response.status} - {error_text}")
-                        return f"Fehler bei LLM-Anfrage: {response.status}"
-        except Exception as e:
-            logger.error(f"Error calling Ollama: {e}")
-            return f"Fehler bei Kommunikation mit LLM: {str(e)}"
+                        logger.error(f"Ollama API error: {response.status} - {error_text[:200]}")
+                        last_error = f"API error {response.status}"
+                        
+            except aiohttp.ClientConnectorError as e:
+                last_error = f"Connection error: {str(e)}"
+                logger.warning(f"Ollama connection error (attempt {attempt + 1}/{self.max_retries}): {e}")
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
+                    
+            except asyncio.TimeoutError:
+                last_error = "Request timeout"
+                logger.warning(f"Ollama timeout (attempt {attempt + 1}/{self.max_retries})")
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))
+                    
+            except Exception as e:
+                last_error = f"Unexpected error: {str(e)}"
+                logger.error(f"Ollama error (attempt {attempt + 1}/{self.max_retries}): {e}")
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))
+        
+        # All retries failed
+        error_msg = f"Fehler bei Kommunikation mit LLM nach {self.max_retries} Versuchen: {last_error}"
+        logger.error(error_msg)
+        return error_msg
+    
+    async def close(self):
+        """Close the HTTP session"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
     
     async def extract_json(self, prompt: str, system_prompt: Optional[str] = None) -> Optional[Dict]:
         """Extract structured JSON from LLM response"""
@@ -668,14 +760,48 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
 class AgentOrchestrator:
     """Orchestrates the agent network for expense report review"""
     
-    def __init__(self):
-        self.llm = OllamaLLM()
+    def __init__(self, llm: Optional[OllamaLLM] = None):
+        self.llm = llm or OllamaLLM()
+        self.message_bus = AgentMessageBus()
         self.chat_agent = ChatAgent(self.llm)
-        self.document_agent = DocumentAgent(self.llm)
-        self.accounting_agent = AccountingAgent(self.llm)
+        self.document_agent = DocumentAgent(self.llm, self.message_bus)
+        self.accounting_agent = AccountingAgent(self.llm, self.message_bus)
+        self._llm_health_checked = False
+    
+    async def ensure_llm_available(self):
+        """Check LLM availability and warn if not reachable"""
+        if not self._llm_health_checked:
+            is_healthy = await self.llm.health_check()
+            if not is_healthy:
+                logger.error(f"⚠️ Ollama LLM nicht erreichbar: {self.llm.base_url}")
+                logger.error("Bitte überprüfen Sie:")
+                logger.error(f"  1. Ollama läuft auf dem GMKTec-Server")
+                logger.error(f"  2. Netzwerk-Verbindung zum GMKTec-Server")
+                logger.error(f"  3. Firewall-Regeln erlauben Zugriff")
+                logger.error(f"  4. OLLAMA_BASE_URL ist korrekt konfiguriert")
+            else:
+                logger.info(f"✅ Ollama LLM erreichbar: {self.llm.base_url}")
+            self._llm_health_checked = True
+            return is_healthy
+        return True
+    
+    def broadcast_message(self, from_agent: str, message: Dict[str, Any]):
+        """Broadcast message to all agents via message bus"""
+        self.message_bus.broadcast(from_agent, message)
+    
+    def send_message(self, from_agent: str, to_agent: str, message: Dict[str, Any]):
+        """Send message from one agent to another"""
+        self.message_bus.publish(from_agent, to_agent, message)
+    
+    async def close(self):
+        """Clean up resources"""
+        await self.llm.close()
     
     async def review_expense_report(self, report_id: str, db) -> Dict[str, Any]:
         """Main orchestration method for reviewing an expense report"""
+        # Ensure LLM is available
+        await self.ensure_llm_available()
+        
         # Fetch report
         report = await db.travel_expense_reports.find_one({"id": report_id})
         if not report:
