@@ -2332,6 +2332,8 @@ async def submit_expense_report(
     try:
         from agents import AgentOrchestrator
         orchestrator = AgentOrchestrator()
+        # Ensure LLM is available before starting review
+        await orchestrator.ensure_llm_available()
         # Run in background task
         import asyncio
         
@@ -2565,6 +2567,8 @@ async def send_chat_message(
         try:
             from agents import AgentOrchestrator
             orchestrator = AgentOrchestrator()
+            # Ensure LLM is available
+            await orchestrator.ensure_llm_available()
             agent_response = await orchestrator.handle_user_message(report_id, message, db)
             
             # If agent needs more info or wants to continue, it will be handled by the response
