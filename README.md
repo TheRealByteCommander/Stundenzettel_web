@@ -15,17 +15,28 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 
 ### Reisekosten-App
 - ✅ Automatische Befüllung aus genehmigten Stundenzetteln
-- ✅ PDF-Beleg-Upload (lokale Speicherung)
+- ✅ PDF-Beleg-Upload (lokale Speicherung, DSGVO-konform)
 - ✅ Monatsbasierte Abrechnungen (aktueller + 2 Monate zurück)
 - ✅ Chat-System für Rückfragen mit Agenten
 - ✅ Status-Management (Entwurf, In Prüfung, Genehmigt)
-- ⏳ Automatische Prüfung mit Ollama LLM (in Entwicklung)
+- ✅ Automatische Prüfung mit Ollama LLM-Agenten
+  - Dokumentenanalyse (OCR, Kategorisierung, Validierung)
+  - Buchhaltungszuordnung (Verpflegungsmehraufwand, Spesensätze)
+  - Chat-Agent für Rückfragen
 
 ### Weitere Features
 - ✅ Benutzer- und Adminverwaltung mit Rollen (User, Admin, Buchhaltung)
 - ✅ Obligatorische 2FA (Google Authenticator)
 - ✅ Ankündigungen/News-System mit Bildern
-- ✅ Responsive Web-Interface
+- ✅ Mobile-First Responsive Web-Interface
+- ✅ PWA-Support (Installierbar auf Mobilgeräten)
+- ✅ DSGVO & EU-AI-Act Compliance
+  - Datenverschlüsselung (Fernet/AES-128)
+  - Audit-Logging
+  - Retention-Management
+  - AI-Transparenz
+- ✅ Datenbank-Migrations-Tool (Import aus Vorgänger-Version)
+- ✅ LLM-Integration für Proxmox (Agents auf Proxmox, LLMs auf GMKTec evo x2)
 
 ## 📘 Installationsanleitungen
 
@@ -294,18 +305,37 @@ LOCAL_RECEIPTS_PATH=C:/Reisekosten_Belege
 - Unter Windows: Verwenden Sie absolute Pfade mit Laufwerksbuchstaben (z.B. `C:/Reisekosten_Belege`)
 - Unter Linux: Verwenden Sie absolute Pfade (z.B. `/var/receipts`)
 
-### Ollama LLM Integration (in Entwicklung)
+### Ollama LLM Integration
 
 Für die automatische Prüfung von Reisekostenabrechnungen:
 
+**Architektur:**
+- Agents laufen auf Proxmox-Server
+- LLMs laufen auf GMKTec evo x2 Rechner im lokalen Netzwerk
+
+**Konfiguration:**
 ```env
-OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_BASE_URL=http://192.168.1.100:11434  # IP des GMKTec-Servers
 OLLAMA_MODEL=llama3.2
+OLLAMA_TIMEOUT=300
+OLLAMA_MAX_RETRIES=3
 ```
 
-**Hinweis:** Die LLM-Integration ist derzeit noch nicht vollständig implementiert.
+Siehe **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** für Details.
 
-## Weitere Informationen
+## 📚 Weitere Dokumentation
 
-Detaillierte Installationsanleitung für andere Server: Siehe `webapp/INSTALLATION.md`
-Änderungshistorie: Siehe `CHANGELOG.md`
+- **Installationsanleitungen:**
+  - [INSTALLATION_ALL_INKL.md](INSTALLATION_ALL_INKL.md) - All-inkl.com spezifisch
+  - [INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md) - Allgemeine Installation
+  - [QUICK_START.md](QUICK_START.md) - Schnellstart
+
+- **Feature-Dokumentation:**
+  - [backend/AGENTS_README.md](backend/AGENTS_README.md) - Agent-Netzwerk
+  - [backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md) - LLM-Integration (Proxmox/GMKTec)
+  - [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) - Datenbank-Migration
+  - [backend/MIGRATION_README.md](backend/MIGRATION_README.md) - Migration API
+  - [backend/DSGVO_COMPLIANCE.md](backend/DSGVO_COMPLIANCE.md) - DSGVO & EU-AI-Act
+  - [frontend/src/SECURITY.md](frontend/src/SECURITY.md) - Frontend-Sicherheit
+
+- **Änderungshistorie:** Siehe [CHANGELOG.md](CHANGELOG.md)

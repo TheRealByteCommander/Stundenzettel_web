@@ -100,8 +100,11 @@ LOCAL_RECEIPTS_PATH=C:/Reisekosten_Belege
 ENCRYPTION_KEY=generate-with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
 # Ollama LLM (für AI-Agenten)
-OLLAMA_BASE_URL=http://localhost:11434
+# Für Proxmox: LLMs laufen auf GMKTec evo x2 im lokalen Netzwerk
+OLLAMA_BASE_URL=http://192.168.1.100:11434  # IP des GMKTec-Servers
 OLLAMA_MODEL=llama3.2
+OLLAMA_TIMEOUT=300
+OLLAMA_MAX_RETRIES=3
 ```
 
 ### Verschlüsselungsschlüssel generieren

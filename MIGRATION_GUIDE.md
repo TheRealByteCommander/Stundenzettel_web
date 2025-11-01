@@ -6,6 +6,8 @@ Dieses Tool ermöglicht die sichere Migration von Daten aus einer Vorgänger-Ver
 
 **🔒 Sicherheit:** Die Source-Datenbank wird **NIE verändert** - nur gelesen!
 
+**⚠️ Wichtig:** Das Tool kann sowohl über die Kommandozeile als auch über die API verwendet werden.
+
 ---
 
 ## 🎯 Was wird migriert?
