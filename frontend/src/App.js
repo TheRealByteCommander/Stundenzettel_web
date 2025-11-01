@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from './components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table';
 import { Checkbox } from './components/ui/checkbox';
-import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X, Menu, Home, LogOut, ChevronLeft } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
 import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
@@ -1144,21 +1144,179 @@ function App() {
     );
   }
 
+  // Mobile Navigation Component
+  const MobileNavigation = () => {
+    if (!selectedApp) return null;
+    
+    return (
+      <>
+        {/* Mobile Menu Button */}
+        <button
+          className="mobile-menu-button md:hidden"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Menü öffnen"
+        >
+          <Menu className="h-6 w-6" style={{ color: colors.primary }} />
+        </button>
+
+        {/* Mobile Menu Overlay */}
+        <div 
+          className={`mobile-menu-overlay ${mobileMenuOpen ? 'open' : ''} md:hidden`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+
+        {/* Mobile Menu Sidebar */}
+        <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''} md:hidden`}>
+          <div className="p-4 border-b flex items-center justify-between">
+            <div className="flex items-center">
+              <Building className="h-6 w-6 mr-2" style={{ color: colors.primary }} />
+              <span className="font-bold" style={{ color: colors.gray }}>Schmitz</span>
+            </div>
+            <button onClick={() => setMobileMenuOpen(false)}>
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <div className="p-2">
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <User className="h-5 w-5" style={{ color: colors.gray }} />
+                <span className="font-semibold">{user?.name}</span>
+              </div>
+              {user?.is_admin && (
+                <Badge style={{ backgroundColor: colors.primary }}>Admin</Badge>
+              )}
+              {user?.role === 'accounting' && (
+                <Badge style={{ backgroundColor: '#10b981' }}>Buchhaltung</Badge>
+              )}
+            </div>
+
+            <button
+              className="mobile-menu-item w-full text-left"
+              onClick={() => {
+                setSelectedApp(null);
+                setMobileMenuOpen(false);
+              }}
+            >
+              <Home className="h-5 w-5" />
+              <span>App-Auswahl</span>
+            </button>
+
+            <button
+              className="mobile-menu-item w-full text-left"
+              onClick={() => {
+                setShowPasswordDialog(true);
+                setMobileMenuOpen(false);
+              }}
+            >
+              <Key className="h-5 w-5" />
+              <span>Passwort ändern</span>
+            </button>
+
+            <button
+              className="mobile-menu-item w-full text-left"
+              onClick={() => {
+                handleLogout();
+                setMobileMenuOpen(false);
+              }}
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Abmelden</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Navigation (Mobile Only) */}
+        {selectedApp === 'timesheets' && (
+          <nav className="mobile-nav md:hidden">
+            <button
+              className={activeTab === 'timesheets' ? 'active' : ''}
+              onClick={() => {
+                setActiveTab('timesheets');
+                document.querySelector('[value="timesheets"]')?.click();
+              }}
+            >
+              <Calendar className="h-5 w-5" />
+              <span>Übersicht</span>
+            </button>
+            <button
+              className={activeTab === 'new-timesheet' ? 'active' : ''}
+              onClick={() => {
+                setActiveTab('new-timesheet');
+                document.querySelector('[value="new-timesheet"]')?.click();
+              }}
+            >
+              <Plus className="h-5 w-5" />
+              <span>Neu</span>
+            </button>
+            <button
+              className={activeTab === 'stats' ? 'active' : ''}
+              onClick={() => {
+                setActiveTab('stats');
+                document.querySelector('[value="stats"]')?.click();
+              }}
+            >
+              <Building className="h-5 w-5" />
+              <span>Statistiken</span>
+            </button>
+            {(user?.is_admin || user?.role === 'admin') && (
+              <button
+                className={activeTab === 'admin' ? 'active' : ''}
+                onClick={() => {
+                  setActiveTab('admin');
+                  document.querySelector('[value="admin"]')?.click();
+                }}
+              >
+                <Settings className="h-5 w-5" />
+                <span>Admin</span>
+              </button>
+            )}
+          </nav>
+        )}
+
+        {selectedApp === 'expenses' && (
+          <nav className="mobile-nav md:hidden">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              <MapPin className="h-5 w-5" />
+              <span>Abrechnung</span>
+            </button>
+            <button onClick={() => {
+              if (currentExpenseReport?.id) {
+                setShowChatDialog(true);
+              }
+            }}>
+              <MessageSquare className="h-5 w-5" />
+              <span>Chat</span>
+            </button>
+          </nav>
+        )}
+      </>
+    );
+  };
+
   // Show timesheets app
   if (selectedApp === 'timesheets') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 content-with-mobile-nav">
+        {/* Mobile Navigation */}
+        <MobileNavigation />
+        
         {/* Header */}
-        <header className="bg-white shadow-sm border-b">
+        <header className="bg-white shadow-sm border-b safe-top">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
+              {/* Mobile: Only show logo, Desktop: Full header */}
               <div className="flex items-center">
-                <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
-                <h1 className="text-xl font-bold" style={{ color: colors.gray }}>
+                <Building className="h-6 w-6 sm:h-8 sm:w-8 mr-2" style={{ color: colors.primary }} />
+                <h1 className="text-base sm:text-xl font-bold hidden sm:block" style={{ color: colors.gray }}>
                   Schmitz Intralogistik GmbH - Zeiterfassung
                 </h1>
+                <h1 className="text-base font-bold sm:hidden" style={{ color: colors.gray }}>
+                  Zeiterfassung
+                </h1>
               </div>
-              <div className="flex items-center space-x-4">
+              {/* Desktop Header Actions */}
+              <div className="hidden md:flex items-center space-x-4">
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -1205,26 +1363,40 @@ function App() {
           </Alert>
         )}
 
-        <Tabs defaultValue="timesheets" className="space-y-6">
-          {user?.is_admin || user?.role === 'admin' ? (
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
-              <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
-              <TabsTrigger value="stats">Statistiken</TabsTrigger>
-              <TabsTrigger value="admin">Admin</TabsTrigger>
-            </TabsList>
-          ) : user?.role === 'accounting' ? (
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="timesheets">Alle Stundenzettel</TabsTrigger>
-              <TabsTrigger value="accounting">Buchhaltung</TabsTrigger>
-            </TabsList>
-          ) : (
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
-              <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
-              <TabsTrigger value="stats">Statistiken</TabsTrigger>
-            </TabsList>
-          )}
+        <Tabs defaultValue="timesheets" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          {/* Desktop Tabs - Hidden on Mobile (Bottom Nav used instead) */}
+          <div className="hidden md:block">
+            {user?.is_admin || user?.role === 'admin' ? (
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
+                <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
+                <TabsTrigger value="stats">Statistiken</TabsTrigger>
+                <TabsTrigger value="admin">Admin</TabsTrigger>
+              </TabsList>
+            ) : user?.role === 'accounting' ? (
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="timesheets">Alle Stundenzettel</TabsTrigger>
+                <TabsTrigger value="accounting">Buchhaltung</TabsTrigger>
+              </TabsList>
+            ) : (
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
+                <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
+                <TabsTrigger value="stats">Statistiken</TabsTrigger>
+              </TabsList>
+            )}
+          </div>
+          
+          {/* Mobile Tab Title */}
+          <div className="md:hidden mb-4">
+            <h2 className="text-xl font-bold" style={{ color: colors.gray }}>
+              {activeTab === 'timesheets' && 'Stundenzettel'}
+              {activeTab === 'new-timesheet' && 'Neuer Stundenzettel'}
+              {activeTab === 'stats' && 'Statistiken'}
+              {activeTab === 'admin' && 'Administration'}
+              {activeTab === 'accounting' && 'Buchhaltung'}
+            </h2>
+          </div>
 
           {/* Timesheets Tab */}
           <TabsContent value="timesheets">
@@ -2401,6 +2573,10 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [newChatMessage, setNewChatMessage] = useState('');
   const [showChatDialog, setShowChatDialog] = useState(false);
+  
+  // Mobile Navigation State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('timesheets');
 
   // Show expenses app
   if (selectedApp === 'expenses') {
