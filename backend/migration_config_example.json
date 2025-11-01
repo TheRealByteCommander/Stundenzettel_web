@@ -1,0 +1,62 @@
+{
+  "description": "Beispiel-Mapping-Konfiguration für Datenbank-Migration",
+  "source_type": "mongo",
+  "mappings": {
+    "users": {
+      "collection": "users",
+      "field_mappings": {
+        "email": "email",
+        "name": "name",
+        "password_hash": "password_hash",
+        "is_admin": "is_admin",
+        "weekly_hours": "weeklyHours"
+      }
+    },
+    "timesheets": {
+      "collection": "timesheets",
+      "field_mappings": {
+        "user_id": "userId",
+        "user_name": "userName",
+        "week_start": "weekStart",
+        "week_end": "weekEnd",
+        "entries": "entries",
+        "status": "status"
+      }
+    },
+    "travel_expenses": {
+      "collection": "travel_expenses",
+      "field_mappings": {
+        "user_id": "userId",
+        "user_name": "userName",
+        "date": "date",
+        "description": "description",
+        "kilometers": "kilometers",
+        "expenses": "expenses"
+      }
+    }
+  },
+  "mysql_mappings": {
+    "users": {
+      "table": "users",
+      "columns": {
+        "email": "email",
+        "name": "name",
+        "password": "password_hash",
+        "is_admin": "is_admin"
+      }
+    },
+    "timesheets": {
+      "table": "timesheets",
+      "columns": {
+        "id": "id",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "week_start": "week_start",
+        "week_end": "week_end",
+        "entries": "entries",
+        "status": "status"
+      }
+    }
+  }
+}
+
