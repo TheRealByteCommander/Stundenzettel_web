@@ -251,6 +251,8 @@ class TravelExpenseReport(BaseModel):
     receipts: List[TravelExpenseReceipt] = []  # Hochgeladene PDFs
     status: str = "draft"  # draft, submitted, in_review, approved
     review_notes: Optional[str] = None  # Notizen von Agenten/Prüfung
+    accounting_data: Optional[Dict[str, Any]] = None  # Ergebnis von Accounting Agent
+    document_analyses: Optional[List[Dict[str, Any]]] = None  # Ergebnisse von Document Agent
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     submitted_at: Optional[datetime] = None
@@ -2302,8 +2304,15 @@ async def submit_expense_report(
         }
     )
     
-    # TODO: Trigger automatic review with Ollama LLM
-    # await review_expense_report_with_llm(report_id)
+    # Trigger automatic review with agent network (async, non-blocking)
+    try:
+        from agents import AgentOrchestrator
+        orchestrator = AgentOrchestrator()
+        # Run in background task
+        import asyncio
+        asyncio.create_task(orchestrator.review_expense_report(report_id, db))
+    except Exception as e:
+        logger.warning(f"Could not start agent review: {e}")
     
     return {"message": "Report submitted and queued for review"}
 
@@ -2476,9 +2485,17 @@ async def send_chat_message(
     user_msg_dict["created_at"] = datetime.utcnow()
     await db.chat_messages.insert_one(user_msg_dict)
     
-    # TODO: If report is in_review, trigger agent response via Ollama LLM
-    # if report.get("status") == "in_review":
-    #     await trigger_agent_response(report_id, message)
+    # If report is in_review, trigger agent response
+    if report.get("status") == "in_review":
+        try:
+            from agents import AgentOrchestrator
+            orchestrator = AgentOrchestrator()
+            agent_response = await orchestrator.handle_user_message(report_id, message, db)
+            
+            # If agent needs more info or wants to continue, it will be handled by the response
+            return agent_response.model_dump()
+        except Exception as e:
+            logger.warning(f"Could not get agent response: {e}")
     
     return user_msg
 
