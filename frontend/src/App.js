@@ -20,6 +20,35 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000');
 const API = `${BACKEND_URL}/api`;
 
+// Axios interceptor for automatic token refresh and error handling
+axios.interceptors.request.use(
+  (config) => {
+    // Add token to every request
+    const token = getSecureToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle 401 - token expired or invalid
+    if (error.response?.status === 401) {
+      clearSecureToken();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Company colors
 const colors = {
   primary: '#e90118',    // Rot
@@ -466,8 +495,33 @@ function App() {
     setLoading(true);
     setError('');
 
+    // Rate limiting check
+    if (!checkRateLimit(5, 60000)) { // Max 5 requests per minute
+      setError('Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut.');
+      setLoading(false);
+      return;
+    }
+
+    // Input validation and sanitization
+    const sanitizedEmail = sanitizeInput(loginForm.email);
+    if (!validateEmail(sanitizedEmail)) {
+      setError('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+      setLoading(false);
+      return;
+    }
+
+    const sanitizedPassword = sanitizeInput(loginForm.password);
+    if (sanitizedPassword.length < 8 || sanitizedPassword.length > 128) {
+      setError('Ungültiges Passwort.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post(`${API}/auth/login`, loginForm);
+      const response = await axios.post(`${API}/auth/login`, {
+        email: sanitizedEmail,
+        password: sanitizedPassword
+      });
       if (response.data?.requires_2fa_setup) {
         // User needs to setup 2FA first
         setSetupToken(response.data.setup_token);
@@ -522,7 +576,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    clearSecureToken(); // Clear all tokens securely
     setToken(null);
     setUser(null);
     setSelectedApp(null);
