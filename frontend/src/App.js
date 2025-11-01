@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
@@ -13,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Checkbox } from './components/ui/checkbox';
 import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
+import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000');
@@ -27,7 +29,7 @@ const colors = {
 
 function App() {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(getSecureToken()); // Use secure token getter
   const [selectedApp, setSelectedApp] = useState(null); // null, 'timesheets', 'expenses'
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [timesheets, setTimesheets] = useState([]);
@@ -242,6 +244,42 @@ function App() {
   const uploadReceipt = async (reportId, file) => {
     setLoading(true);
     setError('');
+    
+    // Security: Validate file
+    if (!file) {
+      setError('Keine Datei ausgewählt.');
+      setLoading(false);
+      return;
+    }
+
+    // Validate filename
+    if (!validateFilename(file.name)) {
+      setError('Ungültiger Dateiname. Dateiname darf keine Sonderzeichen oder Pfad-Trenner enthalten.');
+      setLoading(false);
+      return;
+    }
+
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setError('Nur PDF-Dateien sind erlaubt.');
+      setLoading(false);
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Datei ist zu groß. Maximale Größe: 10MB.');
+      setLoading(false);
+      return;
+    }
+
+    // Rate limiting for uploads
+    if (!checkRateLimit(10, 60000)) { // Max 10 uploads per minute
+      setError('Zu viele Uploads. Bitte versuchen Sie es später erneut.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -340,7 +378,7 @@ function App() {
       console.error('Failed to fetch user info:', error);
       // Only clear token if it's an authentication error (401)
       if (error.response?.status === 401) {
-        localStorage.removeItem('token');
+        clearSecureToken(); // Clear all tokens securely
         setToken(null);
         setUser(null);
       }
@@ -450,7 +488,8 @@ function App() {
       }
       const { access_token, user: userData } = response.data;
       
-      localStorage.setItem('token', access_token);
+      // Secure token storage with expiration
+      setSecureToken(access_token, 24); // 24 hours expiration
       setToken(access_token);
       setUser(userData);
       setSuccess('Erfolgreich angemeldet!');
@@ -468,7 +507,7 @@ function App() {
     try {
       const response = await axios.post(`${API}/auth/2fa/verify`, { otp: otpCode, temp_token: tempToken });
       const { access_token, user: userData } = response.data;
-      localStorage.setItem('token', access_token);
+      setSecureToken(access_token, 24); // Secure token storage
       setToken(access_token);
       setUser(userData);
       setShowOtpDialog(false);
@@ -1011,7 +1050,10 @@ function App() {
                   id="email"
                   type="email"
                   value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                          onChange={(e) => {
+                            const sanitized = sanitizeInput(e.target.value);
+                            setLoginForm({ ...loginForm, email: sanitized });
+                          }}
                   required
                 />
               </div>
@@ -1021,7 +1063,11 @@ function App() {
                   id="password"
                   type="password"
                   value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                          onChange={(e) => {
+                            // Password: Don't sanitize (needs special chars), but limit length
+                            const value = e.target.value.slice(0, 128); // Max 128 chars
+                            setLoginForm({ ...loginForm, password: value });
+                          }}
                   required
                 />
               </div>
@@ -1868,7 +1914,7 @@ function App() {
                       temp_token: setupToken
                     });
                     const { access_token, user: userData } = response.data;
-                    localStorage.setItem('token', access_token);
+                    setSecureToken(access_token, 24); // Secure token storage
                     setToken(access_token);
                     setUser(userData);
                     setShow2FASetupDialog(false);
@@ -1974,7 +2020,11 @@ function App() {
                             <Badge variant="outline">Inaktiv</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: ann.content }} />
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(ann.content, {
+                          ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u'],
+                          ALLOWED_ATTR: [],
+                          ALLOW_DATA_ATTR: false
+                        }) }} />
                       </div>
                       <div className="flex gap-2 ml-4">
                         <Button
@@ -2033,7 +2083,10 @@ function App() {
                     <Label>Titel</Label>
                     <Input
                       value={announcementForm.title}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+                      onChange={(e) => {
+                        const sanitized = sanitizeInput(e.target.value).slice(0, 200); // Max 200 chars
+                        setAnnouncementForm({ ...announcementForm, title: sanitized });
+                      }}
                       placeholder="Titel der Ankündigung"
                     />
                   </div>
@@ -2041,8 +2094,12 @@ function App() {
                     <Label>Inhalt (HTML möglich)</Label>
                     <Textarea
                       value={announcementForm.content}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
-                      placeholder="Inhalt der Ankündigung (HTML-Tags möglich)"
+                      onChange={(e) => {
+                        // Content can contain HTML, but limit length to prevent abuse
+                        const content = e.target.value.slice(0, 10000); // Max 10000 chars
+                        setAnnouncementForm({ ...announcementForm, content });
+                      }}
+                      placeholder="Inhalt der Ankündigung (HTML-Tags möglich, wird beim Speichern sanitized)"
                       className="min-h-[100px]"
                     />
                   </div>
@@ -2119,19 +2176,41 @@ function App() {
                   <div className="flex gap-2">
                     <Button
                       onClick={async () => {
-                        if (!announcementForm.title || !announcementForm.content) {
-                          setError('Titel und Inhalt sind erforderlich');
+                        // Input validation
+                        const sanitizedTitle = sanitizeInput(announcementForm.title).trim();
+                        if (!sanitizedTitle || sanitizedTitle.length < 3 || sanitizedTitle.length > 200) {
+                          setError('Titel muss zwischen 3 und 200 Zeichen lang sein');
                           return;
                         }
+                        
+                        if (!announcementForm.content || announcementForm.content.trim().length < 10) {
+                          setError('Inhalt muss mindestens 10 Zeichen lang sein');
+                          return;
+                        }
+
+                        // Sanitize HTML content before sending (backend will sanitize again)
+                        const sanitizedContent = DOMPurify.sanitize(announcementForm.content, {
+                          ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a'],
+                          ALLOWED_ATTR: ['href', 'title', 'target']
+                        });
+
                         setLoading(true);
                         try {
+                          const formData = {
+                            title: sanitizedTitle,
+                            content: sanitizedContent,
+                            image_url: announcementForm.image_url,
+                            image_filename: announcementForm.image_filename,
+                            active: announcementForm.active
+                          };
+                          
                           if (editingAnnouncement) {
-                            await axios.put(`${API}/announcements/${editingAnnouncement.id}`, announcementForm, {
+                            await axios.put(`${API}/announcements/${editingAnnouncement.id}`, formData, {
                               headers: { Authorization: `Bearer ${token}` }
                             });
                             setSuccess('Ankündigung aktualisiert');
                           } else {
-                            await axios.post(`${API}/announcements`, announcementForm, {
+                            await axios.post(`${API}/announcements`, formData, {
                               headers: { Authorization: `Bearer ${token}` }
                             });
                             setSuccess('Ankündigung erstellt');

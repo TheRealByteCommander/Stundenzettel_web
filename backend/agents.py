@@ -349,8 +349,8 @@ Antworte präzise und strukturiert."""
     async def analyze_document(self, receipt_path: str, filename: str, encryption=None) -> DocumentAnalysis:
         """Analyze a PDF receipt document"""
         try:
-            # Extract text from PDF
-            pdf_text = self.extract_pdf_text(receipt_path)
+            # Extract text from PDF (handles encryption if needed)
+            pdf_text = self.extract_pdf_text(receipt_path, encryption)
             
             # Limit text length for LLM (first 5000 characters)
             pdf_text_limited = pdf_text[:5000] if pdf_text else "Kein Text extrahiert"
