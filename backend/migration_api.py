@@ -81,17 +81,17 @@ async def run_migration_async(request: MigrationRequest):
 
 @migration_router.post("/start")
 async def start_migration(
-    request: MigrationRequest,
-    # current_user wird über Dependency Injection hinzugefügt
+    request: MigrationRequest
+    # current_user: User = Depends(get_admin_user)  # TODO: Import get_admin_user
 ):
-    """Startet Datenbank-Migration
+    """
+    Startet Datenbank-Migration
     
     WICHTIG: Source-DB wird nur gelesen, niemals verändert!
+    Nur für Admin-User zugänglich.
     """
     from migration_tool import DatabaseMigration
     
-    WICHTIG: Source-DB wird nur gelesen, niemals verändert!
-    """
     global migration_status
     
     if migration_status["running"]:
