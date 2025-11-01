@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 import aiohttp
 import base64
+from collections import deque
 
 try:
     import PyPDF2
@@ -32,6 +33,74 @@ logger = logging.getLogger(__name__)
 # Ollama configuration
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
+
+# Prompt directory
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+class AgentMessageBus:
+    """Message bus for inter-agent communication"""
+    
+    def __init__(self):
+        self.messages: deque = deque(maxlen=1000)  # Keep last 1000 messages
+        self.subscribers: Dict[str, List[callable]] = {}
+    
+    def subscribe(self, agent_name: str, callback: callable):
+        """Subscribe an agent to messages"""
+        if agent_name not in self.subscribers:
+            self.subscribers[agent_name] = []
+        self.subscribers[agent_name].append(callback)
+    
+    def publish(self, from_agent: str, to_agent: str, message: Dict[str, Any]):
+        """Publish a message from one agent to another"""
+        msg = {
+            "from": from_agent,
+            "to": to_agent,
+            "content": message,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self.messages.append(msg)
+        
+        # Notify subscribers
+        if to_agent in self.subscribers:
+            for callback in self.subscribers[to_agent]:
+                try:
+                    callback(msg)
+                except Exception as e:
+                    logger.error(f"Error in subscriber callback: {e}")
+    
+    def broadcast(self, from_agent: str, message: Dict[str, Any]):
+        """Broadcast message to all agents"""
+        for agent_name in self.subscribers.keys():
+            if agent_name != from_agent:
+                self.publish(from_agent, agent_name, message)
+    
+    def get_messages(self, agent_name: Optional[str] = None, limit: int = 50) -> List[Dict]:
+        """Get messages for a specific agent or all messages"""
+        if agent_name:
+            return [msg for msg in self.messages if msg.get("to") == agent_name][-limit:]
+        return list(self.messages)[-limit:]
+
+def load_prompt(prompt_file: str) -> str:
+    """Load prompt from markdown file"""
+    prompt_path = PROMPTS_DIR / prompt_file
+    if not prompt_path.exists():
+        logger.warning(f"Prompt file not found: {prompt_path}, using default")
+        return ""
+    
+    try:
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            # Remove markdown header if present
+            if content.startswith('# '):
+                lines = content.split('\n')
+                # Skip until we find the actual prompt content
+                for i, line in enumerate(lines):
+                    if line.strip() and not line.startswith('#'):
+                        return '\n'.join(lines[i:]).strip()
+            return content.strip()
+    except Exception as e:
+        logger.error(f"Error loading prompt from {prompt_path}: {e}")
+        return ""
 
 # Spesensätze API (Beispiel - würde durch echte API ersetzt)
 # Quelle: Bundesfinanzministerium Verpflegungsmehraufwand
@@ -196,10 +265,15 @@ Formuliere eine klare, freundliche Frage an den Benutzer, um die fehlende Inform
 class DocumentAgent:
     """Agent für Dokumentenanalyse: Verstehen, Übersetzen, Kategorisieren, Validieren"""
     
-    def __init__(self, llm: OllamaLLM):
+    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None):
         self.llm = llm
         self.name = "DocumentAgent"
-        self.system_prompt = """Du bist ein Experte für Dokumentenanalyse von Reisekostenbelegen.
+        self.message_bus = message_bus
+        # Load prompt from markdown file
+        self.system_prompt = load_prompt("document_agent.md")
+        if not self.system_prompt:
+            # Fallback default prompt
+            self.system_prompt = """Du bist ein Experte für Dokumentenanalyse von Reisekostenbelegen.
 Deine Aufgaben:
 1. Dokumente kategorisieren (Hotel, Restaurant, Maut, Parken, Tanken, Bahnticket, etc.)
 2. Sprache erkennen und bei Bedarf übersetzen
@@ -208,6 +282,18 @@ Deine Aufgaben:
 5. Probleme und Unstimmigkeiten identifizieren
 
 Antworte präzise und strukturiert."""
+        
+        # Subscribe to messages from other agents
+        if self.message_bus:
+            self.message_bus.subscribe(self.name, self.handle_agent_message)
+    
+    def handle_agent_message(self, message: Dict):
+        """Handle messages from other agents"""
+        logger.info(f"DocumentAgent received message from {message.get('from')}: {message.get('content')}")
+        # Can request clarification from Chat Agent if needed
+        if message.get('from') == 'ChatAgent':
+            # Chat Agent might request document re-analysis
+            pass
     
     def extract_pdf_text(self, pdf_path: str) -> str:
         """Extract text from PDF file"""
@@ -343,21 +429,54 @@ Antworte im JSON-Format mit folgenden Feldern:
                 receipt.get("filename", "")
             )
             analyses.append(analysis)
+            
+            # Notify other agents about analysis completion (if message bus available)
+            if self.message_bus:
+                self.message_bus.publish(self.name, "AccountingAgent", {
+                    "type": "document_analyzed",
+                    "receipt_id": receipt.get("id"),
+                    "analysis": analysis.model_dump()
+                })
+                
+                # If issues found, notify Chat Agent
+                if analysis.validation_issues or not all(analysis.completeness_check.values()):
+                    self.message_bus.publish(self.name, "ChatAgent", {
+                        "type": "document_issue",
+                        "receipt_id": receipt.get("id"),
+                        "filename": receipt.get("filename"),
+                        "issues": analysis.validation_issues,
+                        "completeness": analysis.completeness_check
+                    })
+        
         return analyses
 
 class AccountingAgent:
     """Agent für Buchhaltung: Zuordnung, Verpflegungsmehraufwand, Spesensätze"""
     
-    def __init__(self, llm: OllamaLLM):
+    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None):
         self.llm = llm
         self.name = "AccountingAgent"
-        self.system_prompt = """Du bist ein Buchhaltungs-Experte für Reisekostenabrechnungen.
+        self.message_bus = message_bus
+        # Load prompt from markdown file
+        self.system_prompt = load_prompt("accounting_agent.md")
+        if not self.system_prompt:
+            # Fallback default prompt
+            self.system_prompt = """Du bist ein Buchhaltungs-Experte für Reisekostenabrechnungen.
 Deine Aufgaben:
 1. Dokumente den Reisekosteneinträgen zuordnen (basierend auf Datum, Ort, Zweck)
 2. Verpflegungsmehraufwand automatisch berechnen (basierend auf Land und Abwesenheitsdauer)
 3. Spezielle Dokumente zuordnen (Maut, Parken, etc.)
 4. Kategorien korrekt zuweisen
 5. Beträge validieren und korrigieren"""
+        
+        # Subscribe to messages from other agents
+        if self.message_bus:
+            self.message_bus.subscribe(self.name, self.handle_agent_message)
+    
+    def handle_agent_message(self, message: Dict):
+        """Handle messages from other agents"""
+        logger.info(f"AccountingAgent received message from {message.get('from')}: {message.get('content')}")
+        # Can request document analysis from Document Agent or clarification from Chat Agent
     
     def get_country_code(self, location: str) -> str:
         """Get country code from location (simplified - would use geocoding API)"""
@@ -470,8 +589,9 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
     
     async def process(self, report: Dict, document_analyses: List[DocumentAnalysis]) -> Dict[str, Any]:
         """Process expense assignment and meal allowance"""
+        report_entries = report.get("entries", [])
         assignments = await self.assign_expenses(
-            report.get("entries", []),
+            report_entries,
             document_analyses,
             report.get("receipts", [])
         )
@@ -519,7 +639,18 @@ class AgentOrchestrator:
         
         # Step 1: Document Agent - Analyze all receipts
         logger.info(f"Step 1: Analyzing {len(receipts)} documents...")
+        self.broadcast_message("Orchestrator", {
+            "type": "status_update",
+            "message": f"Starte Dokumentenanalyse für {len(receipts)} Belege",
+            "step": 1
+        })
         document_analyses = await self.document_agent.process(receipts)
+        
+        # Notify other agents about document analyses
+        self.send_message("DocumentAgent", "AccountingAgent", {
+            "type": "document_analyses_complete",
+            "analyses": [a.model_dump() for a in document_analyses]
+        })
         
         # Collect issues
         issues = []
@@ -531,9 +662,34 @@ class AgentOrchestrator:
         
         # Step 2: Accounting Agent - Assign expenses and calculate meal allowance
         logger.info("Step 2: Assigning expenses...")
+        self.broadcast_message("Orchestrator", {
+            "type": "status_update",
+            "message": "Starte Buchhaltungszuordnung",
+            "step": 2
+        })
         accounting_result = await self.accounting_agent.process(report, document_analyses)
         
-        # Step 3: Generate review summary
+        # Check if accounting agent needs clarification
+        issues_needing_clarification = []
+        for assignment in accounting_result.get("assignments", []):
+            if assignment.get("assignment_confidence", 1.0) < 0.7:
+                issues_needing_clarification.append({
+                    "type": "low_confidence_assignment",
+                    "receipt_id": assignment.get("receipt_id"),
+                    "confidence": assignment.get("assignment_confidence")
+                })
+        
+        # Step 3: Handle issues requiring clarification
+        if issues_needing_clarification or issues:
+            logger.info("Step 3: Issues found, may need user clarification")
+            # Notify Chat Agent about issues
+            self.send_message("Orchestrator", "ChatAgent", {
+                "type": "clarification_needed",
+                "document_issues": issues,
+                "assignment_issues": issues_needing_clarification
+            })
+        
+        # Step 4: Generate review summary
         review_summary = f"""Reisekostenabrechnung geprüft:
 
 Dokumentenanalyse:
@@ -545,7 +701,16 @@ Buchhaltungszuordnung:
 
 Zuordnung:
 {json.dumps(accounting_result['assignments'], indent=2, ensure_ascii=False)}
+
+Status: {'Benötigt Klärung' if (issues_needing_clarification or issues) else 'Prüfung abgeschlossen'}
 """
+        
+        # Notify all agents about completion
+        self.broadcast_message("Orchestrator", {
+            "type": "review_complete",
+            "has_issues": bool(issues_needing_clarification or issues),
+            "summary": review_summary
+        })
         
         # Update report with review notes
         await db.travel_expense_reports.update_one(
