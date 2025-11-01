@@ -37,13 +37,30 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.getenv('DB_NAME', 'stundenzettel')]
 
 # Local storage path for receipts (on office computer, not webserver)
+# DSGVO-Compliance: Dokumente werden nur lokal auf Office-Rechner gespeichert
 LOCAL_RECEIPTS_PATH = os.getenv('LOCAL_RECEIPTS_PATH', 'C:/Reisekosten_Belege')
+
+# Validate that storage path is local (not on webserver)
+from compliance import validate_local_storage_path, DataEncryption, AuditLogger, RetentionManager, AITransparency
+is_valid, error_msg = validate_local_storage_path(LOCAL_RECEIPTS_PATH)
+if not is_valid:
+    logging.error(f"INVALID STORAGE PATH: {error_msg}")
+    logging.error("LOCAL_RECEIPTS_PATH must point to a local office computer, not a webserver!")
+    raise ValueError(f"Invalid storage path: {error_msg}")
+
 # Ensure directory exists
 if LOCAL_RECEIPTS_PATH and not Path(LOCAL_RECEIPTS_PATH).exists():
     try:
         Path(LOCAL_RECEIPTS_PATH).mkdir(parents=True, exist_ok=True)
+        logging.info(f"Created local receipts directory: {LOCAL_RECEIPTS_PATH}")
     except Exception as e:
-        logging.warning(f"Could not create local receipts directory: {e}")
+        logging.error(f"Could not create local receipts directory: {e}")
+        raise
+
+# Initialize compliance modules
+data_encryption = DataEncryption()  # Will use ENCRYPTION_KEY from env or warn
+audit_logger = AuditLogger()
+retention_manager = RetentionManager(db)
 
 # Ollama configuration
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
@@ -1895,8 +1912,14 @@ async def get_smtp_config(current_user: User = Depends(get_admin_user)):
     config_safe = {k: v for k, v in config.items() if k not in ["smtp_password", "_id"]}
     return config_safe
 
-# Initialize admin user on startup
+# Initialize admin user and compliance on startup
 @app.on_event("startup")
+async def startup_tasks():
+    """Startup tasks: create admin user and setup compliance"""
+    await create_admin_user()
+    logger.info("DSGVO Compliance: Retention manager initialized")
+    logger.info("EU-AI-Act Compliance: AI transparency logging enabled")
+
 async def create_admin_user():
     admin = await db.users.find_one({"email": "admin@schmitz-intralogistik.de"})
     if not admin:
@@ -2305,11 +2328,25 @@ async def submit_expense_report(
     )
     
     # Trigger automatic review with agent network (async, non-blocking)
+    # EU-AI-Act: Notify user about AI processing
     try:
         from agents import AgentOrchestrator
         orchestrator = AgentOrchestrator()
         # Run in background task
         import asyncio
+        
+        # EU-AI-Act Compliance: Log AI processing start
+        audit_logger.log_access(
+            action="ai_processing_start",
+            user_id=current_user.id,
+            resource_type="report",
+            resource_id=report_id,
+            details={
+                "ai_model": os.getenv('OLLAMA_MODEL', 'llama3.2'),
+                "compliance_note": "EU-AI-Act Art. 13: Automatische Prüfung mit KI-Agenten"
+            }
+        )
+        
         asyncio.create_task(orchestrator.review_expense_report(report_id, db))
     except Exception as e:
         logger.warning(f"Could not start agent review: {e}")
@@ -2322,7 +2359,10 @@ async def upload_receipt(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    """Upload a receipt PDF - saves to local office computer"""
+    """
+    Upload a receipt PDF - saves to local office computer only (not webserver)
+    DSGVO-Compliant: Encrypted storage, audit logging, retention management
+    """
     if not file.filename or not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
     
@@ -2340,14 +2380,40 @@ async def upload_receipt(
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size must be less than 10MB")
     
+    # DSGVO: Audit logging before upload
+    audit_logger.log_access(
+        action="upload",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id="",  # Will be set after creation
+        details={"filename": file.filename, "size": len(contents)}
+    )
+    
     receipt_id = str(uuid.uuid4())
-    filename = f"{report_id}_{receipt_id}_{file.filename}"
+    # Sanitize filename for security
+    safe_filename = re.sub(r'[^\w\-_\.]', '_', file.filename)
+    filename = f"{report_id}_{receipt_id}_{safe_filename}"
     local_file_path = Path(LOCAL_RECEIPTS_PATH) / filename
     
     try:
+        # Save file to local storage (office computer only)
         with open(local_file_path, 'wb') as f:
             f.write(contents)
+        
+        # DSGVO Art. 32: Encrypt sensitive data
+        data_encryption.encrypt_file(local_file_path)
+        
+        # Verify file is encrypted (try to decrypt - should work)
+        try:
+            data_encryption.decrypt_file(local_file_path)
+        except Exception as e:
+            logging.error(f"File encryption verification failed: {e}")
+            local_file_path.unlink()  # Delete unencrypted file
+            raise HTTPException(status_code=500, detail="File encryption failed")
+        
     except Exception as e:
+        if local_file_path.exists():
+            local_file_path.unlink()  # Clean up on error
         raise HTTPException(status_code=500, detail=f"Failed to save file to local storage: {str(e)}")
     
     receipt = TravelExpenseReceipt(
@@ -2369,7 +2435,16 @@ async def upload_receipt(
         }
     )
     
-    return {"message": "Receipt uploaded successfully", "receipt_id": receipt.id}
+    # Update audit log with receipt_id
+    audit_logger.log_access(
+        action="upload_complete",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id=receipt.id,
+        details={"local_path": str(local_file_path), "encrypted": True}
+    )
+    
+    return {"message": "Receipt uploaded successfully and encrypted", "receipt_id": receipt.id}
 
 @api_router.delete("/travel-expense-reports/{report_id}/receipts/{receipt_id}")
 async def delete_receipt(

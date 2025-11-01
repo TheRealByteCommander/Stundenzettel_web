@@ -295,11 +295,29 @@ Antworte präzise und strukturiert."""
             # Chat Agent might request document re-analysis
             pass
     
-    def extract_pdf_text(self, pdf_path: str) -> str:
-        """Extract text from PDF file"""
+    def extract_pdf_text(self, pdf_path: str, encryption=None) -> str:
+        """
+        Extract text from PDF file
+        Handles encrypted files for DSGVO compliance
+        """
         extracted_text = ""
         
         try:
+            # Check if file is encrypted and decrypt if needed
+            file_data = None
+            if encryption:
+                try:
+                    # Try to decrypt first
+                    file_data = encryption.decrypt_file(Path(pdf_path))
+                    # Write decrypted data to temp file for processing
+                    temp_path = Path(pdf_path).with_suffix('.tmp.pdf')
+                    with open(temp_path, 'wb') as f:
+                        f.write(file_data)
+                    pdf_path = str(temp_path)
+                except Exception:
+                    # File might not be encrypted, proceed normally
+                    pass
+            
             if HAS_PDFPLUMBER:
                 # Use pdfplumber (better for tables and structured data)
                 with pdfplumber.open(pdf_path) as pdf:
@@ -315,12 +333,20 @@ Antworte präzise und strukturiert."""
                         text = page.extract_text()
                         if text:
                             extracted_text += text + "\n"
+            
+            # Clean up temp file if created
+            if file_data and Path(pdf_path).suffix == '.tmp.pdf':
+                try:
+                    Path(pdf_path).unlink()
+                except:
+                    pass
+                    
         except Exception as e:
             logger.warning(f"Could not extract text from PDF {pdf_path}: {e}")
         
         return extracted_text
     
-    async def analyze_document(self, receipt_path: str, filename: str) -> DocumentAnalysis:
+    async def analyze_document(self, receipt_path: str, filename: str, encryption=None) -> DocumentAnalysis:
         """Analyze a PDF receipt document"""
         try:
             # Extract text from PDF
@@ -420,14 +446,35 @@ Antworte im JSON-Format mit folgenden Feldern:
                 confidence=0.0
             )
     
-    async def process(self, receipts: List[Dict[str, Any]]) -> List[DocumentAnalysis]:
-        """Process multiple receipts"""
+    async def process(self, receipts: List[Dict[str, Any]], encryption=None) -> List[DocumentAnalysis]:
+        """
+        Process multiple receipts
+        Supports encrypted files for DSGVO compliance
+        """
         analyses = []
         for receipt in receipts:
             analysis = await self.analyze_document(
                 receipt.get("local_path", ""),
-                receipt.get("filename", "")
+                receipt.get("filename", ""),
+                encryption
             )
+            
+            # EU-AI-Act: Log AI decision
+            try:
+                from compliance import AITransparency
+                ai_log = AITransparency.create_ai_decision_log(
+                    decision_type="document_analysis",
+                    agent_name=self.name,
+                    input_data={"filename": receipt.get("filename"), "path": receipt.get("local_path")},
+                    output_data=analysis.model_dump(),
+                    confidence=analysis.confidence,
+                    human_reviewed=False
+                )
+                # Store AI log in analysis metadata for transparency
+                if not hasattr(analysis, 'ai_decision_log'):
+                    analysis.ai_decision_log = ai_log
+            except Exception as e:
+                logger.warning(f"Could not create AI decision log: {e}")
             analyses.append(analysis)
             
             # Notify other agents about analysis completion (if message bus available)
