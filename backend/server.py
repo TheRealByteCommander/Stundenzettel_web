@@ -214,6 +214,15 @@ class WeeklyTimesheet(BaseModel):
     entries: List[TimeEntry]
     created_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "draft"  # draft, sent, approved
+    signed_pdf_path: Optional[str] = None  # Pfad zum hochgeladenen unterschriebenen PDF
+
+class SignedTimesheetUpload(BaseModel):
+    """Model für hochgeladene unterschriebene Stundenzettel"""
+    timesheet_id: str
+    filename: str
+    local_path: str
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    file_size: int
 
 class WeeklyTimesheetCreate(BaseModel):
     week_start: str
@@ -1890,6 +1899,146 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
             {"$set": {"status": "sent"}}
         )
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+@api_router.post("/timesheets/{timesheet_id}/upload-signed")
+async def upload_signed_timesheet(
+    timesheet_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload unterschriebener Stundenzettel-PDF. Benachrichtigt alle Buchhaltungs-User per E-Mail."""
+    
+    # Get timesheet
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Stundenzettel nicht gefunden")
+    
+    # Check permissions - nur der Owner kann unterschriebene Version hochladen
+    if timesheet["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Nur der Eigentümer kann den unterschriebenen Stundenzettel hochladen")
+    
+    # Validate file type
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Nur PDF-Dateien sind erlaubt")
+    
+    # Read file contents
+    contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Datei ist leer")
+    
+    # Validate file size (max 10MB)
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Datei zu groß (max 10MB)")
+    
+    # Create safe filename
+    safe_filename = "".join(c for c in file.filename if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+    if not safe_filename:
+        safe_filename = f"unterschrieben_{timesheet_id}.pdf"
+    
+    # Generate unique filename
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timesheet_id}_signed_{timestamp}_{safe_filename}"
+    local_file_path = Path(LOCAL_RECEIPTS_PATH) / "signed_timesheets" / filename
+    
+    # Ensure directory exists
+    local_file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Save file to local storage (DSGVO-compliant)
+        with open(local_file_path, 'wb') as f:
+            f.write(contents)
+        
+        # DSGVO Art. 32: Encrypt sensitive data
+        data_encryption.encrypt_file(local_file_path)
+        
+        # Verify file is encrypted
+        try:
+            data_encryption.decrypt_file(local_file_path)
+        except Exception as e:
+            logging.error(f"File encryption verification failed: {e}")
+            local_file_path.unlink()
+            raise HTTPException(status_code=500, detail="Verschlüsselung fehlgeschlagen")
+        
+        # Update timesheet with signed PDF path
+        await db.timesheets.update_one(
+            {"id": timesheet_id},
+            {
+                "$set": {
+                    "signed_pdf_path": str(local_file_path),
+                    "status": "sent"  # Mark as sent when signed version is uploaded
+                }
+            }
+        )
+        
+        # Audit log
+        audit_logger.log_access(
+            action="upload_signed_timesheet",
+            user_id=current_user.id,
+            resource_type="timesheet",
+            resource_id=timesheet_id,
+            details={"filename": safe_filename, "local_path": str(local_file_path), "encrypted": True}
+        )
+        
+        # Get all accounting users
+        accounting_users = await db.users.find({"role": "accounting"}).to_list(100)
+        
+        # Send email to all accounting users
+        smtp_config = await db.smtp_config.find_one()
+        if smtp_config and accounting_users:
+            try:
+                timesheet_obj = WeeklyTimesheet(**timesheet)
+                week_info = f"KW {get_calendar_week(timesheet_obj.week_start)} ({timesheet_obj.week_start} - {timesheet_obj.week_end})"
+                
+                # Prepare email
+                msg = MIMEMultipart()
+                msg['From'] = smtp_config["smtp_username"]
+                msg['Subject'] = f"Unterschriebener Stundenzettel hochgeladen - {timesheet_obj.user_name} - {week_info}"
+                
+                body = f"""Hallo,
+
+ein unterschriebener Stundenzettel wurde hochgeladen:
+
+Mitarbeiter: {timesheet_obj.user_name}
+Woche: {week_info}
+Stundenzettel-ID: {timesheet_id}
+
+Der unterschriebene Stundenzettel wurde verschlüsselt im lokalen Speicher gespeichert.
+
+Bitte prüfen Sie den Stundenzettel im System.
+
+Mit freundlichen Grüßen
+{COMPANY_INFO["name"]}
+                """
+                
+                msg.attach(MIMEText(body, 'plain', 'utf-8'))
+                
+                # Send to all accounting users
+                recipients = [user["email"] for user in accounting_users]
+                msg['To'] = ", ".join(recipients)
+                
+                server = smtplib.SMTP(smtp_config["smtp_server"], smtp_config["smtp_port"])
+                server.starttls()
+                server.login(smtp_config["smtp_username"], smtp_config["smtp_password"])
+                server.sendmail(smtp_config["smtp_username"], recipients, msg.as_string().encode('utf-8'))
+                server.quit()
+                
+                logging.info(f"Email sent to accounting users: {recipients}")
+                
+            except Exception as e:
+                logging.error(f"Failed to send email to accounting users: {e}")
+                # Don't fail the upload if email fails
+        
+        return {
+            "message": "Unterschriebener Stundenzettel erfolgreich hochgeladen",
+            "filename": safe_filename,
+            "accounting_users_notified": len(accounting_users) if accounting_users else 0
+        }
+        
+    except Exception as e:
+        if local_file_path.exists():
+            local_file_path.unlink()
+        logging.error(f"Failed to upload signed timesheet: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload fehlgeschlagen: {str(e)}")
 
 @api_router.post("/admin/smtp-config")
 async def update_smtp_config(smtp_config: SMTPConfigCreate, current_user: User = Depends(get_admin_user)):

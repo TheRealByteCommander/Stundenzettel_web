@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from './components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table';
 import { Checkbox } from './components/ui/checkbox';
-import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X, Menu, Home, LogOut, ChevronLeft } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X, Menu, Home, LogOut, ChevronLeft, Upload } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
 import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
@@ -1464,11 +1464,12 @@ function App() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex space-x-2">
+                            <div className="flex space-x-2 flex-wrap gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => downloadPDF(timesheet.id, timesheet.user_name, timesheet.week_start)}
+                                title="PDF herunterladen"
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
@@ -1477,10 +1478,40 @@ function App() {
                                 onClick={() => sendTimesheetEmail(timesheet.id)}
                                 style={{ backgroundColor: colors.primary }}
                                 disabled={loading || timesheet.status === 'approved'}
-                                title={timesheet.status === 'approved' ? 'Stundenzettel bereits genehmigt' : ''}
+                                title={timesheet.status === 'approved' ? 'Stundenzettel bereits genehmigt' : 'Per E-Mail senden'}
                               >
                                 <Send className="h-4 w-4" />
                               </Button>
+                              {/* Upload unterschriebener Stundenzettel - nur für Owner */}
+                              {timesheet.user_id === user?.id && (
+                                <label className="cursor-pointer">
+                                  <input
+                                    type="file"
+                                    accept=".pdf"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        uploadSignedTimesheet(timesheet.id, file);
+                                        e.target.value = ''; // Reset input
+                                      }
+                                    }}
+                                    disabled={loading}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    asChild
+                                    style={{ backgroundColor: timesheet.signed_pdf_path ? '#10b981' : undefined, color: timesheet.signed_pdf_path ? 'white' : undefined }}
+                                    title={timesheet.signed_pdf_path ? 'Unterschriebene Version bereits hochgeladen' : 'Unterschriebenen Stundenzettel hochladen'}
+                                    disabled={loading}
+                                  >
+                                    <span>
+                                      <Upload className="h-4 w-4" />
+                                    </span>
+                                  </Button>
+                                </label>
+                              )}
                               {(user?.role === 'accounting' || user?.role === 'admin' || user?.is_admin) && (
                                 <>
                                   {timesheet.status !== 'approved' && (
