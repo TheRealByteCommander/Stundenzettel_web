@@ -669,6 +669,54 @@ function App() {
     }
   };
 
+  const uploadSignedTimesheet = async (timesheetId, file) => {
+    if (!file) {
+      setError('Bitte wählen Sie eine PDF-Datei aus');
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setError('Nur PDF-Dateien sind erlaubt');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Datei zu groß (max 10MB)');
+      return;
+    }
+
+    // Rate limiting check
+    if (!checkRateLimit(5, 60000, 'upload')) {
+      setError('Zu viele Uploads in kurzer Zeit. Bitte warten Sie einen Moment.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setLoading(true);
+    try {
+      const token = getSecureToken();
+      const response = await axios.post(
+        `${API}/timesheets/${timesheetId}/upload-signed`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`
+          },
+        }
+      );
+      setSuccess(`Unterschriebener Stundenzettel erfolgreich hochgeladen! ${response.data.accounting_users_notified} Buchhaltungs-User benachrichtigt.`);
+      fetchTimesheets(); // Refresh list
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError(error.response?.data?.detail || 'Upload fehlgeschlagen');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const downloadPDF = async (timesheetId, userName, weekStart) => {
     setLoading(true);
     try {
