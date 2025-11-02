@@ -1,5 +1,34 @@
 # 🏗️ Architektur: All-inkl Webserver + Proxmox + GMKTec
 
+## ⚠️ WICHTIG: All-inkl.com vs. Proxmox
+
+**Klarstellung:**
+- ✅ **Frontend auf All-inkl.com**: Nur statische Dateien (React Build) - hier gelten All-inkl-Regeln
+- ✅ **Backend auf Proxmox**: Komplett unabhängig - **KEINE All-inkl-Regeln relevant!**
+
+**Was bedeutet das für Sie:**
+- ❌ **Keine PHP-Limits auf Backend**: Backend ist Python/FastAPI auf Proxmox
+- ❌ **Keine Upload-Limits auf Backend**: Backend läuft auf Proxmox
+- ❌ **Keine Datenbank-Limits**: MongoDB auf Proxmox (oder remote)
+- ❌ **Keine PHP-Extensions**: Backend ist Python, nicht PHP
+- ✅ **Volle Kontrolle**: Auf Proxmox haben Sie volle Kontrolle über das Backend
+- ✅ **Eigene Firewall**: Firewall-Regeln auf Proxmox, nicht All-inkl
+
+**All-inkl-Regeln gelten NUR für:**
+1. Frontend-Hosting (statische Dateien)
+2. `.htaccess` Konfiguration (für React Router)
+3. Einmaliger Frontend-Build-Upload
+
+**Proxmox-Regeln gelten für:**
+- Backend-API (FastAPI)
+- MongoDB-Instanz
+- Agent-Container
+- Lokale Dateispeicherung
+- Firewall-Regeln
+- SSL/HTTPS-Zertifikate
+
+---
+
 ## Ihre spezifische Architektur
 
 ```
@@ -57,8 +86,13 @@
 **Architektur:**
 ```
 Frontend (All-inkl) → Backend (Proxmox) → MongoDB → Agents (Proxmox) → LLM (GMKTec)
+   [Statische        [Python/FastAPI]  [Proxmox]   [Proxmox]         [GMKTec]
+    Dateien]          [KEINE All-inkl   [KEINE      [KEINE            [KEINE
+   [All-inkl-Regeln]  Regeln!]          All-inkl-   All-inkl-Regeln!] All-inkl-
+                                       Regeln!]                        Regeln!]
                                                      ↓
                                               Local Storage (Proxmox)
+                                              [KEINE All-inkl-Regeln!]
 ```
 
 **Wie es funktioniert:**

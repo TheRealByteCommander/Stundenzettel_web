@@ -46,11 +46,36 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## ⚠️ WICHTIG: All-inkl.com Regeln gelten NUR für Frontend
+
+**Ihre Architektur:**
+- ✅ **Frontend auf All-inkl.com**: Nur statische Dateien (React Build)
+- ✅ **Backend auf Proxmox**: Komplett unabhängig von All-inkl-Regeln
+
+**Was bedeutet das?**
+- ❌ **Keine All-inkl-Regeln für Backend**: Backend läuft auf Proxmox, nicht auf All-inkl
+- ✅ **All-inkl-Regeln nur für Frontend**: Nur für statische Dateien-Hosting relevant
+- ✅ **Backend-Konfiguration**: Vollständig auf Proxmox (Python, FastAPI, MongoDB, etc.)
+- ✅ **Keine PHP/Limits auf Backend**: Backend ist Python/FastAPI, keine All-inkl-Limits
+
+**All-inkl-Regeln sind nur relevant für:**
+1. Frontend-Build-Upload (statische Dateien)
+2. `.htaccess` für React Router Support (optional)
+3. Upload-Limits beim Hochladen des Frontend-Builds (einmalig)
+
+**Backend-Regeln (auf Proxmox):**
+- Keine All-inkl-Limits
+- Volle Python-Umgebung
+- Eigene Firewall-Regeln
+- Eigene Docker-Container
+- Eigene MongoDB-Instanz
+- Keine Upload-Limits
+
+---
+
 ## Installation Schritt für Schritt
 
-### Teil 1: Frontend auf All-inkl.com
-
-#### Schritt 1.1: Frontend lokal bauen
+### Teil 1: Frontend auf All-inkl.com (nur statische Dateien)
 
 **Auf Ihrem Entwicklungsrechner:**
 
@@ -92,7 +117,9 @@ npm run build
    └── ...
    ```
 
-#### Schritt 1.3: .htaccess auf All-inkl konfigurieren
+#### Schritt 1.3: .htaccess auf All-inkl konfigurieren (optional)
+
+**Hinweis:** Dies ist nur für das Frontend (statische Dateien) relevant, nicht für das Backend!
 
 **Erstellen Sie `/html/.htaccess`:**
 
