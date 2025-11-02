@@ -221,6 +221,23 @@ Agent-System → Lokal (Python)
 LLM-Server → Ollama (localhost:11434)
 ```
 
+### Szenario 4: Office-Rechner mit lokaler Speicherung
+
+```
+Frontend → Webserver (öffentlich)
+Backend → Office-Rechner (lokal, über VPN/Reverse Tunnel)
+Datenbank → MongoDB (remote oder lokal)
+Lokale Dateien → Office-Rechner (C:/Reisekosten_Belege)
+Agent-System → Proxmox (optional)
+LLM-Server → GMKTec evo x2 (optional)
+```
+
+**Besonderheiten:**
+- Backend läuft direkt auf Office-Rechner (DSGVO-konform)
+- `LOCAL_RECEIPTS_PATH` zeigt auf lokales Laufwerk
+- Keine Netzwerk-Freigabe nötig
+- API erreichbar über VPN oder Reverse Tunnel
+
 ## Sicherheit
 
 ### Frontend

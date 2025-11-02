@@ -2094,7 +2094,11 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=False,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://stundenzettel.byte-commander.de",
+        "http://localhost:3000",
+        "http://localhost:8000"
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -2480,7 +2484,7 @@ async def submit_expense_report(
     # EU-AI-Act: Notify user about AI processing
     try:
         from agents import AgentOrchestrator
-        orchestrator = AgentOrchestrator()
+        orchestrator = AgentOrchestrator(db=db)
         # Ensure LLM is available before starting review
         await orchestrator.ensure_llm_available()
         # Run in background task
@@ -2715,7 +2719,7 @@ async def send_chat_message(
     if report.get("status") == "in_review":
         try:
             from agents import AgentOrchestrator
-            orchestrator = AgentOrchestrator()
+            orchestrator = AgentOrchestrator(db=db)
             # Ensure LLM is available
             await orchestrator.ensure_llm_available()
             agent_response = await orchestrator.handle_user_message(report_id, message, db)

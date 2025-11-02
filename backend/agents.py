@@ -7,8 +7,9 @@ import os
 import json
 import logging
 import asyncio
+import uuid
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import aiohttp
 import base64
@@ -30,6 +31,10 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+# Memory configuration - große Gedächtnisgröße für jeden Agenten
+MEMORY_MAX_ENTRIES = int(os.getenv('AGENT_MEMORY_MAX_ENTRIES', '10000'))  # 10000 Einträge pro Agent
+MEMORY_SUMMARY_INTERVAL = int(os.getenv('AGENT_MEMORY_SUMMARY_INTERVAL', '100'))  # Zusammenfassung alle 100 Einträge
+
 # Ollama configuration
 # For Proxmox deployment: LLMs run on GMKTec evo x2 in local network
 # Default: http://localhost:11434 (local)
@@ -42,6 +47,236 @@ OLLAMA_RETRY_DELAY = float(os.getenv('OLLAMA_RETRY_DELAY', '2.0'))  # seconds
 
 # Prompt directory
 PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+class AgentMemoryEntry(BaseModel):
+    """Einzelner Memory-Eintrag für einen Agenten"""
+    entry_id: str
+    agent_name: str
+    entry_type: str  # "conversation", "analysis", "decision", "pattern", "insight", "error", "correction"
+    content: str  # Der eigentliche Inhalt
+    context: Optional[Dict[str, Any]] = None  # Zusätzlicher Kontext
+    metadata: Optional[Dict[str, Any]] = None  # Metadaten (z.B. confidence, source, etc.)
+    timestamp: datetime
+    tags: List[str] = []  # Tags für bessere Suche
+
+class AgentMemory:
+    """
+    Großes persistentes Gedächtnis für Agenten
+    Speichert Konversationen, Erkenntnisse, Muster und historische Entscheidungen
+    """
+    
+    def __init__(self, agent_name: str, db=None):
+        self.agent_name = agent_name
+        self.db = db
+        self.collection_name = "agent_memory"
+        self._cache: deque = deque(maxlen=500)  # In-Memory Cache für schnellen Zugriff
+        self._cache_loaded = False
+    
+    async def initialize(self):
+        """Initialisiere Memory und lade Cache"""
+        if self.db and not self._cache_loaded:
+            try:
+                # Lade die letzten 500 Einträge in den Cache
+                async for entry in self.db[self.collection_name].find(
+                    {"agent_name": self.agent_name}
+                ).sort("timestamp", -1).limit(500):
+                    self._cache.appendleft(entry)
+                self._cache_loaded = True
+                logger.info(f"AgentMemory für {self.agent_name} initialisiert: {len(self._cache)} Einträge geladen")
+            except Exception as e:
+                logger.warning(f"Fehler beim Laden des Memory-Cache für {self.agent_name}: {e}")
+                self._cache_loaded = True  # Setze auf True, um weitere Versuche zu vermeiden
+    
+    async def add(self, 
+                  entry_type: str, 
+                  content: str, 
+                  context: Optional[Dict[str, Any]] = None,
+                  metadata: Optional[Dict[str, Any]] = None,
+                  tags: Optional[List[str]] = None) -> str:
+        """Füge einen neuen Memory-Eintrag hinzu"""
+        entry_id = str(uuid.uuid4())
+        entry = {
+            "entry_id": entry_id,
+            "agent_name": self.agent_name,
+            "entry_type": entry_type,
+            "content": content,
+            "context": context or {},
+            "metadata": metadata or {},
+            "timestamp": datetime.utcnow(),
+            "tags": tags or []
+        }
+        
+        # Füge zum Cache hinzu
+        self._cache.append(entry)
+        
+        # Persistiere in Datenbank
+        if self.db:
+            try:
+                await self.db[self.collection_name].insert_one(entry)
+                
+                # Prüfe, ob Zusammenfassung nötig ist
+                count = await self.db[self.collection_name].count_documents({"agent_name": self.agent_name})
+                if count > 0 and count % MEMORY_SUMMARY_INTERVAL == 0:
+                    await self._create_summary()
+                    
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern des Memory-Eintrags für {self.agent_name}: {e}")
+        
+        return entry_id
+    
+    async def search(self, 
+                    query: Optional[str] = None,
+                    entry_type: Optional[str] = None,
+                    tags: Optional[List[str]] = None,
+                    limit: int = 50,
+                    days: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Suche in Memory-Einträgen"""
+        results = []
+        
+        if self.db:
+            try:
+                # Baue Query auf
+                db_query = {"agent_name": self.agent_name}
+                
+                if entry_type:
+                    db_query["entry_type"] = entry_type
+                
+                if tags:
+                    db_query["tags"] = {"$in": tags}
+                
+                if days:
+                    cutoff_date = datetime.utcnow() - timedelta(days=days)
+                    db_query["timestamp"] = {"$gte": cutoff_date}
+                
+                # Suche in Datenbank
+                async for entry in self.db[self.collection_name].find(db_query).sort("timestamp", -1).limit(limit):
+                    results.append(entry)
+                
+                # Wenn Text-Suche, filtere nach Inhalt
+                if query and query.strip():
+                    query_lower = query.lower()
+                    results = [
+                        entry for entry in results
+                        if query_lower in entry.get("content", "").lower() or
+                           query_lower in str(entry.get("context", {})).lower()
+                    ]
+                    
+            except Exception as e:
+                logger.error(f"Fehler beim Suchen im Memory für {self.agent_name}: {e}")
+        else:
+            # Fallback: Suche nur im Cache
+            for entry in self._cache:
+                if entry_type and entry.get("entry_type") != entry_type:
+                    continue
+                if tags and not any(tag in entry.get("tags", []) for tag in tags):
+                    continue
+                if query and query.lower() not in entry.get("content", "").lower():
+                    continue
+                results.append(entry)
+                if len(results) >= limit:
+                    break
+        
+        return results[:limit]
+    
+    async def get_recent(self, limit: int = 20, entry_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Hole die letzten Einträge"""
+        return await self.search(entry_type=entry_type, limit=limit)
+    
+    async def get_patterns(self, pattern_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Hole gespeicherte Muster und Erkenntnisse"""
+        return await self.search(entry_type="pattern", limit=100)
+    
+    async def get_insights(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Hole gespeicherte Erkenntnisse"""
+        return await self.search(entry_type="insight", limit=limit)
+    
+    async def get_context_for_prompt(self, 
+                                     max_tokens: int = 2000,
+                                     relevant_query: Optional[str] = None) -> str:
+        """
+        Generiere Kontext für LLM-Prompt aus Memory
+        Kombiniert relevante Einträge und Erkenntnisse
+        """
+        context_parts = []
+        
+        # Hole relevante Erkenntnisse und Muster
+        insights = await self.get_insights(limit=10)
+        patterns = await self.get_patterns()
+        
+        if insights:
+            context_parts.append("=== Gelernte Erkenntnisse ===")
+            for insight in insights[:5]:  # Top 5 Erkenntnisse
+                context_parts.append(f"- {insight.get('content', '')}")
+                if insight.get('timestamp'):
+                    context_parts.append(f"  (Gespeichert: {insight['timestamp']})")
+        
+        if patterns:
+            context_parts.append("\n=== Gelernte Muster ===")
+            for pattern in patterns[:5]:  # Top 5 Muster
+                context_parts.append(f"- {pattern.get('content', '')}")
+        
+        # Wenn relevante Query, hole passende Einträge
+        if relevant_query:
+            relevant = await self.search(query=relevant_query, limit=10)
+            if relevant:
+                context_parts.append(f"\n=== Relevante historische Kontexte ===")
+                for entry in relevant[:5]:
+                    context_parts.append(f"- [{entry.get('entry_type', 'unknown')}] {entry.get('content', '')[:200]}")
+                    if entry.get('timestamp'):
+                        context_parts.append(f"  (Von: {entry['timestamp']})")
+        
+        # Hole die letzten wichtigen Entscheidungen
+        recent_decisions = await self.search(entry_type="decision", limit=5)
+        if recent_decisions:
+            context_parts.append("\n=== Letzte wichtige Entscheidungen ===")
+            for decision in recent_decisions:
+                context_parts.append(f"- {decision.get('content', '')[:300]}")
+        
+        context = "\n".join(context_parts)
+        
+        # Kürze auf max_tokens (ungefähre Zeichenanzahl)
+        if len(context) > max_tokens * 4:  # ~4 Zeichen pro Token
+            context = context[:max_tokens * 4] + "\n... (weitere Einträge im Memory verfügbar)"
+        
+        return context
+    
+    async def _create_summary(self):
+        """Erstelle eine Zusammenfassung von Memory-Einträgen (für große Memories)"""
+        # Diese Funktion kann periodisch aufgerufen werden, um das Memory zu komprimieren
+        # Für jetzt nur Logging
+        count = await self.db[self.collection_name].count_documents({"agent_name": self.agent_name})
+        logger.info(f"AgentMemory für {self.agent_name}: {count} Einträge gespeichert (Zusammenfassung könnte nützlich sein)")
+    
+    async def add_conversation(self, user_message: str, agent_response: str, context: Optional[Dict] = None):
+        """Speichere eine Konversation"""
+        content = f"User: {user_message}\nAgent: {agent_response}"
+        await self.add("conversation", content, context=context, tags=["conversation", "interaction"])
+    
+    async def add_analysis(self, analysis_result: str, metadata: Optional[Dict] = None):
+        """Speichere ein Analyseergebnis"""
+        await self.add("analysis", analysis_result, metadata=metadata, tags=["analysis", "document"])
+    
+    async def add_decision(self, decision: str, confidence: float = 1.0, context: Optional[Dict] = None):
+        """Speichere eine getroffene Entscheidung"""
+        await self.add("decision", decision, 
+                      metadata={"confidence": confidence}, 
+                      context=context,
+                      tags=["decision"])
+    
+    async def add_pattern(self, pattern: str, examples: Optional[List[str]] = None):
+        """Speichere ein gelerntes Muster"""
+        context = {"examples": examples} if examples else {}
+        await self.add("pattern", pattern, context=context, tags=["pattern", "learning"])
+    
+    async def add_insight(self, insight: str, source: Optional[str] = None):
+        """Speichere eine Erkenntnis"""
+        metadata = {"source": source} if source else {}
+        await self.add("insight", insight, metadata=metadata, tags=["insight", "learning"])
+    
+    async def add_correction(self, original: str, corrected: str, reason: str):
+        """Speichere eine Korrektur"""
+        content = f"Original: {original}\nKorrigiert: {corrected}\nGrund: {reason}"
+        await self.add("correction", content, tags=["correction", "learning"])
 
 class AgentMessageBus:
     """Message bus for inter-agent communication"""
@@ -302,18 +537,35 @@ class OllamaLLM:
 class ChatAgent:
     """Agent für Dialog und Rückfragen mit Benutzer"""
     
-    def __init__(self, llm: OllamaLLM):
+    def __init__(self, llm: OllamaLLM, memory: Optional[AgentMemory] = None, db=None):
         self.llm = llm
         self.name = "ChatAgent"
-        self.system_prompt = """Du bist ein hilfreicher Assistent für Reisekostenabrechnungen. 
+        self.memory = memory or AgentMemory(self.name, db)
+        self.system_prompt_base = """Du bist ein hilfreicher Assistent für Reisekostenabrechnungen. 
 Du stellst dem Benutzer klare Fragen zu fehlenden oder unklaren Informationen in den Reisekostenabrechnungen.
 Sei präzise, freundlich und auf Deutsch.
 Formuliere Fragen so, dass sie mit kurzen Antworten beantwortet werden können."""
+    
+    async def initialize(self):
+        """Initialisiere Memory"""
+        await self.memory.initialize()
     
     async def process(self, context: Dict[str, Any], user_message: Optional[str] = None) -> AgentResponse:
         """Process user message or generate question based on context"""
         report_issues = context.get("issues", [])
         missing_info = context.get("missing_info", [])
+        
+        # Hole relevanten Memory-Kontext
+        memory_context = await self.memory.get_context_for_prompt(
+            max_tokens=1500,
+            relevant_query=f"{missing_info} {report_issues}" if missing_info or report_issues else None
+        )
+        
+        # Erweitere System-Prompt mit Memory
+        system_prompt = self.system_prompt_base
+        if memory_context:
+            system_prompt += f"\n\n=== Dein Gedächtnis (frühere Erfahrungen) ===\n{memory_context}\n"
+            system_prompt += "\nNutze diese Informationen aus deinem Gedächtnis, um bessere Fragen zu stellen und den Benutzer besser zu verstehen."
         
         if user_message:
             # Process user's answer
@@ -327,7 +579,21 @@ Bewerte die Antwort und gib an:
             
             response_text = await self.llm.chat([
                 {"role": "user", "content": prompt}
-            ], self.system_prompt)
+            ], system_prompt)
+            
+            # Speichere Konversation im Memory
+            await self.memory.add_conversation(
+                user_message=user_message,
+                agent_response=response_text,
+                context={"report_issues": report_issues, "missing_info": missing_info}
+            )
+            
+            # Speichere Erkenntnis, falls neue Information
+            if len(missing_info) == 0:
+                await self.memory.add_insight(
+                    f"Benutzer hat vollständige Informationen für Reisekostenabrechnung bereitgestellt: {user_message[:200]}",
+                    source="user_conversation"
+                )
             
             return AgentResponse(
                 agent_name=self.name,
@@ -344,9 +610,17 @@ Bewerte die Antwort und gib an:
 Formuliere eine klare, freundliche Frage an den Benutzer, um die fehlende Information zu erhalten."""
                 response_text = await self.llm.chat([
                     {"role": "user", "content": prompt}
-                ], self.system_prompt)
+                ], system_prompt)
             else:
                 response_text = "Alle Informationen sind vollständig. Die Prüfung kann fortgesetzt werden."
+            
+            # Speichere generierte Frage
+            if missing_info:
+                await self.memory.add_decision(
+                    f"Frage generiert für fehlende Informationen: {missing_info}",
+                    confidence=0.8,
+                    context={"missing_info": missing_info}
+                )
             
             return AgentResponse(
                 agent_name=self.name,
@@ -357,15 +631,16 @@ Formuliere eine klare, freundliche Frage an den Benutzer, um die fehlende Inform
 class DocumentAgent:
     """Agent für Dokumentenanalyse: Verstehen, Übersetzen, Kategorisieren, Validieren"""
     
-    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None):
+    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None, memory: Optional[AgentMemory] = None, db=None):
         self.llm = llm
         self.name = "DocumentAgent"
         self.message_bus = message_bus
+        self.memory = memory or AgentMemory(self.name, db)
         # Load prompt from markdown file
-        self.system_prompt = load_prompt("document_agent.md")
-        if not self.system_prompt:
+        self.system_prompt_base = load_prompt("document_agent.md")
+        if not self.system_prompt_base:
             # Fallback default prompt
-            self.system_prompt = """Du bist ein Experte für Dokumentenanalyse von Reisekostenbelegen.
+            self.system_prompt_base = """Du bist ein Experte für Dokumentenanalyse von Reisekostenbelegen.
 Deine Aufgaben:
 1. Dokumente kategorisieren (Hotel, Restaurant, Maut, Parken, Tanken, Bahnticket, etc.)
 2. Sprache erkennen und bei Bedarf übersetzen
@@ -378,6 +653,10 @@ Antworte präzise und strukturiert."""
         # Subscribe to messages from other agents
         if self.message_bus:
             self.message_bus.subscribe(self.name, self.handle_agent_message)
+    
+    async def initialize(self):
+        """Initialisiere Memory"""
+        await self.memory.initialize()
     
     def handle_agent_message(self, message: Dict):
         """Handle messages from other agents"""
@@ -447,6 +726,18 @@ Antworte präzise und strukturiert."""
             # Limit text length for LLM (first 5000 characters)
             pdf_text_limited = pdf_text[:5000] if pdf_text else "Kein Text extrahiert"
             
+            # Hole relevanten Memory-Kontext für ähnliche Dokumente
+            memory_context = await self.memory.get_context_for_prompt(
+                max_tokens=1500,
+                relevant_query=f"document analysis {filename} {pdf_text_limited[:200]}"
+            )
+            
+            # Erweitere System-Prompt mit Memory
+            system_prompt = self.system_prompt_base
+            if memory_context:
+                system_prompt += f"\n\n=== Dein Gedächtnis (frühere Dokumentenanalysen) ===\n{memory_context}\n"
+                system_prompt += "\nNutze diese Erfahrungen aus deinem Gedächtnis, um ähnliche Dokumente besser zu analysieren und bekannte Muster zu erkennen."
+            
             prompt = f"""Analysiere das folgende Reisekosten-Dokument:
 
 Dateiname: {filename}
@@ -489,7 +780,7 @@ Antworte im JSON-Format mit folgenden Feldern:
   "confidence": 0.0-1.0
 }}"""
             
-            analysis_json = await self.llm.extract_json(prompt, self.system_prompt)
+            analysis_json = await self.llm.extract_json(prompt, system_prompt)
             
             if not analysis_json:
                 # Fallback: Try to extract basic info from filename
@@ -518,7 +809,7 @@ Antworte im JSON-Format mit folgenden Feldern:
                 )
             
             # Map to DocumentAnalysis model
-            return DocumentAnalysis(
+            analysis = DocumentAnalysis(
                 document_type=analysis_json.get("document_type", "unknown"),
                 language=analysis_json.get("language", "de"),
                 translated_content=analysis_json.get("translated_content"),
@@ -527,6 +818,30 @@ Antworte im JSON-Format mit folgenden Feldern:
                 completeness_check=analysis_json.get("completeness_check", {}),
                 confidence=float(analysis_json.get("confidence", 0.5))
             )
+            
+            # Speichere Analyse im Memory
+            analysis_summary = f"Dokument: {filename}, Typ: {analysis.document_type}, Betrag: {analysis.extracted_data.get('amount', 0.0)} {analysis.extracted_data.get('currency', 'EUR')}, Sprache: {analysis.language}, Konfidenz: {analysis.confidence:.2f}"
+            await self.memory.add_analysis(
+                analysis_summary,
+                metadata={
+                    "document_type": analysis.document_type,
+                    "filename": filename,
+                    "confidence": analysis.confidence,
+                    "validation_issues_count": len(analysis.validation_issues)
+                }
+            )
+            
+            # Speichere Muster, wenn hohe Konfidenz
+            if analysis.confidence > 0.8:
+                pattern = f"Dokumenttyp '{analysis.document_type}' mit typischen Merkmalen: Sprache={analysis.language}, Betrag-Format={analysis.extracted_data.get('amount')}"
+                await self.memory.add_pattern(pattern, examples=[filename])
+            
+            # Speichere Erkenntnis bei Problemen
+            if analysis.validation_issues:
+                insight = f"Dokument '{filename}' hat Probleme: {', '.join(analysis.validation_issues[:3])}"
+                await self.memory.add_insight(insight, source="document_analysis")
+            
+            return analysis
         except Exception as e:
             logger.error(f"Error analyzing document {filename}: {e}")
             return DocumentAnalysis(
@@ -592,15 +907,16 @@ Antworte im JSON-Format mit folgenden Feldern:
 class AccountingAgent:
     """Agent für Buchhaltung: Zuordnung, Verpflegungsmehraufwand, Spesensätze"""
     
-    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None):
+    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None, memory: Optional[AgentMemory] = None, db=None):
         self.llm = llm
         self.name = "AccountingAgent"
         self.message_bus = message_bus
+        self.memory = memory or AgentMemory(self.name, db)
         # Load prompt from markdown file
-        self.system_prompt = load_prompt("accounting_agent.md")
-        if not self.system_prompt:
+        self.system_prompt_base = load_prompt("accounting_agent.md")
+        if not self.system_prompt_base:
             # Fallback default prompt
-            self.system_prompt = """Du bist ein Buchhaltungs-Experte für Reisekostenabrechnungen.
+            self.system_prompt_base = """Du bist ein Buchhaltungs-Experte für Reisekostenabrechnungen.
 Deine Aufgaben:
 1. Dokumente den Reisekosteneinträgen zuordnen (basierend auf Datum, Ort, Zweck)
 2. Verpflegungsmehraufwand automatisch berechnen (basierend auf Land und Abwesenheitsdauer)
@@ -611,6 +927,10 @@ Deine Aufgaben:
         # Subscribe to messages from other agents
         if self.message_bus:
             self.message_bus.subscribe(self.name, self.handle_agent_message)
+    
+    async def initialize(self):
+        """Initialisiere Memory"""
+        await self.memory.initialize()
     
     def handle_agent_message(self, message: Dict):
         """Handle messages from other agents"""
@@ -667,6 +987,18 @@ Deine Aufgaben:
             
             # If no exact date match, use LLM to find best match
             if not matching_entry and report_entries:
+                # Hole relevanten Memory-Kontext für ähnliche Zuordnungen
+                memory_context = await self.memory.get_context_for_prompt(
+                    max_tokens=1500,
+                    relevant_query=f"assignment {analysis.document_type} {doc_date} {doc_amount}"
+                )
+                
+                # Erweitere System-Prompt mit Memory
+                system_prompt = self.system_prompt_base
+                if memory_context:
+                    system_prompt += f"\n\n=== Dein Gedächtnis (frühere Zuordnungen) ===\n{memory_context}\n"
+                    system_prompt += "\nNutze diese Erfahrungen aus deinem Gedächtnis, um ähnliche Zuordnungen besser durchzuführen."
+                
                 prompt = f"""Ordne folgendes Dokument einem Reiseeintrag zu:
 
 Dokument:
@@ -685,7 +1017,7 @@ Finde den besten passenden Reiseeintrag basierend auf:
 
 Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason": "Warum dieser Eintrag passt"}}"""
                 
-                match_result = await self.llm.extract_json(prompt, self.system_prompt)
+                match_result = await self.llm.extract_json(prompt, system_prompt)
                 if match_result and "entry_date" in match_result:
                     matching_entry = entries_by_date.get(match_result["entry_date"])
                     if matching_entry and match_result.get("confidence", 0.0) < 0.5:
@@ -714,7 +1046,7 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
                     # Full day absence = 24h rate
                     meal_allowance = self.get_meal_allowance(location, days, is_24h_absence=True)
                 
-                assignments.append(ExpenseAssignment(
+                assignment = ExpenseAssignment(
                     receipt_id=receipt.get("id", ""),
                     entry_date=matching_entry.get("date", ""),
                     category=category,
@@ -722,7 +1054,24 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
                     currency=analysis.extracted_data.get("currency", "EUR"),
                     meal_allowance_added=meal_allowance,
                     assignment_confidence=analysis.confidence
-                ))
+                )
+                
+                # Speichere Zuordnung im Memory
+                assignment_summary = f"Dokument {receipt.get('id', '')} zugeordnet zu Eintrag {assignment.entry_date}, Kategorie: {category}, Betrag: {doc_amount} {assignment.currency}"
+                if meal_allowance:
+                    assignment_summary += f", Verpflegungsmehraufwand: {meal_allowance} EUR"
+                
+                await self.memory.add_decision(
+                    assignment_summary,
+                    confidence=assignment.assignment_confidence,
+                    context={
+                        "document_type": analysis.document_type,
+                        "category": category,
+                        "entry_date": assignment.entry_date
+                    }
+                )
+                
+                assignments.append(assignment)
         
         return assignments
     
@@ -750,23 +1099,34 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
                 meal_allowance = self.get_meal_allowance(location, days, is_24h_absence=True)
                 total_meal_allowance += meal_allowance
         
-        return {
+        result = {
             "assignments": [a.model_dump() for a in assignments],
             "total_expenses": round(total_expenses, 2),
             "total_meal_allowance": round(total_meal_allowance, 2),
             "summary": f"Zuordnung abgeschlossen: {len(assignments)} Dokumente zugeordnet, Gesamtausgaben: {total_expenses:.2f} EUR, Verpflegungsmehraufwand: {total_meal_allowance:.2f} EUR"
         }
+        
+        # Speichere Zusammenfassung im Memory
+        await self.memory.add_insight(
+            f"Buchhaltungszuordnung abgeschlossen: {len(assignments)} Dokumente, Gesamtausgaben: {total_expenses:.2f} EUR, Verpflegungsmehraufwand: {total_meal_allowance:.2f} EUR",
+            source="process_completion"
+        )
+        
+        return result
 
 class AgentOrchestrator:
     """Orchestrates the agent network for expense report review"""
     
-    def __init__(self, llm: Optional[OllamaLLM] = None):
+    def __init__(self, llm: Optional[OllamaLLM] = None, db=None):
         self.llm = llm or OllamaLLM()
+        self.db = db
         self.message_bus = AgentMessageBus()
-        self.chat_agent = ChatAgent(self.llm)
-        self.document_agent = DocumentAgent(self.llm, self.message_bus)
-        self.accounting_agent = AccountingAgent(self.llm, self.message_bus)
+        # Initialisiere Agenten mit Memory
+        self.chat_agent = ChatAgent(self.llm, db=db)
+        self.document_agent = DocumentAgent(self.llm, self.message_bus, db=db)
+        self.accounting_agent = AccountingAgent(self.llm, self.message_bus, db=db)
         self._llm_health_checked = False
+        self._memory_initialized = False
     
     async def ensure_llm_available(self):
         """Check LLM availability and warn if not reachable"""
@@ -785,6 +1145,15 @@ class AgentOrchestrator:
             return is_healthy
         return True
     
+    async def initialize_memory(self):
+        """Initialisiere Memory für alle Agenten"""
+        if not self._memory_initialized:
+            await self.chat_agent.initialize()
+            await self.document_agent.initialize()
+            await self.accounting_agent.initialize()
+            self._memory_initialized = True
+            logger.info("Agent-Memory für alle Agenten initialisiert")
+    
     def broadcast_message(self, from_agent: str, message: Dict[str, Any]):
         """Broadcast message to all agents via message bus"""
         self.message_bus.broadcast(from_agent, message)
@@ -801,6 +1170,9 @@ class AgentOrchestrator:
         """Main orchestration method for reviewing an expense report"""
         # Ensure LLM is available
         await self.ensure_llm_available()
+        
+        # Initialisiere Memory
+        await self.initialize_memory()
         
         # Fetch report
         report = await db.travel_expense_reports.find_one({"id": report_id})
@@ -911,6 +1283,9 @@ Status: {'Benötigt Klärung' if (issues_needing_clarification or issues) else '
     
     async def handle_user_message(self, report_id: str, user_message: str, db) -> AgentResponse:
         """Handle user message in chat context"""
+        # Initialisiere Memory
+        await self.initialize_memory()
+        
         report = await db.travel_expense_reports.find_one({"id": report_id})
         if not report:
             raise ValueError(f"Report {report_id} not found")

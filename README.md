@@ -44,9 +44,11 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 
 - **Für Windows:** Siehe **[WINDOWS_INSTALLATION.md](WINDOWS_INSTALLATION.md)** - Windows-spezifische Anleitung
 - **Für All-inkl.com:** Siehe **[INSTALLATION_ALL_INKL.md](INSTALLATION_ALL_INKL.md)** - Vollständige, spezifische Anleitung
+- **Architektur All-inkl + Proxmox:** Siehe **[ARCHITEKTUR_ALL_INKL_PROXMOX.md](ARCHITEKTUR_ALL_INKL_PROXMOX.md)** - Ihre spezifische Architektur
 - **Für andere Server:** Siehe **[INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md)** - Allgemeine Installationsanleitung
 - **Schnellstart:** Siehe **[QUICK_START.md](QUICK_START.md)**
 - **Frontend Dependency-Fixes:** Siehe **[frontend/INSTALLATION_FIX.md](frontend/INSTALLATION_FIX.md)**
+- **Office-Rechner Routing:** Siehe **[OFFICE_RECHNER_ROUTING.md](OFFICE_RECHNER_ROUTING.md)** - Lösungen für dynamische IPs
 
 ## Installation auf All-Inkl.com Webserver (Kurzanleitung)
 
