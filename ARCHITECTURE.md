@@ -110,15 +110,22 @@ Das Stundenzettel Web-System besteht aus mehreren Komponenten, die zusammenarbei
 - **GMKTec evo x2**: Ollama LLM-Server im lokalen Netzwerk
 
 **Agenten:**
-1. **ChatAgent**: Dialog mit Benutzer, Rückfragen
-2. **DocumentAgent**: PDF-Analyse, OCR, Validierung
-3. **AccountingAgent**: Zuordnung, Verpflegungsmehraufwand
+1. **ChatAgent**: Dialog mit Benutzer, Rückfragen (mit Memory)
+2. **DocumentAgent**: PDF-Analyse, OCR, Validierung (mit Memory)
+3. **AccountingAgent**: Zuordnung, Verpflegungsmehraufwand (mit Memory + Web-Tools)
 4. **AgentOrchestrator**: Orchestrierung des Workflows
+
+**Features:**
+- **Memory-System**: Jeder Agent hat persistentes Gedächtnis (bis zu 10.000 Einträge)
+- **Web-Tools**: Zugriff auf aktuelle Daten (Spesensätze, Wechselkurse, Geocoding)
+- **Tool-Registry**: Zentrale Verwaltung aller verfügbaren Tools
+- **Intelligente Suche**: Memory-Einträge werden für bessere Entscheidungen genutzt
 
 **Kommunikation:**
 - HTTP API zwischen Proxmox und GMKTec
 - Message Bus für Inter-Agent-Kommunikation
 - Health Checks vor Verwendung
+- Web-APIs für Tool-Zugriff (OpenStreetMap, Exchange Rates, etc.)
 
 **Dateien:**
 - `backend/agents.py` - Agent-Implementierung

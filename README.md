@@ -23,6 +23,12 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
   - Dokumentenanalyse (OCR, Kategorisierung, Validierung)
   - Buchhaltungszuordnung (Verpflegungsmehraufwand, Spesensätze)
   - Chat-Agent für Rückfragen
+  - **Memory-System**: Agenten lernen aus früheren Erfahrungen (bis zu 10.000 Einträge pro Agent)
+  - **Web-Tools**: Zugriff auf aktuelle Daten
+    - Aktuelle Spesensätze aus dem Internet
+    - Währungswechselkurse in Echtzeit
+    - Geocoding für Länderbestimmung
+    - Web-Suche für aktuelle Informationen
 
 ### Weitere Features
 - ✅ Benutzer- und Adminverwaltung mit Rollen (User, Admin, Buchhaltung)
