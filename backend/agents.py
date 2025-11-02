@@ -393,6 +393,494 @@ class AgentResponse(BaseModel):
     requires_user_input: bool = False
     next_agent: Optional[str] = None
 
+# ============================================================================
+# Agent Tools System - Web-Zugriff und externe APIs
+# ============================================================================
+
+class AgentTool(BaseModel):
+    """Basis-Klasse für Agent-Tools"""
+    name: str
+    description: str
+    parameters: Dict[str, Any]
+    
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Führe das Tool aus - muss von Unterklassen implementiert werden"""
+        raise NotImplementedError("Subclasses must implement execute()")
+
+class WebSearchTool(AgentTool):
+    """Tool für Web-Suche - holt aktuelle Informationen aus dem Internet"""
+    
+    def __init__(self):
+        super().__init__(
+            name="web_search",
+            description="Suche nach aktuellen Informationen im Internet. Nützlich für aktuelle Daten, Spesensätze, Währungsinformationen, etc.",
+            parameters={
+                "query": {
+                    "type": "string",
+                    "description": "Suchanfrage (z.B. 'aktuelle Verpflegungsmehraufwand Sätze 2024 Deutschland')"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximale Anzahl an Ergebnissen (Standard: 5)",
+                    "default": 5
+                }
+            }
+        )
+        self._session = None
+    
+    async def _get_session(self):
+        """Get aiohttp session"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=5, limit_per_host=2)
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+    
+    async def execute(self, query: str, max_results: int = 5) -> Dict[str, Any]:
+        """Führe Web-Suche aus"""
+        try:
+            # Verwende DuckDuckGo HTML-Suche (kein API-Key nötig)
+            # Alternative: Man könnte auch eine echte Search API verwenden (Google, Bing, etc.)
+            search_url = "https://html.duckduckgo.com/html/"
+            params = {"q": query}
+            
+            session = await self._get_session()
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+            
+            async with session.get(search_url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    html = await response.text()
+                    # Einfache Text-Extraktion aus HTML (vereinfacht)
+                    # In Produktion würde man BeautifulSoup verwenden
+                    import re
+                    # Extrahiere Snippets aus dem HTML
+                    snippets = re.findall(r'<a[^>]*class="result__a"[^>]*>(.*?)</a>', html, re.DOTALL)
+                    results = []
+                    for i, snippet in enumerate(snippets[:max_results]):
+                        # HTML-Tags entfernen
+                        clean_snippet = re.sub(r'<[^>]+>', '', snippet).strip()
+                        if clean_snippet:
+                            results.append({
+                                "title": clean_snippet[:100],
+                                "snippet": clean_snippet[:300]
+                            })
+                    
+                    return {
+                        "success": True,
+                        "query": query,
+                        "results": results,
+                        "count": len(results)
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status}",
+                        "query": query
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Web search error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "query": query
+            }
+
+class CurrencyExchangeTool(AgentTool):
+    """Tool für Währungswechselkurse - holt aktuelle Wechselkurse"""
+    
+    def __init__(self):
+        super().__init__(
+            name="currency_exchange",
+            description="Holt aktuelle Wechselkurse zwischen verschiedenen Währungen. Nützlich für Reisekostenabrechnungen in Fremdwährung.",
+            parameters={
+                "from_currency": {
+                    "type": "string",
+                    "description": "Quell-Währung (z.B. 'USD', 'EUR', 'GBP')"
+                },
+                "to_currency": {
+                    "type": "string",
+                    "description": "Ziel-Währung (Standard: 'EUR')",
+                    "default": "EUR"
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Betrag zum Umrechnen (optional)",
+                    "default": 1.0
+                }
+            }
+        )
+        self._session = None
+        self._cache: Dict[str, tuple] = {}  # Cache für 1 Stunde
+        self._cache_ttl = 3600  # 1 Stunde in Sekunden
+    
+    async def _get_session(self):
+        """Get aiohttp session"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=5, limit_per_host=2)
+            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+    
+    async def execute(self, from_currency: str, to_currency: str = "EUR", amount: float = 1.0) -> Dict[str, Any]:
+        """Holt Wechselkurs und rechnet Betrag um"""
+        try:
+            from_upper = from_currency.upper()
+            to_upper = to_currency.upper()
+            
+            if from_upper == to_upper:
+                return {
+                    "success": True,
+                    "from_currency": from_upper,
+                    "to_currency": to_upper,
+                    "rate": 1.0,
+                    "amount": amount,
+                    "converted_amount": amount
+                }
+            
+            # Prüfe Cache
+            cache_key = f"{from_upper}_{to_upper}"
+            now = datetime.utcnow().timestamp()
+            if cache_key in self._cache:
+                cached_rate, cached_time = self._cache[cache_key]
+                if now - cached_time < self._cache_ttl:
+                    converted = amount * cached_rate
+                    return {
+                        "success": True,
+                        "from_currency": from_upper,
+                        "to_currency": to_upper,
+                        "rate": cached_rate,
+                        "amount": amount,
+                        "converted_amount": round(converted, 2),
+                        "cached": True
+                    }
+            
+            # Hole aktuellen Kurs von exchangerate-api.com (kostenlos, kein API-Key nötig)
+            session = await self._get_session()
+            url = f"https://api.exchangerate-api.com/v4/latest/{from_upper}"
+            
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    rates = data.get("rates", {})
+                    
+                    if to_upper in rates:
+                        rate = rates[to_upper]
+                        # Update Cache
+                        self._cache[cache_key] = (rate, now)
+                        
+                        converted = amount * rate
+                        return {
+                            "success": True,
+                            "from_currency": from_upper,
+                            "to_currency": to_upper,
+                            "rate": rate,
+                            "amount": amount,
+                            "converted_amount": round(converted, 2),
+                            "date": data.get("date", ""),
+                            "cached": False
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Währung {to_upper} nicht gefunden",
+                            "from_currency": from_upper,
+                            "to_currency": to_upper
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status}",
+                        "from_currency": from_upper,
+                        "to_currency": to_upper
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Currency exchange error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "from_currency": from_currency,
+                "to_currency": to_currency
+            }
+
+class MealAllowanceLookupTool(AgentTool):
+    """Tool für aktuelle Verpflegungsmehraufwand-Spesensätze"""
+    
+    def __init__(self):
+        super().__init__(
+            name="meal_allowance_lookup",
+            description="Sucht nach aktuellen Verpflegungsmehraufwand-Spesensätzen für verschiedene Länder. Nutzt Web-Suche für aktuelle Daten.",
+            parameters={
+                "country": {
+                    "type": "string",
+                    "description": "Land oder Ländercode (z.B. 'Deutschland', 'DE', 'USA', 'US')"
+                },
+                "year": {
+                    "type": "integer",
+                    "description": "Jahr für die Spesensätze (Standard: aktuelles Jahr)",
+                    "default": None
+                }
+            }
+        )
+        self.web_search = WebSearchTool()
+    
+    async def execute(self, country: str, year: Optional[int] = None) -> Dict[str, Any]:
+        """Sucht nach aktuellen Spesensätzen"""
+        try:
+            if year is None:
+                year = datetime.now().year
+            
+            # Baue Suchanfrage
+            query = f"Verpflegungsmehraufwand {country} {year} Spesensätze Bundesfinanzministerium"
+            
+            # Nutze Web-Search-Tool
+            search_result = await self.web_search.execute(query, max_results=3)
+            
+            if search_result.get("success") and search_result.get("results"):
+                # Extrahiere Zahlen aus den Ergebnissen
+                results_text = " ".join([r.get("snippet", "") for r in search_result["results"]])
+                
+                # Versuche Beträge zu extrahieren (vereinfacht)
+                import re
+                # Suche nach Euro-Beträgen wie "28,00 EUR" oder "28.00 Euro"
+                amounts = re.findall(r'(\d+[.,]\d{2})\s*(?:EUR|Euro|€)', results_text, re.IGNORECASE)
+                
+                if amounts:
+                    # Konvertiere zu float
+                    try:
+                        rates = [float(a.replace(",", ".")) for a in amounts[:2]]  # Nimm erste 2
+                        return {
+                            "success": True,
+                            "country": country,
+                            "year": year,
+                            "rates": rates,
+                            "source": "web_search",
+                            "search_results": search_result["results"][:2]
+                        }
+                    except ValueError:
+                        pass
+                
+                return {
+                    "success": True,
+                    "country": country,
+                    "year": year,
+                    "found_information": True,
+                    "search_results": search_result["results"],
+                    "note": "Spesensätze gefunden, aber Beträge müssen manuell extrahiert werden"
+                }
+            else:
+                # Fallback auf lokale Datenbank
+                country_upper = country.upper()
+                if country_upper in MEAL_ALLOWANCE_RATES:
+                    rates = MEAL_ALLOWANCE_RATES[country_upper]
+                    return {
+                        "success": True,
+                        "country": country,
+                        "year": year,
+                        "rates": rates,
+                        "source": "local_database",
+                        "note": "Verwendet lokale Datenbank (möglicherweise nicht aktuell)"
+                    }
+                
+                return {
+                    "success": False,
+                    "error": "Keine Spesensätze gefunden",
+                    "country": country,
+                    "year": year
+                }
+                
+        except Exception as e:
+            logger.error(f"Meal allowance lookup error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "country": country
+            }
+
+class GeocodingTool(AgentTool):
+    """Tool für Geocoding - bestimmt Ländercode aus Ortsangabe"""
+    
+    def __init__(self):
+        super().__init__(
+            name="geocoding",
+            description="Bestimmt Ländercode aus einer Ortsangabe oder Adresse. Nützlich für automatische Ländererkennung.",
+            parameters={
+                "location": {
+                    "type": "string",
+                    "description": "Ortsangabe (z.B. 'München', 'Berlin, Deutschland', 'New York, USA')"
+                }
+            }
+        )
+        self._session = None
+    
+    async def _get_session(self):
+        """Get aiohttp session"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=5, limit_per_host=2)
+            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+    
+    async def execute(self, location: str) -> Dict[str, Any]:
+        """Bestimmt Ländercode aus Ortsangabe"""
+        try:
+            # Verwende Nominatim (OpenStreetMap Geocoding API) - kostenlos
+            session = await self._get_session()
+            url = "https://nominatim.openstreetmap.org/search"
+            params = {
+                "q": location,
+                "format": "json",
+                "limit": 1,
+                "addressdetails": 1
+            }
+            headers = {
+                "User-Agent": "Stundenzettel-Web-App/1.0"  # Nominatim erfordert User-Agent
+            }
+            
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data and len(data) > 0:
+                        result = data[0]
+                        address = result.get("address", {})
+                        country_code = address.get("country_code", "").upper()
+                        country = address.get("country", "")
+                        
+                        return {
+                            "success": True,
+                            "location": location,
+                            "country_code": country_code,
+                            "country": country,
+                            "full_address": result.get("display_name", ""),
+                            "lat": float(result.get("lat", 0)),
+                            "lon": float(result.get("lon", 0))
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Ort nicht gefunden",
+                            "location": location
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status}",
+                        "location": location
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Geocoding error: {e}")
+            # Fallback auf einfache String-Erkennung
+            location_lower = location.lower()
+            country_mapping = {
+                "deutschland": "DE", "germany": "DE",
+                "österreich": "AT", "austria": "AT",
+                "schweiz": "CH", "switzerland": "CH",
+                "frankreich": "FR", "france": "FR",
+                "italien": "IT", "italy": "IT",
+                "spanien": "ES", "spain": "ES",
+                "großbritannien": "GB", "uk": "GB", "england": "GB",
+                "usa": "US", "vereinigte staaten": "US"
+            }
+            for key, code in country_mapping.items():
+                if key in location_lower:
+                    return {
+                        "success": True,
+                        "location": location,
+                        "country_code": code,
+                        "country": key,
+                        "source": "fallback_mapping"
+                    }
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "location": location
+            }
+    
+    async def close(self):
+        """Close HTTP session"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+class AgentToolRegistry:
+    """Registry für alle verfügbaren Agent-Tools"""
+    
+    def __init__(self):
+        self.tools: Dict[str, AgentTool] = {}
+        self._register_default_tools()
+    
+    def _register_default_tools(self):
+        """Registriere Standard-Tools"""
+        self.register(WebSearchTool())
+        self.register(CurrencyExchangeTool())
+        self.register(MealAllowanceLookupTool())
+        self.register(GeocodingTool())
+    
+    def register(self, tool: AgentTool):
+        """Registriere ein neues Tool"""
+        self.tools[tool.name] = tool
+        logger.info(f"Tool '{tool.name}' registriert")
+    
+    def get_tool(self, name: str) -> Optional[AgentTool]:
+        """Hole Tool nach Namen"""
+        return self.tools.get(name)
+    
+    def list_tools(self) -> List[Dict[str, Any]]:
+        """Liste alle verfügbaren Tools"""
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters
+            }
+            for tool in self.tools.values()
+        ]
+    
+    async def execute_tool(self, name: str, **kwargs) -> Dict[str, Any]:
+        """Führe ein Tool aus"""
+        tool = self.get_tool(name)
+        if not tool:
+            return {
+                "success": False,
+                "error": f"Tool '{name}' nicht gefunden",
+                "available_tools": list(self.tools.keys())
+            }
+        
+        try:
+            result = await tool.execute(**kwargs)
+            return result
+        except Exception as e:
+            logger.error(f"Tool execution error for {name}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "tool": name
+            }
+    
+    async def close(self):
+        """Schließe alle Tools (für Cleanup)"""
+        for tool in self.tools.values():
+            if hasattr(tool, 'close') and callable(tool.close):
+                try:
+                    await tool.close()
+                except Exception as e:
+                    logger.warning(f"Error closing tool {tool.name}: {e}")
+
+# Globale Tool-Registry
+_tool_registry: Optional[AgentToolRegistry] = None
+
+def get_tool_registry() -> AgentToolRegistry:
+    """Hole die globale Tool-Registry (Singleton)"""
+    global _tool_registry
+    if _tool_registry is None:
+        _tool_registry = AgentToolRegistry()
+    return _tool_registry
+
 class OllamaLLM:
     """Wrapper for Ollama LLM API
     
@@ -907,11 +1395,12 @@ Antworte im JSON-Format mit folgenden Feldern:
 class AccountingAgent:
     """Agent für Buchhaltung: Zuordnung, Verpflegungsmehraufwand, Spesensätze"""
     
-    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None, memory: Optional[AgentMemory] = None, db=None):
+    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None, memory: Optional[AgentMemory] = None, db=None, tools: Optional[AgentToolRegistry] = None):
         self.llm = llm
         self.name = "AccountingAgent"
         self.message_bus = message_bus
         self.memory = memory or AgentMemory(self.name, db)
+        self.tools = tools or get_tool_registry()
         # Load prompt from markdown file
         self.system_prompt_base = load_prompt("accounting_agent.md")
         if not self.system_prompt_base:
@@ -922,7 +1411,13 @@ Deine Aufgaben:
 2. Verpflegungsmehraufwand automatisch berechnen (basierend auf Land und Abwesenheitsdauer)
 3. Spezielle Dokumente zuordnen (Maut, Parken, etc.)
 4. Kategorien korrekt zuweisen
-5. Beträge validieren und korrigieren"""
+5. Beträge validieren und korrigieren
+
+Verfügbare Tools:
+- geocoding: Bestimmt Ländercode aus Ortsangabe
+- meal_allowance_lookup: Holt aktuelle Verpflegungsmehraufwand-Spesensätze
+- currency_exchange: Rechnet Fremdwährungen in EUR um
+- web_search: Sucht nach aktuellen Informationen"""
         
         # Subscribe to messages from other agents
         if self.message_bus:
@@ -937,8 +1432,25 @@ Deine Aufgaben:
         logger.info(f"AccountingAgent received message from {message.get('from')}: {message.get('content')}")
         # Can request document analysis from Document Agent or clarification from Chat Agent
     
-    def get_country_code(self, location: str) -> str:
-        """Get country code from location (simplified - would use geocoding API)"""
+    async def get_country_code(self, location: str) -> str:
+        """Get country code from location - nutzt Geocoding-Tool für aktuelle Daten"""
+        try:
+            # Versuche zuerst Geocoding-Tool
+            geocoding_tool = self.tools.get_tool("geocoding")
+            if geocoding_tool:
+                result = await geocoding_tool.execute(location)
+                if result.get("success") and result.get("country_code"):
+                    country_code = result["country_code"]
+                    # Speichere im Memory
+                    await self.memory.add_insight(
+                        f"Länderbestimmung für '{location}': {country_code} ({result.get('country', '')})",
+                        source="geocoding_tool"
+                    )
+                    return country_code
+        except Exception as e:
+            logger.warning(f"Geocoding tool error: {e}, using fallback")
+        
+        # Fallback auf einfache String-Erkennung
         location_lower = location.lower()
         country_mapping = {
             "deutschland": "DE", "germany": "DE",
@@ -955,11 +1467,45 @@ Deine Aufgaben:
                 return code
         return "DE"  # Default: Deutschland
     
-    def get_meal_allowance(self, location: str, days: int, is_24h_absence: bool = True) -> float:
-        """Get Verpflegungsmehraufwand based on location and duration"""
-        country_code = self.get_country_code(location)
-        rates = MEAL_ALLOWANCE_RATES.get(country_code, MEAL_ALLOWANCE_RATES["DEFAULT"])
+    async def get_meal_allowance(self, location: str, days: int, is_24h_absence: bool = True) -> float:
+        """Get Verpflegungsmehraufwand based on location and duration - nutzt Web-Tools für aktuelle Daten"""
+        country_code = await self.get_country_code(location)
         
+        # Versuche zuerst aktuelle Spesensätze aus dem Web zu holen
+        try:
+            meal_allowance_tool = self.tools.get_tool("meal_allowance_lookup")
+            if meal_allowance_tool:
+                result = await meal_allowance_tool.execute(country_code)
+                if result.get("success"):
+                    if result.get("rates"):
+                        rates_list = result["rates"]
+                        if isinstance(rates_list, list) and len(rates_list) >= 2:
+                            # Nimm die ersten beiden Werte (24h und abwesend)
+                            rates = {
+                                "24h": float(rates_list[0]),
+                                "abwesend": float(rates_list[1]) if len(rates_list) > 1 else float(rates_list[0]) / 2
+                            }
+                            rate_type = "24h" if is_24h_absence else "abwesend"
+                            daily_rate = rates.get(rate_type, rates["24h"])
+                            
+                            # Speichere im Memory
+                            await self.memory.add_insight(
+                                f"Aktuelle Spesensätze für {country_code}: 24h={rates['24h']} EUR, abwesend={rates['abwesend']} EUR (Quelle: Web)",
+                                source="meal_allowance_lookup_tool"
+                            )
+                            
+                            return daily_rate * days
+                        elif isinstance(rates_list, dict):
+                            # Falls es bereits ein Dict ist
+                            rates = rates_list
+                            rate_type = "24h" if is_24h_absence else "abwesend"
+                            daily_rate = rates.get(rate_type, rates.get("24h", 28.0))
+                            return daily_rate * days
+        except Exception as e:
+            logger.warning(f"Meal allowance lookup tool error: {e}, using local database")
+        
+        # Fallback auf lokale Datenbank
+        rates = MEAL_ALLOWANCE_RATES.get(country_code, MEAL_ALLOWANCE_RATES["DEFAULT"])
         rate_type = "24h" if is_24h_absence else "abwesend"
         daily_rate = rates[rate_type]
         
@@ -1044,7 +1590,7 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
                     location = matching_entry.get("location", "")
                     days = matching_entry.get("days_count", 1)
                     # Full day absence = 24h rate
-                    meal_allowance = self.get_meal_allowance(location, days, is_24h_absence=True)
+                    meal_allowance = await self.get_meal_allowance(location, days, is_24h_absence=True)
                 
                 assignment = ExpenseAssignment(
                     receipt_id=receipt.get("id", ""),
@@ -1096,7 +1642,7 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
                 # Travel day without receipt - add meal allowance
                 location = entry.get("location", "")
                 days = entry.get("days_count", 1)
-                meal_allowance = self.get_meal_allowance(location, days, is_24h_absence=True)
+                meal_allowance = await self.get_meal_allowance(location, days, is_24h_absence=True)
                 total_meal_allowance += meal_allowance
         
         result = {
@@ -1121,10 +1667,12 @@ class AgentOrchestrator:
         self.llm = llm or OllamaLLM()
         self.db = db
         self.message_bus = AgentMessageBus()
-        # Initialisiere Agenten mit Memory
+        # Initialisiere Tool-Registry
+        self.tools = get_tool_registry()
+        # Initialisiere Agenten mit Memory und Tools
         self.chat_agent = ChatAgent(self.llm, db=db)
         self.document_agent = DocumentAgent(self.llm, self.message_bus, db=db)
-        self.accounting_agent = AccountingAgent(self.llm, self.message_bus, db=db)
+        self.accounting_agent = AccountingAgent(self.llm, self.message_bus, db=db, tools=self.tools)
         self._llm_health_checked = False
         self._memory_initialized = False
     
@@ -1165,6 +1713,8 @@ class AgentOrchestrator:
     async def close(self):
         """Clean up resources"""
         await self.llm.close()
+        # Schließe alle Tools
+        await self.tools.close()
     
     async def review_expense_report(self, report_id: str, db) -> Dict[str, Any]:
         """Main orchestration method for reviewing an expense report"""
