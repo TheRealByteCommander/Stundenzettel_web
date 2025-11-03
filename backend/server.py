@@ -215,6 +215,8 @@ class WeeklyTimesheet(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "draft"  # draft, sent, approved
     signed_pdf_path: Optional[str] = None  # Pfad zum hochgeladenen unterschriebenen PDF
+    signed_pdf_verified: Optional[bool] = False  # Durch Dokumenten-Agent verifiziert
+    signed_pdf_verification_notes: Optional[str] = None
 
 class SignedTimesheetUpload(BaseModel):
     """Model für hochgeladene unterschriebene Stundenzettel"""
@@ -1236,14 +1238,17 @@ async def get_monthly_stats(month: str, current_user: User = Depends(get_current
     all_users = await db.users.find({}).to_list(1000)
     users_by_id = {u["id"]: u for u in all_users}
 
-    # Aggregate hours per user for the given month, counting only entries within that month
-    # Only approved timesheets count as working hours, plus absence days
+    # Aggregate hours per user für den Monat – NUR unterschriebene (hochgeladene) und freigegebene Stundenzettel zählen
+    # (Anforderung: Stunden werden ausschließlich anhand vom Kunden unterzeichneter und hochgeladener PDFs erfasst)
     user_totals: Dict[str, Dict[str, Any]] = {}
     for t in ts:
         user_id = t.get("user_id")
         user_name = t.get("user_name", "")
         entries = t.get("entries", [])
         timesheet_status = t.get("status", "draft")
+        # Nur zählen, wenn unterschriebener Stundenzettel vorhanden ist
+        if not t.get("signed_pdf_path"):
+            continue
         
         # Only count approved timesheets as working hours
         if timesheet_status != "approved":
@@ -1305,11 +1310,14 @@ async def get_monthly_rank(month: str, current_user: User = Depends(get_current_
     all_users = await db.users.find({}).to_list(1000)
     users_by_id = {u["id"]: u for u in all_users}
     
-    # Aggregate totals per user - only approved timesheets count
+    # Aggregate totals per user – nur unterschriebene (hochgeladene) und freigegebene Stundenzettel zählen
     totals: Dict[str, float] = {}
     names: Dict[str, str] = {}
     for t in ts:
         timesheet_status = t.get("status", "draft")
+        # Nur zählen, wenn unterschriebener Stundenzettel vorhanden ist
+        if not t.get("signed_pdf_path"):
+            continue
         # Only count approved timesheets
         if timesheet_status != "approved":
             continue
@@ -1468,9 +1476,13 @@ async def get_accounting_monthly_stats(month: str, current_user: User = Depends(
         if has_entries_in_month:
             timesheets_by_user[user_id].add(timesheet_id)
         
-        # Add hours to user stats (only approved timesheets count as working hours)
+        # Add hours to user stats – nur unterschriebene (hochgeladene) UND freigegebene Stundenzettel zählen
         timesheet_status = t.get("status", "draft")
-        if timesheet_status == "approved" and (monthly_total_hours > 0 or has_entries_in_month):
+        if (
+            timesheet_status == "approved"
+            and t.get("signed_pdf_path")
+            and (monthly_total_hours > 0 or has_entries_in_month)
+        ):
             user_stats[user_id]["total_hours"] += monthly_total_hours
             user_stats[user_id]["hours_on_timesheets"] += monthly_hours_on_timesheets
             user_stats[user_id]["travel_hours"] += monthly_travel_hours
@@ -1568,6 +1580,13 @@ async def approve_timesheet(timesheet_id: str, current_user: User = Depends(get_
     # Only sent timesheets can be approved
     if timesheet["status"] not in ["sent", "draft"]:
         raise HTTPException(status_code=400, detail="Only sent or draft timesheets can be approved")
+    
+    # Require uploaded, signed PDF before approval
+    if not timesheet.get("signed_pdf_path"):
+        raise HTTPException(
+            status_code=400,
+            detail="Approval requires uploaded signed timesheet PDF. Please upload the customer-signed document first."
+        )
     
     # Update status to approved
     await db.timesheets.update_one(
@@ -1959,12 +1978,36 @@ async def upload_signed_timesheet(
             local_file_path.unlink()
             raise HTTPException(status_code=500, detail="Verschlüsselung fehlgeschlagen")
         
-        # Update timesheet with signed PDF path
+        # Verifiziere unterschriebenes PDF mit Dokumenten-Agent (Heuristik basierend auf PDF-Text)
+        try:
+            from agents import DocumentAgent, OllamaLLM
+            llm = OllamaLLM()
+            doc_agent = DocumentAgent(llm)
+            # Extrahiere Text (mit Entschlüsselung)
+            pdf_text = doc_agent.extract_pdf_text(str(local_file_path), encryption=data_encryption)
+            import re as _re
+            verified = False
+            notes = ""
+            if pdf_text and isinstance(pdf_text, str):
+                if _re.search(r"(unterschrift|unterzeichnet|signature|signed)", pdf_text, _re.IGNORECASE):
+                    verified = True
+                    notes = "Schlüsselwörter für Unterschrift im PDF-Text gefunden."
+                else:
+                    notes = "Keine offensichtlichen Unterschrifts-Schlüsselwörter im PDF-Text gefunden. Manuelle Prüfung empfohlen."
+            else:
+                notes = "Kein Text extrahiert. Manuelle Prüfung empfohlen."
+        except Exception as e:
+            verified = False
+            notes = f"Automatische Verifikation fehlgeschlagen: {str(e)}"
+
+        # Update timesheet with signed PDF metadata
         await db.timesheets.update_one(
             {"id": timesheet_id},
             {
                 "$set": {
                     "signed_pdf_path": str(local_file_path),
+                    "signed_pdf_verified": bool(verified),
+                    "signed_pdf_verification_notes": notes,
                     "status": "sent"  # Mark as sent when signed version is uploaded
                 }
             }
@@ -2372,7 +2415,9 @@ async def initialize_expense_report(
     
     timesheets = await db.timesheets.find({
         "user_id": current_user.id,
-        "status": "approved"
+        "status": "approved",
+        "signed_pdf_path": {"$ne": None},
+        "signed_pdf_verified": True
     }).to_list(1000)
     
     entries_dict = {}
@@ -2469,6 +2514,48 @@ async def submit_expense_report(
     if report.get("status") != "draft":
         raise HTTPException(status_code=400, detail="Only draft reports can be submitted")
     
+    # Validierung: Für alle relevanten Report-Tage muss es freigegebene, unterschriebene und verifizierte Stundenzettel geben
+    try:
+      entries = report.get("entries", [])
+      missing_dates = []
+      for e in entries:
+          d = e.get("date") if isinstance(e, dict) else getattr(e, "date", None)
+          if not d:
+              continue
+          # Suche Timesheet mit passender Woche, approved, mit verifizierter Unterschrift
+          ts = await db.timesheets.find_one({
+              "user_id": report["user_id"],
+              "status": "approved",
+              "signed_pdf_path": {"$ne": None},
+              "signed_pdf_verified": True,
+              # Woche enthält Datum d
+              "$expr": {
+                  "$and": [
+                      {"$lte": ["$week_start", d]},
+                      {"$gte": ["$week_end", d]}
+                  ]
+              }
+          })
+          if not ts:
+              missing_dates.append(d)
+      if missing_dates:
+          raise HTTPException(
+              status_code=400,
+              detail=f"Einreichen nicht möglich. Für folgende Tage fehlt ein freigegebener, unterschriebener und verifizierter Stundenzettel: {', '.join(missing_dates)}"
+          )
+    except HTTPException:
+      raise
+    except Exception:
+      # Fallback: wenn die Wochen-Grenzprüfung per $expr nicht unterstützt ist, prüfen wir einfach, ob der Monat überhaupt verifizierte TS hat
+      any_verified = await db.timesheets.find_one({
+          "user_id": report["user_id"],
+          "status": "approved",
+          "signed_pdf_path": {"$ne": None},
+          "signed_pdf_verified": True
+      })
+      if not any_verified:
+          raise HTTPException(status_code=400, detail="Einreichen nicht möglich. Es liegt kein freigegebener, unterschriebener und verifizierter Stundenzettel vor.")
+
     await db.travel_expense_reports.update_one(
         {"id": report_id},
         {

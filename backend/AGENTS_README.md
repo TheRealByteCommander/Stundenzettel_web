@@ -16,9 +16,14 @@ Dieses Modul implementiert ein Netzwerk von spezialisierten AI-Agenten zur autom
   - Speichert Dialoge und Erkenntnisse für bessere zukünftige Interaktionen
 
 ### 2. Dokumenten Agent (`DocumentAgent`)
-- **Aufgabe**: Analyse von PDF-Belegen
+- **Aufgabe**: Analyse von PDF-Belegen und Verifikation unterschriebener Stundenzettel
 - **Features**:
   - **Text-Extraktion** aus PDFs (PyPDF2/pdfplumber)
+  - **Automatische Verifikation unterschriebener Stundenzettel**:
+    - Extrahiert PDF-Text (mit DSGVO-konformer Entschlüsselung)
+    - Sucht nach Schlüsselwörtern für Unterschrift (z.B. "unterschrift", "signed", "signature")
+    - Heuristische Prüfung des PDF-Inhalts
+    - Speichert Verifikationsergebnis (`signed_pdf_verified`, `signed_pdf_verification_notes`)
   - **Dokumenttyp-Erkennung**: Hotel, Restaurant, Maut, Parken, Tanken, Bahnticket, etc.
   - **Sprache-Erkennung** und Übersetzung bei Bedarf
   - **Daten-Extraktion**: Betrag, Datum, Währung, Steuernummer, Firmenanschrift

@@ -858,6 +858,78 @@ function App() {
     }
   };
 
+  // Freigabe-Bedingung: Button nur aktiv, wenn unterschriebene PDF vorhanden ODER ausschließlich Abwesenheitstage erfasst sind
+  const canApproveTimesheet = (timesheet) => {
+    try {
+      if (timesheet?.signed_pdf_path) return true;
+      const entries = Array.isArray(timesheet?.entries) ? timesheet.entries : [];
+      if (entries.length === 0) return false;
+      const ABSENCE = new Set(['urlaub', 'krankheit', 'feiertag']);
+      // Nur Abwesenheit: jeder Eintrag hat Abwesenheitstyp und keine Arbeitszeiten
+      const onlyAbsences = entries.every((e) => {
+        const absence = e?.absence_type && ABSENCE.has(String(e.absence_type).toLowerCase());
+        const hasTimes = Boolean(e?.start_time) || Boolean(e?.end_time);
+        return absence && !hasTimes;
+      });
+      return onlyAbsences;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  // Reisekosten: Vorprüfung – für alle Report-Tage muss ein freigegebener, unterschriebener UND verifizierter Stundenzettel existieren
+  const isDateInRange = (dateStr, startStr, endStr) => {
+    try {
+      const d = new Date(dateStr);
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      if (Number.isNaN(d) || Number.isNaN(s) || Number.isNaN(e)) return false;
+      // Inklusive Grenzen
+      return d >= s && d <= e;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const hasVerifiedTimesheetForDate = (dateStr) => {
+    try {
+      return (Array.isArray(timesheets) ? timesheets : []).some((ts) => {
+        if (!ts) return false;
+        const approved = ts.status === 'approved';
+        const signedOk = Boolean(ts.signed_pdf_path) && Boolean(ts.signed_pdf_verified);
+        const inWeek = isDateInRange(dateStr, ts.week_start, ts.week_end);
+        return approved && signedOk && inWeek;
+      });
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const getMissingDatesForReport = (report) => {
+    try {
+      const entries = Array.isArray(report?.entries) ? report.entries : [];
+      const dates = entries.map((e) => e?.date).filter(Boolean);
+      const uniqueDates = Array.from(new Set(dates));
+      return uniqueDates.filter((d) => !hasVerifiedTimesheetForDate(d));
+    } catch (_) {
+      return [];
+    }
+  };
+
+  const canSubmitExpenseReport = (report) => {
+    const missing = getMissingDatesForReport(report);
+    return missing.length === 0;
+  };
+
+  const getCoveredAndMissingDates = (report) => {
+    const entries = Array.isArray(report?.entries) ? report.entries : [];
+    const dates = entries.map((e) => e?.date).filter(Boolean);
+    const uniqueDates = Array.from(new Set(dates));
+    const missing = uniqueDates.filter((d) => !hasVerifiedTimesheetForDate(d));
+    const covered = uniqueDates.filter((d) => hasVerifiedTimesheetForDate(d));
+    return { covered, missing };
+  };
+
   const editUser = (userItem) => {
     setEditingUser(userItem);
     setEditUserForm({
@@ -1510,6 +1582,23 @@ function App() {
                               {timesheet.status === 'approved' ? 'Genehmigt' : 
                                timesheet.status === 'sent' ? 'Versendet' : 'Entwurf'}
                             </Badge>
+                            {timesheet.signed_pdf_path && (
+                              <Badge
+                                variant="outline"
+                                style={{
+                                  marginLeft: 8,
+                                  backgroundColor: timesheet.signed_pdf_verified ? '#10b981' : '#f59e0b',
+                                  color: 'white'
+                                }}
+                                title={
+                                  timesheet.signed_pdf_verified
+                                    ? 'Unterschrift verifiziert'
+                                    : 'Unterschrift hochgeladen, Verifikation empfohlen/ausstehend'
+                                }
+                              >
+                                {timesheet.signed_pdf_verified ? 'Unterschrift verifiziert' : 'Unterschrift hochgeladen'}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2 flex-wrap gap-2">
@@ -1567,8 +1656,12 @@ function App() {
                                       size="sm"
                                       onClick={() => approveTimesheet(timesheet.id)}
                                       style={{ backgroundColor: '#10b981' }}
-                                      disabled={loading}
-                                      title="Stundenzettel genehmigen"
+                                      disabled={loading || !canApproveTimesheet(timesheet)}
+                                      title={
+                                        canApproveTimesheet(timesheet)
+                                          ? 'Stundenzettel genehmigen'
+                                          : 'Freigabe nur mit unterschriebener PDF oder ausschließlich Abwesenheit'
+                                      }
                                     >
                                       ✓ Genehmigen
                                     </Button>
@@ -2780,9 +2873,22 @@ function App() {
                             }
                           }}
                           style={{ backgroundColor: colors.primary }}
+                          disabled={loading || !canSubmitExpenseReport(currentExpenseReport)}
+                          title={
+                            canSubmitExpenseReport(currentExpenseReport)
+                              ? 'Abrechnung abschließen'
+                              : 'Es fehlen verifizierte, unterschriebene Stundenzettel für einige Tage – Reisekosten werden für diese Zeiträume nicht berücksichtigt.'
+                          }
                         >
                           Abrechnung abschließen
                         </Button>
+                        {!canSubmitExpenseReport(currentExpenseReport) && (
+                          <div className="text-sm" style={{ color: '#ef4444' }}>
+                            Hinweis: Es fehlen verifizierte, unterschriebene Stundenzettel für folgende Tage:
+                            {' '}
+                            {getMissingDatesForReport(currentExpenseReport).join(', ')}
+                          </div>
+                        )}
                       </div>
                     )}
                     {currentExpenseReport.status === 'in_review' && (
@@ -2799,6 +2905,29 @@ function App() {
                   {/* Entries from Timesheets */}
                   <div className="space-y-2">
                     <h4 className="font-medium">Einträge aus Stundenzetteln (automatisch)</h4>
+                    {/* Übersicht: Abgedeckte vs. fehlende Tage */}
+                    {currentExpenseReport && (
+                      (() => {
+                        const { covered, missing } = getCoveredAndMissingDates(currentExpenseReport);
+                        if ((covered.length + missing.length) === 0) return null;
+                        return (
+                          <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                            <div>
+                              <div className="text-sm font-medium" style={{ color: '#10b981' }}>Abgedeckte Tage (verifiziert)</div>
+                              <div className="text-sm" style={{ minHeight: 24 }}>
+                                {covered.length > 0 ? covered.join(', ') : '—'}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium" style={{ color: '#ef4444' }}>Fehlende Tage</div>
+                              <div className="text-sm" style={{ minHeight: 24 }}>
+                                {missing.length > 0 ? missing.join(', ') : '—'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
                     {currentExpenseReport.entries && currentExpenseReport.entries.length > 0 ? (
                       <Table>
                         <TableHeader>

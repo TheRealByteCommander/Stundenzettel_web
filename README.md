@@ -12,15 +12,22 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 - ✅ Fahrzeit-Erfassung mit optionaler Weiterberechnung
 - ✅ Monatsstatistiken und Rang-System
 - ✅ Stundenzettel-Genehmigung durch Buchhaltung
+- ✅ **Upload unterschriebener Stundenzettel** (vom Kunden unterzeichnet)
+- ✅ **Automatische Verifikation der Unterschrift** durch Dokumenten-Agent
+- ✅ **Stunden werden nur aus verifizierten, unterschriebenen Stundenzetteln gezählt**
 
 ### Reisekosten-App
-- ✅ Automatische Befüllung aus genehmigten Stundenzetteln
+- ✅ Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln
 - ✅ PDF-Beleg-Upload (lokale Speicherung, DSGVO-konform)
 - ✅ Monatsbasierte Abrechnungen (aktueller + 2 Monate zurück)
 - ✅ Chat-System für Rückfragen mit Agenten
 - ✅ Status-Management (Entwurf, In Prüfung, Genehmigt)
+- ✅ **Validierung vor Einreichen**: Prüfung, ob alle Tage verifizierte Stundenzettel haben
+- ✅ **Übersicht abgedeckte/fehlende Tage** in der UI
+- ✅ **Reisekosten nur für verifizierte Stundenzettel** - fehlende Tage werden nicht berücksichtigt
 - ✅ Automatische Prüfung mit Ollama LLM-Agenten
   - Dokumentenanalyse (OCR, Kategorisierung, Validierung)
+  - **Automatische Verifikation unterschriebener Stundenzettel** (PDF-Text-Analyse)
   - Buchhaltungszuordnung (Verpflegungsmehraufwand, Spesensätze)
   - Chat-Agent für Rückfragen
   - **Memory-System**: Agenten lernen aus früheren Erfahrungen (bis zu 10.000 Einträge pro Agent)
