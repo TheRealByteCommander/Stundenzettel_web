@@ -15,6 +15,7 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 - ✅ **Upload unterschriebener Stundenzettel** (vom Kunden unterzeichnet)
 - ✅ **Automatische Verifikation der Unterschrift** durch Dokumenten-Agent
 - ✅ **Stunden werden nur aus verifizierten, unterschriebenen Stundenzetteln gezählt**
+- ✅ **Urlaubsplaner**: Urlaub beantragen, Genehmigung, automatischer Eintrag in Stundenzettel
 
 ### Reisekosten-App
 - ✅ Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln
@@ -36,6 +37,20 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
     - Währungswechselkurse in Echtzeit
     - Geocoding für Länderbestimmung
     - Web-Suche für aktuelle Informationen
+
+### Urlaubsplaner-App
+- ✅ **Urlaubsanträge stellen**: User können Urlaub beantragen (Start-/Enddatum)
+- ✅ **Automatische Werktage-Berechnung**: System zählt nur Mo-Fr als Urlaubstage
+- ✅ **Genehmigung durch Admin/Buchhaltung**: Genehmigung/Ablehnung von Anträgen
+- ✅ **Urlaubstage-Verwaltung**: Admin kann verfügbare Urlaubstage pro Mitarbeiter eintragen (Mo-Fr)
+- ✅ **Automatischer Eintrag in Stundenzettel**: Genehmigte Urlaubstage werden automatisch als "Urlaub" in Stundenzettel eingetragen
+- ✅ **Validierung**: 
+  - Mindestens 10 Tage am Stück (14 Werktage) pro Jahr
+  - Insgesamt mindestens 20 Urlaubstage pro Jahr
+  - Deadline: 01.02. jedes Jahres für das laufende Jahr
+- ✅ **Wöchentliche Erinnerungsmails**: Automatische Erinnerung an User, die Mindestanforderungen noch nicht erfüllt haben
+- ✅ **Nicht mehr änderbar**: Genehmigte Urlaubstage können vom User nicht mehr verändert werden
+- ✅ **Admin-Löschung**: Admin kann genehmigte Urlaubsanträge löschen (Guthaben wird aktualisiert)
 
 ### Weitere Features
 - ✅ Benutzer- und Adminverwaltung mit Rollen (User, Admin, Buchhaltung)

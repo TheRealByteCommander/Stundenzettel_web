@@ -5,6 +5,17 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 ## [Unreleased]
 
 ### Hinzugefügt
+- **Urlaubsplaner**: Vollständige Implementierung
+  - Urlaubsanträge stellen (Start-/Enddatum, Notizen)
+  - Automatische Werktage-Berechnung (Mo-Fr)
+  - Genehmigung/Ablehnung durch Admin/Buchhaltung
+  - Urlaubstage-Verwaltung: Admin kann verfügbare Tage pro Mitarbeiter eintragen
+  - Automatischer Eintrag genehmigter Urlaubstage in Stundenzettel
+  - Validierung: Mindestens 10 Tage am Stück, 20 gesamt, Deadline 01.02.
+  - Wöchentliche Erinnerungsmails bei fehlenden Mindestanforderungen
+  - Genehmigte Urlaubstage sind nicht mehr änderbar (User)
+  - Admin kann genehmigte Urlaubsanträge löschen (aktualisiert Guthaben)
+  - UI: Urlaubsplaner-Tab mit Jahr-Auswahl, Guthaben-Anzeige, Validierungshinweisen
 - **Stundenzettel-Verifikation**: 
   - Upload unterschriebener Stundenzettel (vom Kunden unterzeichnet)
   - Automatische Verifikation der Unterschrift durch Dokumenten-Agent (PDF-Text-Analyse)
