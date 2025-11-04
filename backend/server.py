@@ -409,22 +409,63 @@ def _date_in_year_month(date_str: str, year: int, month: int) -> bool:
     except Exception:
         return False
 
+def get_german_holidays(year: int) -> set:
+    """Holt deutsche (bundesweit) und sächsische Feiertage für ein Jahr"""
+    try:
+        import holidays
+        # Deutsche Feiertage (bundesweit)
+        de_holidays = holidays.Germany(years=year, prov=None)
+        # Sächsische Feiertage (Bundesland: SN = Sachsen)
+        sn_holidays = holidays.Germany(years=year, prov='SN')
+        # Kombiniere beide Sets
+        all_holidays = set(de_holidays.keys()) | set(sn_holidays.keys())
+        return all_holidays
+    except Exception as e:
+        logger.warning(f"Fehler beim Laden der Feiertage: {e}")
+        # Fallback: Manuelle Liste der wichtigsten Feiertage
+        fallback_holidays = set()
+        # Neujahr, Karfreitag, Ostermontag, Tag der Arbeit, Christi Himmelfahrt, Pfingstmontag, Tag der Deutschen Einheit, 1. Weihnachtstag, 2. Weihnachtstag
+        # Diese sind immer in Deutschland
+        # Für Sachsen: zusätzlich Reformationsfest (31.10) als Feiertag
+        # Vereinfacht: Wir verwenden nur die Feiertage, die in der holidays-Bibliothek sind
+        return fallback_holidays
+
+def is_holiday(date_str: str) -> bool:
+    """Prüft, ob ein Datum ein Feiertag ist (deutschlandweit oder Sachsen)"""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        year = date_obj.year
+        holidays_set = get_german_holidays(year)
+        return date_obj.date() in holidays_set
+    except Exception:
+        return False
+
 def count_working_days(start_date: str, end_date: str) -> int:
-    """Zählt Werktage (Mo-Fr) zwischen zwei Daten"""
+    """Zählt Werktage (Mo-Fr) zwischen zwei Daten, Feiertage werden ausgeschlossen"""
     try:
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")
         if start > end:
             return 0
+        
+        # Hole Feiertage für alle Jahre, die der Zeitraum abdeckt
+        years = set(range(start.year, end.year + 1))
+        all_holidays = set()
+        for year in years:
+            all_holidays.update(get_german_holidays(year))
+        
         count = 0
         current = start
         while current <= end:
             # 0 = Montag, 4 = Freitag
             if current.weekday() < 5:
-                count += 1
+                # Prüfe, ob es kein Feiertag ist
+                if current.date() not in all_holidays:
+                    count += 1
             current += timedelta(days=1)
         return count
-    except Exception:
+    except Exception as e:
+        logger.error(f"Fehler beim Zählen der Werktage: {e}")
         return 0
 
 def get_vacation_dates_in_range(start_date: str, end_date: str, approved_requests: List[Dict]) -> List[str]:
@@ -449,7 +490,8 @@ def get_vacation_dates_in_range(start_date: str, end_date: str, approved_request
     return list(set(vacation_dates))  # Remove duplicates
 
 async def add_vacation_entries_to_timesheet(entries: List[TimeEntry], week_start: str, week_end: str, user_id: str, db) -> List[TimeEntry]:
-    """Fügt automatisch genehmigte Urlaubstage als Einträge hinzu, falls noch nicht vorhanden"""
+    """Fügt automatisch genehmigte Urlaubstage als Einträge hinzu, falls noch nicht vorhanden.
+    Feiertage werden als 'feiertag' eingetragen, nicht als 'urlaub'."""
     # Hole alle genehmigten Urlaubsanträge, die diese Woche überlappen
     approved_requests = await db.vacation_requests.find({
         "user_id": user_id,
@@ -464,36 +506,59 @@ async def add_vacation_entries_to_timesheet(entries: List[TimeEntry], week_start
     # Erstelle Set von vorhandenen Einträgen-Daten
     existing_dates = {entry.date for entry in entries}
     
-    # Für jeden Urlaubstag in der Woche, füge Eintrag hinzu falls nicht vorhanden
+    # Hole Feiertage für die Woche
     week_start_dt = datetime.strptime(week_start, "%Y-%m-%d")
     week_end_dt = datetime.strptime(week_end, "%Y-%m-%d")
+    years = set(range(week_start_dt.year, week_end_dt.year + 1))
+    all_holidays = set()
+    for year in years:
+        all_holidays.update(get_german_holidays(year))
     
     new_entries = []
     current = week_start_dt
     while current <= week_end_dt:
         date_str = current.strftime("%Y-%m-%d")
-        # Nur Werktage (Mo-Fr)
+        current_date = current.date()
+        
+        # Nur Werktage (Mo-Fr) und nicht bereits vorhanden
         if current.weekday() < 5 and date_str not in existing_dates:
-            # Prüfe, ob dieser Tag in einem genehmigten Urlaub liegt
-            for req in approved_requests:
-                req_start = datetime.strptime(req.get("start_date"), "%Y-%m-%d")
-                req_end = datetime.strptime(req.get("end_date"), "%Y-%m-%d")
-                if req_start <= current <= req_end:
-                    # Erstelle Urlaubseintrag
-                    vacation_entry = TimeEntry(
-                        date=date_str,
-                        start_time="",
-                        end_time="",
-                        break_minutes=0,
-                        tasks="",
-                        customer_project="",
-                        location="",
-                        absence_type="urlaub",
-                        travel_time_minutes=0,
-                        include_travel_time=False
-                    )
-                    new_entries.append(vacation_entry)
-                    break  # Nur einmal pro Tag hinzufügen
+            # Prüfe zuerst, ob es ein Feiertag ist
+            if current_date in all_holidays:
+                # Feiertag eintragen
+                holiday_entry = TimeEntry(
+                    date=date_str,
+                    start_time="",
+                    end_time="",
+                    break_minutes=0,
+                    tasks="",
+                    customer_project="",
+                    location="",
+                    absence_type="feiertag",
+                    travel_time_minutes=0,
+                    include_travel_time=False
+                )
+                new_entries.append(holiday_entry)
+            else:
+                # Prüfe, ob dieser Tag in einem genehmigten Urlaub liegt
+                for req in approved_requests:
+                    req_start = datetime.strptime(req.get("start_date"), "%Y-%m-%d")
+                    req_end = datetime.strptime(req.get("end_date"), "%Y-%m-%d")
+                    if req_start <= current <= req_end:
+                        # Erstelle Urlaubseintrag
+                        vacation_entry = TimeEntry(
+                            date=date_str,
+                            start_time="",
+                            end_time="",
+                            break_minutes=0,
+                            tasks="",
+                            customer_project="",
+                            location="",
+                            absence_type="urlaub",
+                            travel_time_minutes=0,
+                            include_travel_time=False
+                        )
+                        new_entries.append(vacation_entry)
+                        break  # Nur einmal pro Tag hinzufügen
         current += timedelta(days=1)
     
     # Kombiniere bestehende und neue Einträge, sortiert nach Datum
@@ -3273,6 +3338,26 @@ async def get_vacation_requirements(
 ):
     """Check vacation requirements for current user"""
     return await check_vacation_requirements(year, current_user.id, db)
+
+@api_router.get("/vacation/holidays/{year}")
+async def get_holidays(year: int):
+    """Get German and Saxon holidays for a year (programmweit verfügbar)"""
+    holidays_set = get_german_holidays(year)
+    # Sortiere und formatiere als Liste von Datumsstrings
+    holidays_list = sorted([date.strftime("%Y-%m-%d") for date in holidays_set])
+    return {
+        "year": year,
+        "holidays": holidays_list,
+        "count": len(holidays_list)
+    }
+
+@api_router.get("/vacation/check-holiday/{date}")
+async def check_holiday(date: str):
+    """Check if a specific date is a holiday (German or Saxon)"""
+    return {
+        "date": date,
+        "is_holiday": is_holiday(date)
+    }
 
 @api_router.post("/vacation/send-reminders")
 async def send_vacation_reminders(current_user: User = Depends(get_admin_user)):
