@@ -40,13 +40,20 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 
 ### Urlaubsplaner-App
 - ✅ **Urlaubsanträge stellen**: User können Urlaub beantragen (Start-/Enddatum)
-- ✅ **Automatische Werktage-Berechnung**: System zählt nur Mo-Fr als Urlaubstage
+- ✅ **Automatische Werktage-Berechnung**: System zählt nur Mo-Fr als Urlaubstage, **Feiertage werden automatisch ausgeschlossen**
+- ✅ **Feiertags-Integration**: 
+  - Deutsche Feiertage (bundesweit) und sächsische Feiertage werden automatisch erkannt
+  - Feiertage werden **nicht als Urlaubstage gezählt**
+  - Feiertage werden automatisch als "Feiertag" in Stundenzettel eingetragen
+  - Feiertage sind programmweit verfügbar und werden automatisch genutzt
 - ✅ **Genehmigung durch Admin/Buchhaltung**: Genehmigung/Ablehnung von Anträgen
 - ✅ **Urlaubstage-Verwaltung**: Admin kann verfügbare Urlaubstage pro Mitarbeiter eintragen (Mo-Fr)
-- ✅ **Automatischer Eintrag in Stundenzettel**: Genehmigte Urlaubstage werden automatisch als "Urlaub" in Stundenzettel eingetragen
+- ✅ **Automatischer Eintrag in Stundenzettel**: 
+  - Genehmigte Urlaubstage werden automatisch als "Urlaub" eingetragen
+  - Feiertage werden automatisch als "Feiertag" eingetragen (auch ohne genehmigten Urlaub)
 - ✅ **Validierung**: 
-  - Mindestens 10 Tage am Stück (14 Werktage) pro Jahr
-  - Insgesamt mindestens 20 Urlaubstage pro Jahr
+  - Mindestens 10 Tage am Stück (14 Werktage, ohne Feiertage) pro Jahr
+  - Insgesamt mindestens 20 Urlaubstage (ohne Feiertage) pro Jahr
   - Deadline: 01.02. jedes Jahres für das laufende Jahr
 - ✅ **Wöchentliche Erinnerungsmails**: Automatische Erinnerung an User, die Mindestanforderungen noch nicht erfüllt haben
 - ✅ **Nicht mehr änderbar**: Genehmigte Urlaubstage können vom User nicht mehr verändert werden

@@ -7,11 +7,17 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 ### Hinzugefügt
 - **Urlaubsplaner**: Vollständige Implementierung
   - Urlaubsanträge stellen (Start-/Enddatum, Notizen)
-  - Automatische Werktage-Berechnung (Mo-Fr)
+  - Automatische Werktage-Berechnung (Mo-Fr) **mit Ausschluss von Feiertagen**
+  - **Feiertags-Integration**: 
+    - Deutsche Feiertage (bundesweit) und sächsische Feiertage werden automatisch erkannt
+    - Feiertage werden **nicht als Urlaubstage gezählt**
+    - Feiertage werden automatisch als "Feiertag" in Stundenzettel eingetragen
+    - Feiertage sind programmweit verfügbar und werden automatisch genutzt
+    - API-Endpunkte: `/vacation/holidays/{year}` und `/vacation/check-holiday/{date}`
   - Genehmigung/Ablehnung durch Admin/Buchhaltung
   - Urlaubstage-Verwaltung: Admin kann verfügbare Tage pro Mitarbeiter eintragen
   - Automatischer Eintrag genehmigter Urlaubstage in Stundenzettel
-  - Validierung: Mindestens 10 Tage am Stück, 20 gesamt, Deadline 01.02.
+  - Validierung: Mindestens 10 Tage am Stück (ohne Feiertage), 20 gesamt (ohne Feiertage), Deadline 01.02.
   - Wöchentliche Erinnerungsmails bei fehlenden Mindestanforderungen
   - Genehmigte Urlaubstage sind nicht mehr änderbar (User)
   - Admin kann genehmigte Urlaubsanträge löschen (aktualisiert Guthaben)
@@ -48,6 +54,11 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - Statistiken berücksichtigen nur verifizierte, unterschriebene Stundenzettel
   - Reisekosten-Initialisierung verwendet nur verifizierte Stundenzettel
   - Reisekosten-Einreichung validiert Vorhandensein verifizierter Stundenzettel für alle Tage
+  - **Feiertags-Integration**: 
+    - `count_working_days()` Funktion erweitert: Feiertage werden automatisch ausgeschlossen
+    - `add_vacation_entries_to_timesheet()` erweitert: Feiertage werden automatisch als "feiertag" eingetragen
+    - Neue Funktionen: `get_german_holidays()`, `is_holiday()` für programmweite Nutzung
+    - `holidays`-Bibliothek zu `requirements.txt` hinzugefügt
 - **Frontend**: 
   - Freigabe-Button logik erweitert: Prüft auf unterschriebene PDF oder nur Abwesenheitstage
   - Reisekosten-UI zeigt Übersicht abgedeckte/fehlende Tage
