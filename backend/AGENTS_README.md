@@ -24,6 +24,8 @@ Dieses Modul implementiert ein Netzwerk von spezialisierten AI-Agenten zur autom
     - Sucht nach Schlüsselwörtern für Unterschrift (z.B. "unterschrift", "signed", "signature")
     - Heuristische Prüfung des PDF-Inhalts
     - Speichert Verifikationsergebnis (`signed_pdf_verified`, `signed_pdf_verification_notes`)
+    - **Automatische Genehmigung**: Wenn Unterschrift verifiziert wird, wird der Stundenzettel automatisch als "approved" markiert und die Arbeitszeit wird gutgeschrieben
+    - **Buchhaltung genehmigt nur in Ausnahmefällen**: Wenn Agent Unterschrift nicht verifizieren kann, bleibt Status "sent" für manuelle Prüfung
   - **Dokumenttyp-Erkennung**: Hotel, Restaurant, Maut, Parken, Tanken, Bahnticket, etc.
   - **Sprache-Erkennung** und Übersetzung bei Bedarf
   - **Daten-Extraktion**: Betrag, Datum, Währung, Steuernummer, Firmenanschrift

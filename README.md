@@ -11,10 +11,11 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 - ✅ Urlaub, Krankheit, Feiertag-Tracking
 - ✅ Fahrzeit-Erfassung mit optionaler Weiterberechnung
 - ✅ Monatsstatistiken und Rang-System
-- ✅ Stundenzettel-Genehmigung durch Buchhaltung
-- ✅ **Upload unterschriebener Stundenzettel** (vom Kunden unterzeichnet)
-- ✅ **Automatische Verifikation der Unterschrift** durch Dokumenten-Agent
-- ✅ **Stunden werden nur aus verifizierten, unterschriebenen Stundenzetteln gezählt**
+- ✅ **Automatische Genehmigung durch Agent**: Wenn Dokumenten-Agent die Unterschrift verifiziert, wird automatisch als Arbeitszeit gutgeschrieben
+- ✅ **Buchhaltung genehmigt nur in Ausnahmefällen**: Wenn Agent Unterschrift nicht verifizieren konnte oder nur Abwesenheitstage
+- ✅ **Upload unterschriebener Stundenzettel** (vom Kunden unterzeichnet, vom User hochgeladen)
+- ✅ **Automatische Verifikation der Unterschrift** durch Dokumenten-Agent (PDF-Text-Analyse)
+- ✅ **Stunden werden nur aus verifizierten, unterschriebenen und genehmigten Stundenzetteln gezählt**
 - ✅ **Urlaubsplaner**: Urlaub beantragen, Genehmigung, automatischer Eintrag in Stundenzettel
 
 ### Reisekosten-App

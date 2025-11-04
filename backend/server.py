@@ -1806,21 +1806,56 @@ async def get_accounting_timesheets_list(
 
 @api_router.post("/timesheets/{timesheet_id}/approve")
 async def approve_timesheet(timesheet_id: str, current_user: User = Depends(get_accounting_or_admin_user)):
-    """Approve a timesheet - only accounting or admin can approve"""
+    """Approve a timesheet - nur in Ausnahmefällen durch Buchhaltung/Admin.
+    
+    Normalfall: Agent genehmigt automatisch, wenn Unterschrift verifiziert wurde.
+    Buchhaltung kann nur genehmigen, wenn:
+    - signed_pdf_verified=False (Agent konnte Unterschrift nicht verifizieren)
+    - oder nur Abwesenheitstage (Urlaub/Krankheit/Feiertag) ohne Arbeitszeit
+    """
     # Find timesheet
     timesheet = await db.timesheets.find_one({"id": timesheet_id})
     if not timesheet:
         raise HTTPException(status_code=404, detail="Timesheet not found")
     
-    # Only sent timesheets can be approved
+    # Nur sent oder draft Stundenzettel können genehmigt werden
     if timesheet["status"] not in ["sent", "draft"]:
         raise HTTPException(status_code=400, detail="Only sent or draft timesheets can be approved")
     
-    # Require uploaded, signed PDF before approval
-    if not timesheet.get("signed_pdf_path"):
+    # Prüfe, ob bereits automatisch genehmigt wurde (sollte nicht vorkommen)
+    if timesheet.get("signed_pdf_verified") and timesheet.get("status") == "approved":
         raise HTTPException(
             status_code=400,
-            detail="Approval requires uploaded signed timesheet PDF. Please upload the customer-signed document first."
+            detail="Timesheet wurde bereits automatisch durch Agent genehmigt. Keine manuelle Genehmigung erforderlich."
+        )
+    
+    # Normalfall: Wenn Unterschrift verifiziert wurde, sollte automatisch approved sein
+    # Manuelle Genehmigung nur in Ausnahmefällen:
+    # 1. signed_pdf_verified=False (Agent konnte nicht verifizieren)
+    # 2. Nur Abwesenheitstage (Urlaub/Krankheit/Feiertag) ohne Arbeitszeit
+    signed_pdf_verified = timesheet.get("signed_pdf_verified", False)
+    has_signed_pdf = bool(timesheet.get("signed_pdf_path"))
+    
+    # Prüfe, ob nur Abwesenheitstage vorhanden sind
+    entries = timesheet.get("entries", [])
+    only_absences = True
+    if entries:
+        ABSENCE_TYPES = {"urlaub", "krankheit", "feiertag"}
+        for entry in entries:
+            absence_type = entry.get("absence_type") if isinstance(entry, dict) else getattr(entry, "absence_type", None)
+            has_work_time = bool(entry.get("start_time") if isinstance(entry, dict) else getattr(entry, "start_time", None))
+            if not absence_type or absence_type.lower() not in ABSENCE_TYPES or has_work_time:
+                only_absences = False
+                break
+    else:
+        only_absences = False
+    
+    # Genehmigung nur in Ausnahmefällen:
+    # - Unterschrift nicht verifiziert ODER nur Abwesenheitstage
+    if signed_pdf_verified and not only_absences:
+        raise HTTPException(
+            status_code=400,
+            detail="Dieser Stundenzettel sollte automatisch durch den Agent genehmigt werden. Bitte laden Sie den unterschriebenen Stundenzettel hoch, damit der Agent prüfen kann."
         )
     
     # Update status to approved
@@ -1829,7 +1864,10 @@ async def approve_timesheet(timesheet_id: str, current_user: User = Depends(get_
         {"$set": {"status": "approved"}}
     )
     
-    return {"message": "Timesheet approved successfully"}
+    return {
+        "message": "Timesheet approved successfully (Ausnahmefall)",
+        "reason": "Manuelle Genehmigung durch Buchhaltung" if not signed_pdf_verified else "Nur Abwesenheitstage"
+    }
 
 @api_router.post("/timesheets/{timesheet_id}/reject")
 async def reject_timesheet(timesheet_id: str, current_user: User = Depends(get_accounting_or_admin_user)):
@@ -2175,7 +2213,14 @@ async def upload_signed_timesheet(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    """Upload unterschriebener Stundenzettel-PDF. Benachrichtigt alle Buchhaltungs-User per E-Mail."""
+    """Upload unterschriebener Stundenzettel-PDF (vom Kunden unterzeichnet, vom User hochgeladen).
+    
+    Der Dokumenten-Agent prüft automatisch die Unterschrift:
+    - Wenn Unterschrift verifiziert: Stundenzettel wird automatisch als "approved" markiert und Arbeitszeit gutgeschrieben
+    - Wenn Unterschrift nicht verifiziert: Status bleibt "sent" für manuelle Prüfung durch Buchhaltung
+    
+    Benachrichtigt alle Buchhaltungs-User per E-Mail (unterscheidet zwischen automatisch genehmigt und manuelle Prüfung erforderlich).
+    """
     
     # Get timesheet
     timesheet = await db.timesheets.find_one({"id": timesheet_id})
@@ -2229,6 +2274,7 @@ async def upload_signed_timesheet(
             raise HTTPException(status_code=500, detail="Verschlüsselung fehlgeschlagen")
         
         # Verifiziere unterschriebenes PDF mit Dokumenten-Agent (Heuristik basierend auf PDF-Text)
+        # Wenn Agent Unterschrift verifiziert, wird automatisch als Arbeitszeit gutgeschrieben (approved)
         try:
             from agents import DocumentAgent, OllamaLLM
             llm = OllamaLLM()
@@ -2241,15 +2287,19 @@ async def upload_signed_timesheet(
             if pdf_text and isinstance(pdf_text, str):
                 if _re.search(r"(unterschrift|unterzeichnet|signature|signed)", pdf_text, _re.IGNORECASE):
                     verified = True
-                    notes = "Schlüsselwörter für Unterschrift im PDF-Text gefunden."
+                    notes = "Schlüsselwörter für Unterschrift im PDF-Text gefunden. Automatisch als Arbeitszeit gutgeschrieben."
                 else:
-                    notes = "Keine offensichtlichen Unterschrifts-Schlüsselwörter im PDF-Text gefunden. Manuelle Prüfung empfohlen."
+                    notes = "Keine offensichtlichen Unterschrifts-Schlüsselwörter im PDF-Text gefunden. Manuelle Prüfung durch Buchhaltung erforderlich."
             else:
-                notes = "Kein Text extrahiert. Manuelle Prüfung empfohlen."
+                notes = "Kein Text extrahiert. Manuelle Prüfung durch Buchhaltung erforderlich."
         except Exception as e:
             verified = False
-            notes = f"Automatische Verifikation fehlgeschlagen: {str(e)}"
+            notes = f"Automatische Verifikation fehlgeschlagen: {str(e)}. Manuelle Prüfung durch Buchhaltung erforderlich."
 
+        # Automatische Genehmigung, wenn Agent Unterschrift verifiziert hat
+        # Buchhaltung kann nur in Ausnahmefällen genehmigen (wenn verified=False)
+        new_status = "approved" if verified else "sent"
+        
         # Update timesheet with signed PDF metadata
         await db.timesheets.update_one(
             {"id": timesheet_id},
@@ -2258,7 +2308,7 @@ async def upload_signed_timesheet(
                     "signed_pdf_path": str(local_file_path),
                     "signed_pdf_verified": bool(verified),
                     "signed_pdf_verification_notes": notes,
-                    "status": "sent"  # Mark as sent when signed version is uploaded
+                    "status": new_status  # Automatisch approved wenn verifiziert, sonst sent für manuelle Prüfung
                 }
             }
         )
@@ -2284,20 +2334,41 @@ async def upload_signed_timesheet(
                 
                 # Prepare email
                 msg = MIMEMultipart()
+                if verified:
+                    subject = f"Stundenzettel automatisch genehmigt - {timesheet_obj.user_name} - {week_info}"
+                else:
+                    subject = f"Unterschriebener Stundenzettel - Manuelle Prüfung erforderlich - {timesheet_obj.user_name} - {week_info}"
                 msg['From'] = smtp_config["smtp_username"]
-                msg['Subject'] = f"Unterschriebener Stundenzettel hochgeladen - {timesheet_obj.user_name} - {week_info}"
+                msg['Subject'] = subject
                 
-                body = f"""Hallo,
+                if verified:
+                    body = f"""Hallo,
 
-ein unterschriebener Stundenzettel wurde hochgeladen:
+ein unterschriebener Stundenzettel wurde hochgeladen und automatisch durch den Agent genehmigt:
 
 Mitarbeiter: {timesheet_obj.user_name}
 Woche: {week_info}
 Stundenzettel-ID: {timesheet_id}
+Status: Automatisch genehmigt (Unterschrift verifiziert)
 
 Der unterschriebene Stundenzettel wurde verschlüsselt im lokalen Speicher gespeichert.
+Die Arbeitszeit wurde automatisch gutgeschrieben.
 
-Bitte prüfen Sie den Stundenzettel im System.
+Mit freundlichen Grüßen
+{COMPANY_INFO["name"]}
+                """
+                else:
+                    body = f"""Hallo,
+
+ein unterschriebener Stundenzettel wurde hochgeladen, benötigt aber manuelle Prüfung:
+
+Mitarbeiter: {timesheet_obj.user_name}
+Woche: {week_info}
+Stundenzettel-ID: {timesheet_id}
+Status: Manuelle Prüfung erforderlich
+
+Der Agent konnte die Unterschrift nicht automatisch verifizieren.
+Bitte prüfen Sie den Stundenzettel im System und genehmigen Sie ihn manuell, falls die Unterschrift vorhanden ist.
 
 Mit freundlichen Grüßen
 {COMPANY_INFO["name"]}

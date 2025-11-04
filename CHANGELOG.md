@@ -22,12 +22,15 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - Genehmigte Urlaubstage sind nicht mehr änderbar (User)
   - Admin kann genehmigte Urlaubsanträge löschen (aktualisiert Guthaben)
   - UI: Urlaubsplaner-Tab mit Jahr-Auswahl, Guthaben-Anzeige, Validierungshinweisen
-- **Stundenzettel-Verifikation**: 
-  - Upload unterschriebener Stundenzettel (vom Kunden unterzeichnet)
-  - Automatische Verifikation der Unterschrift durch Dokumenten-Agent (PDF-Text-Analyse)
-  - Stunden werden nur aus verifizierten, unterschriebenen und freigegebenen Stundenzetteln gezählt
+- **Stundenzettel-Verifikation und automatische Genehmigung**: 
+  - Upload unterschriebener Stundenzettel (vom Kunden unterzeichnet, vom User hochgeladen)
+  - **Automatische Verifikation der Unterschrift durch Dokumenten-Agent** (PDF-Text-Analyse)
+  - **Automatische Genehmigung**: Wenn Agent Unterschrift verifiziert, wird automatisch als "approved" markiert und Arbeitszeit gutgeschrieben
+  - **Buchhaltung genehmigt nur in Ausnahmefällen**: Wenn Agent Unterschrift nicht verifizieren konnte oder nur Abwesenheitstage (Urlaub/Krankheit/Feiertag)
+  - Stunden werden nur aus verifizierten, unterschriebenen und genehmigten Stundenzetteln gezählt
   - Freigabe-Button nur aktiv, wenn unterschriebene PDF vorhanden oder ausschließlich Abwesenheitstage
   - Visuelle Anzeige des Verifikationsstatus (Badge: "Unterschrift verifiziert" / "Unterschrift hochgeladen")
+  - E-Mail-Benachrichtigung an Buchhaltung: Unterscheidet zwischen automatisch genehmigt und manuelle Prüfung erforderlich
 - **Reisekosten-App**: Vollständige Implementierung der Reisekostenabrechnung
   - Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln (Ort, Tage, Fahrzeit, Kunde)
   - Monatsauswahl (aktueller Monat + max 2 Monate zurück)
@@ -51,7 +54,10 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 - **Backend**: 
   - `WeeklyTimesheet` Modell erweitert um `signed_pdf_verified` und `signed_pdf_verification_notes`
   - Upload-Endpunkt führt automatische Verifikation durch Dokumenten-Agent aus
-  - Statistiken berücksichtigen nur verifizierte, unterschriebene Stundenzettel
+  - **Automatische Genehmigung**: Wenn `signed_pdf_verified=True`, wird Status automatisch auf "approved" gesetzt
+  - **Genehmigungs-Endpunkt**: Buchhaltung kann nur noch in Ausnahmefällen genehmigen (wenn `signed_pdf_verified=False` oder nur Abwesenheitstage)
+  - **E-Mail-Benachrichtigung**: Unterscheidet zwischen automatisch genehmigt und manuelle Prüfung erforderlich
+  - Statistiken berücksichtigen nur verifizierte, unterschriebene und genehmigte Stundenzettel
   - Reisekosten-Initialisierung verwendet nur verifizierte Stundenzettel
   - Reisekosten-Einreichung validiert Vorhandensein verifizierter Stundenzettel für alle Tage
   - **Feiertags-Integration**: 
