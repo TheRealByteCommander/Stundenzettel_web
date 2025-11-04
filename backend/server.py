@@ -289,6 +289,40 @@ class TravelExpenseReport(BaseModel):
 class TravelExpenseReportUpdate(BaseModel):
     entries: Optional[List[TravelExpenseReportEntry]] = None
 
+class VacationRequest(BaseModel):
+    """Urlaubsantrag"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_name: str
+    start_date: str  # YYYY-MM-DD
+    end_date: str  # YYYY-MM-DD
+    working_days: int  # Anzahl Werktage (Mo-Fr)
+    year: int  # Jahr des Urlaubs
+    status: str = "pending"  # pending, approved, rejected
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None  # user_id des Genehmigers
+    notes: Optional[str] = None  # Optional: Notizen
+
+class VacationRequestCreate(BaseModel):
+    start_date: str
+    end_date: str
+    notes: Optional[str] = None
+
+class VacationBalance(BaseModel):
+    """Urlaubsguthaben pro Mitarbeiter pro Jahr"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_name: str
+    year: int
+    total_days: int  # Gesamt verfügbare Urlaubstage (Mo-Fr)
+    used_days: int = 0  # Verbrauchte Tage
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class VacationBalanceUpdate(BaseModel):
+    total_days: int
+
 class ChatMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     report_id: str
@@ -374,6 +408,142 @@ def _date_in_year_month(date_str: str, year: int, month: int) -> bool:
         return d.year == year and d.month == month
     except Exception:
         return False
+
+def count_working_days(start_date: str, end_date: str) -> int:
+    """Zählt Werktage (Mo-Fr) zwischen zwei Daten"""
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        if start > end:
+            return 0
+        count = 0
+        current = start
+        while current <= end:
+            # 0 = Montag, 4 = Freitag
+            if current.weekday() < 5:
+                count += 1
+            current += timedelta(days=1)
+        return count
+    except Exception:
+        return 0
+
+def get_vacation_dates_in_range(start_date: str, end_date: str, approved_requests: List[Dict]) -> List[str]:
+    """Gibt alle Datumsstrings (YYYY-MM-DD) zurück, die in genehmigten Urlaubsanträgen liegen"""
+    vacation_dates = []
+    try:
+        range_start = datetime.strptime(start_date, "%Y-%m-%d")
+        range_end = datetime.strptime(end_date, "%Y-%m-%d")
+        for req in approved_requests:
+            if req.get("status") != "approved":
+                continue
+            req_start = datetime.strptime(req.get("start_date"), "%Y-%m-%d")
+            req_end = datetime.strptime(req.get("end_date"), "%Y-%m-%d")
+            current = max(req_start, range_start)
+            end = min(req_end, range_end)
+            while current <= end:
+                if current.weekday() < 5:  # Mo-Fr
+                    vacation_dates.append(current.strftime("%Y-%m-%d"))
+                current += timedelta(days=1)
+    except Exception:
+        pass
+    return list(set(vacation_dates))  # Remove duplicates
+
+async def add_vacation_entries_to_timesheet(entries: List[TimeEntry], week_start: str, week_end: str, user_id: str, db) -> List[TimeEntry]:
+    """Fügt automatisch genehmigte Urlaubstage als Einträge hinzu, falls noch nicht vorhanden"""
+    # Hole alle genehmigten Urlaubsanträge, die diese Woche überlappen
+    approved_requests = await db.vacation_requests.find({
+        "user_id": user_id,
+        "status": "approved",
+        "$or": [
+            {"start_date": {"$lte": week_end, "$gte": week_start}},
+            {"end_date": {"$lte": week_end, "$gte": week_start}},
+            {"$and": [{"start_date": {"$lte": week_start}}, {"end_date": {"$gte": week_end}}]}
+        ]
+    }).to_list(100)
+    
+    # Erstelle Set von vorhandenen Einträgen-Daten
+    existing_dates = {entry.date for entry in entries}
+    
+    # Für jeden Urlaubstag in der Woche, füge Eintrag hinzu falls nicht vorhanden
+    week_start_dt = datetime.strptime(week_start, "%Y-%m-%d")
+    week_end_dt = datetime.strptime(week_end, "%Y-%m-%d")
+    
+    new_entries = []
+    current = week_start_dt
+    while current <= week_end_dt:
+        date_str = current.strftime("%Y-%m-%d")
+        # Nur Werktage (Mo-Fr)
+        if current.weekday() < 5 and date_str not in existing_dates:
+            # Prüfe, ob dieser Tag in einem genehmigten Urlaub liegt
+            for req in approved_requests:
+                req_start = datetime.strptime(req.get("start_date"), "%Y-%m-%d")
+                req_end = datetime.strptime(req.get("end_date"), "%Y-%m-%d")
+                if req_start <= current <= req_end:
+                    # Erstelle Urlaubseintrag
+                    vacation_entry = TimeEntry(
+                        date=date_str,
+                        start_time="",
+                        end_time="",
+                        break_minutes=0,
+                        tasks="",
+                        customer_project="",
+                        location="",
+                        absence_type="urlaub",
+                        travel_time_minutes=0,
+                        include_travel_time=False
+                    )
+                    new_entries.append(vacation_entry)
+                    break  # Nur einmal pro Tag hinzufügen
+        current += timedelta(days=1)
+    
+    # Kombiniere bestehende und neue Einträge, sortiert nach Datum
+    all_entries = entries + new_entries
+    all_entries.sort(key=lambda e: e.date)
+    return all_entries
+
+async def check_vacation_requirements(year: int, user_id: str, db) -> Dict[str, Any]:
+    """Prüft, ob Mindestanforderungen erfüllt sind:
+    - Mindestens 10 Tage (14 Werktage) am Stück
+    - Mindestens 20 Tage insgesamt
+    - Eingetragen bis 01.02. des Jahres
+    """
+    from datetime import date
+    today = date.today()
+    deadline = date(year, 2, 1)
+    
+    # Hole alle genehmigten Urlaubsanträge für das Jahr
+    approved_requests = await db.vacation_requests.find({
+        "user_id": user_id,
+        "year": year,
+        "status": "approved"
+    }).to_list(100)
+    
+    total_days = sum(req.get("working_days", 0) for req in approved_requests)
+    max_consecutive = 0
+    current_consecutive = 0
+    
+    if approved_requests:
+        # Sortiere nach Startdatum
+        sorted_requests = sorted(approved_requests, key=lambda x: x.get("start_date", ""))
+        for req in sorted_requests:
+            days = req.get("working_days", 0)
+            if days >= 10:
+                max_consecutive = max(max_consecutive, days)
+            current_consecutive = max(current_consecutive, days)
+    
+    meets_min_consecutive = max_consecutive >= 10
+    meets_min_total = total_days >= 20
+    meets_deadline = today <= deadline
+    
+    return {
+        "meets_min_consecutive": meets_min_consecutive,
+        "meets_min_total": meets_min_total,
+        "meets_deadline": meets_deadline,
+        "total_days": total_days,
+        "max_consecutive": max_consecutive,
+        "deadline_passed": today > deadline,
+        "needs_reminder": not (meets_min_consecutive and meets_min_total and meets_deadline)
+    }
 
 def _entry_hours(entry: TimeEntry) -> float:
     """Calculate working hours including travel time if include_travel_time is True"""
@@ -1649,16 +1819,21 @@ async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user
     week_start = datetime.strptime(timesheet_create.week_start, "%Y-%m-%d")
     week_end = week_start + timedelta(days=6)
     
-    # Filter out entries without work times (optional - allow empty entries for flexibility)
-    # valid_entries = [entry for entry in timesheet_create.entries if entry.start_time and entry.end_time]
-    # Or keep all entries as they might have tasks/notes even without times
+    # Automatisch genehmigte Urlaubstage hinzufügen
+    entries_with_vacation = await add_vacation_entries_to_timesheet(
+        timesheet_create.entries,
+        timesheet_create.week_start,
+        week_end.strftime("%Y-%m-%d"),
+        current_user.id,
+        db
+    )
     
     timesheet = WeeklyTimesheet(
         user_id=current_user.id,
         user_name=current_user.name,
         week_start=timesheet_create.week_start,
         week_end=week_end.strftime("%Y-%m-%d"),
-        entries=timesheet_create.entries  # Keep all entries, let PDF handle empty times
+        entries=entries_with_vacation
     )
     
     await db.timesheets.insert_one(timesheet.dict())
@@ -1700,7 +1875,17 @@ async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate,
         update_data["week_end"] = week_end.strftime("%Y-%m-%d")
     
     if timesheet_update.entries is not None:
-        update_data["entries"] = [entry.model_dump() for entry in timesheet_update.entries]
+        # Automatisch genehmigte Urlaubstage hinzufügen
+        week_start_str = update_data.get("week_start", timesheet.get("week_start"))
+        week_end_str = update_data.get("week_end", timesheet.get("week_end"))
+        entries_with_vacation = await add_vacation_entries_to_timesheet(
+            timesheet_update.entries,
+            week_start_str,
+            week_end_str,
+            timesheet["user_id"],
+            db
+        )
+        update_data["entries"] = [entry.model_dump() for entry in entries_with_vacation]
     
     if update_data:
         await db.timesheets.update_one({"id": timesheet_id}, {"$set": update_data})
@@ -2817,6 +3002,349 @@ async def send_chat_message(
             logger.warning(f"Could not get agent response: {e}")
     
     return user_msg
+
+# ============================================================================
+# Urlaubsplaner Endpunkte
+# ============================================================================
+
+@api_router.get("/vacation/requests", response_model=List[VacationRequest])
+async def get_vacation_requests(
+    year: Optional[int] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Get vacation requests for current user, or all if admin/accounting"""
+    query = {}
+    if not current_user.can_view_all_data():
+        query["user_id"] = current_user.id
+    
+    if year:
+        query["year"] = year
+    
+    requests = []
+    async for req in db.vacation_requests.find(query).sort("created_at", -1):
+        requests.append(VacationRequest(**req))
+    return requests
+
+@api_router.post("/vacation/requests", response_model=VacationRequest)
+async def create_vacation_request(
+    request_create: VacationRequestCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new vacation request"""
+    from datetime import date
+    start = datetime.strptime(request_create.start_date, "%Y-%m-%d")
+    end = datetime.strptime(request_create.end_date, "%Y-%m-%d")
+    
+    if start > end:
+        raise HTTPException(status_code=400, detail="Startdatum muss vor Enddatum liegen")
+    
+    year = start.year
+    working_days = count_working_days(request_create.start_date, request_create.end_date)
+    
+    if working_days <= 0:
+        raise HTTPException(status_code=400, detail="Keine Werktage im angegebenen Zeitraum")
+    
+    # Prüfe Urlaubsguthaben
+    balance = await db.vacation_balances.find_one({
+        "user_id": current_user.id,
+        "year": year
+    })
+    
+    if balance:
+        used_days = balance.get("used_days", 0)
+        total_days = balance.get("total_days", 0)
+        
+        # Berechne bereits genehmigte Tage für dieses Jahr
+        approved_requests = await db.vacation_requests.find({
+            "user_id": current_user.id,
+            "year": year,
+            "status": "approved"
+        }).to_list(100)
+        approved_days = sum(r.get("working_days", 0) for r in approved_requests)
+        
+        if approved_days + working_days > total_days:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Nicht genug Urlaubstage verfügbar. Verfügbar: {total_days - approved_days}, benötigt: {working_days}"
+            )
+    
+    request = VacationRequest(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        start_date=request_create.start_date,
+        end_date=request_create.end_date,
+        working_days=working_days,
+        year=year,
+        notes=request_create.notes
+    )
+    
+    request_dict = request.model_dump()
+    request_dict["created_at"] = datetime.utcnow()
+    await db.vacation_requests.insert_one(request_dict)
+    
+    return request
+
+@api_router.delete("/vacation/requests/{request_id}")
+async def delete_vacation_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a vacation request (only if pending and own request, or admin/accounting)"""
+    request = await db.vacation_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Urlaubsantrag nicht gefunden")
+    
+    # Nur eigene pending Anträge können gelöscht werden, oder Admin/Buchhaltung
+    if request["status"] == "approved" and not current_user.can_view_all_data():
+        raise HTTPException(status_code=400, detail="Genehmigte Anträge können nicht gelöscht werden")
+    
+    if request["user_id"] != current_user.id and not current_user.can_view_all_data():
+        raise HTTPException(status_code=403, detail="Nicht autorisiert")
+    
+    await db.vacation_requests.delete_one({"id": request_id})
+    return {"message": "Urlaubsantrag gelöscht"}
+
+@api_router.post("/vacation/requests/{request_id}/approve")
+async def approve_vacation_request(
+    request_id: str,
+    current_user: User = Depends(get_accounting_or_admin_user)
+):
+    """Approve a vacation request (accounting/admin only)"""
+    request = await db.vacation_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Urlaubsantrag nicht gefunden")
+    
+    if request["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Nur ausstehende Anträge können genehmigt werden")
+    
+    # Update status
+    await db.vacation_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": "approved",
+                "reviewed_at": datetime.utcnow(),
+                "reviewed_by": current_user.id
+            }
+        }
+    )
+    
+    # Update vacation balance
+    balance = await db.vacation_balances.find_one({
+        "user_id": request["user_id"],
+        "year": request["year"]
+    })
+    
+    if balance:
+        new_used = balance.get("used_days", 0) + request["working_days"]
+        await db.vacation_balances.update_one(
+            {"id": balance["id"]},
+            {
+                "$set": {
+                    "used_days": new_used,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+    
+    return {"message": "Urlaubsantrag genehmigt"}
+
+@api_router.post("/vacation/requests/{request_id}/reject")
+async def reject_vacation_request(
+    request_id: str,
+    current_user: User = Depends(get_accounting_or_admin_user)
+):
+    """Reject a vacation request (accounting/admin only)"""
+    request = await db.vacation_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Urlaubsantrag nicht gefunden")
+    
+    if request["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Nur ausstehende Anträge können abgelehnt werden")
+    
+    await db.vacation_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": "rejected",
+                "reviewed_at": datetime.utcnow(),
+                "reviewed_by": current_user.id
+            }
+        }
+    )
+    
+    return {"message": "Urlaubsantrag abgelehnt"}
+
+@api_router.get("/vacation/balance", response_model=List[VacationBalance])
+async def get_vacation_balance(
+    year: Optional[int] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Get vacation balance for current user, or all if admin/accounting"""
+    query = {}
+    if not current_user.can_view_all_data():
+        query["user_id"] = current_user.id
+    
+    if year:
+        query["year"] = year
+    
+    balances = []
+    async for bal in db.vacation_balances.find(query).sort("year", -1):
+        balances.append(VacationBalance(**bal))
+    return balances
+
+@api_router.put("/vacation/balance/{user_id}/{year}", response_model=VacationBalance)
+async def update_vacation_balance(
+    user_id: str,
+    year: int,
+    balance_update: VacationBalanceUpdate,
+    current_user: User = Depends(get_admin_user)
+):
+    """Update vacation balance (admin only)"""
+    balance = await db.vacation_balances.find_one({"user_id": user_id, "year": year})
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    
+    if balance:
+        # Update existing
+        await db.vacation_balances.update_one(
+            {"id": balance["id"]},
+            {
+                "$set": {
+                    "total_days": balance_update.total_days,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        updated = await db.vacation_balances.find_one({"id": balance["id"]})
+        return VacationBalance(**updated)
+    else:
+        # Create new
+        new_balance = VacationBalance(
+            user_id=user_id,
+            user_name=user.get("name", ""),
+            year=year,
+            total_days=balance_update.total_days,
+            used_days=0
+        )
+        balance_dict = new_balance.model_dump()
+        balance_dict["created_at"] = datetime.utcnow()
+        balance_dict["updated_at"] = datetime.utcnow()
+        await db.vacation_balances.insert_one(balance_dict)
+        return new_balance
+
+@api_router.delete("/vacation/requests/{request_id}/admin-delete")
+async def admin_delete_vacation_request(
+    request_id: str,
+    current_user: User = Depends(get_admin_user)
+):
+    """Delete approved vacation request (admin only) - updates balance"""
+    request = await db.vacation_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Urlaubsantrag nicht gefunden")
+    
+    # Wenn approved, reduziere used_days im Balance
+    if request["status"] == "approved":
+        balance = await db.vacation_balances.find_one({
+            "user_id": request["user_id"],
+            "year": request["year"]
+        })
+        if balance:
+            new_used = max(0, balance.get("used_days", 0) - request["working_days"])
+            await db.vacation_balances.update_one(
+                {"id": balance["id"]},
+                {
+                    "$set": {
+                        "used_days": new_used,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+    
+    await db.vacation_requests.delete_one({"id": request_id})
+    return {"message": "Urlaubsantrag gelöscht"}
+
+@api_router.get("/vacation/requirements/{year}")
+async def get_vacation_requirements(
+    year: int,
+    current_user: User = Depends(get_current_user)
+):
+    """Check vacation requirements for current user"""
+    return await check_vacation_requirements(year, current_user.id, db)
+
+@api_router.post("/vacation/send-reminders")
+async def send_vacation_reminders(current_user: User = Depends(get_admin_user)):
+    """Send weekly reminder emails to users who haven't met vacation requirements (admin only)"""
+    from datetime import date
+    current_year = date.today().year
+    deadline = date(current_year, 2, 1)
+    today = date.today()
+    
+    # Only send reminders after deadline has passed or approaching
+    if today > deadline:
+        return {"message": f"Deadline ({deadline}) bereits verstrichen. Keine Erinnerungen mehr nötig."}
+    
+    # Get all users
+    all_users = await db.users.find({"role": {"$ne": "admin"}}).to_list(1000)
+    
+    # Get SMTP config
+    smtp_config = await db.smtp_config.find_one()
+    if not smtp_config:
+        raise HTTPException(status_code=400, detail="SMTP-Konfiguration nicht gefunden")
+    
+    reminders_sent = 0
+    errors = []
+    
+    for user in all_users:
+        try:
+            requirements = await check_vacation_requirements(current_year, user["id"], db)
+            
+            if requirements["needs_reminder"]:
+                # Send reminder email
+                msg = MIMEMultipart()
+                msg['From'] = smtp_config["smtp_username"]
+                msg['To'] = user["email"]
+                msg['Subject'] = f"Erinnerung: Urlaubsplanung für {current_year}"
+                
+                body = f"""Hallo {user.get('name', '')},
+
+diese E-Mail erinnert Sie daran, Ihre Urlaubsplanung für das Jahr {current_year} zu vervollständigen.
+
+**Aktueller Status:**
+- Mindestens 10 Tage am Stück: {'✓' if requirements['meets_min_consecutive'] else '✗'} (aktuell: {requirements['max_consecutive']} Tage)
+- Insgesamt mindestens 20 Tage: {'✓' if requirements['meets_min_total'] else '✗'} (aktuell: {requirements['total_days']} Tage)
+- Eingetragen bis 01.02.{current_year}: {'✓' if requirements['meets_deadline'] else '✗'}
+
+**Bitte tragen Sie Ihre Urlaubstage bis zum 01.02.{current_year} ein.**
+
+Sie können Ihre Urlaubsanträge im System unter "Urlaubsplaner" stellen.
+
+Mit freundlichen Grüßen
+{COMPANY_INFO["name"]}
+                """
+                
+                msg.attach(MIMEText(body, 'plain', 'utf-8'))
+                
+                server = smtplib.SMTP(smtp_config["smtp_server"], smtp_config["smtp_port"])
+                server.starttls()
+                server.login(smtp_config["smtp_username"], smtp_config["smtp_password"])
+                server.sendmail(smtp_config["smtp_username"], [user["email"]], msg.as_string().encode('utf-8'))
+                server.quit()
+                
+                reminders_sent += 1
+                logger.info(f"Urlaubserinnerung gesendet an {user['email']}")
+                
+        except Exception as e:
+            errors.append(f"Fehler bei {user.get('email', 'unbekannt')}: {str(e)}")
+            logger.error(f"Fehler beim Senden der Urlaubserinnerung: {e}")
+    
+    return {
+        "message": f"Erinnerungsmails versendet",
+        "reminders_sent": reminders_sent,
+        "errors": errors if errors else None
+    }
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

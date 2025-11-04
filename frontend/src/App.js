@@ -87,6 +87,19 @@ function App() {
     week_start: '',
     entries: []
   });
+  
+  // Vacation state
+  const [vacationRequests, setVacationRequests] = useState([]);
+  const [vacationBalances, setVacationBalances] = useState([]);
+  const [vacationRequirements, setVacationRequirements] = useState(null);
+  const [currentVacationYear, setCurrentVacationYear] = useState(() => new Date().getFullYear());
+  const [newVacationRequest, setNewVacationRequest] = useState({
+    start_date: '',
+    end_date: '',
+    notes: ''
+  });
+  const [editingBalance, setEditingBalance] = useState(null);
+  const [editBalanceDays, setEditBalanceDays] = useState(0);
 
   // New user form
   const [newUser, setNewUser] = useState({
@@ -169,6 +182,9 @@ function App() {
   useEffect(() => {
     if (user) {
       fetchTimesheets();
+      fetchVacationRequests(currentVacationYear);
+      fetchVacationBalance(currentVacationYear);
+      fetchVacationRequirements(currentVacationYear);
       if (user.is_admin || user.role === 'admin') {
         fetchUsers();
         fetchSmtpConfig();
@@ -930,6 +946,156 @@ function App() {
     return { covered, missing };
   };
 
+  // Vacation API functions
+  const fetchVacationRequests = async (year) => {
+    try {
+      const response = await axios.get(`${API}/vacation/requests`, {
+        params: year ? { year } : {},
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setVacationRequests(response.data);
+    } catch (error) {
+      console.error('Error fetching vacation requests:', error);
+    }
+  };
+
+  const fetchVacationBalance = async (year) => {
+    try {
+      const response = await axios.get(`${API}/vacation/balance`, {
+        params: year ? { year } : {},
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setVacationBalances(response.data);
+    } catch (error) {
+      console.error('Error fetching vacation balance:', error);
+    }
+  };
+
+  const fetchVacationRequirements = async (year) => {
+    try {
+      const response = await axios.get(`${API}/vacation/requirements/${year}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setVacationRequirements(response.data);
+    } catch (error) {
+      console.error('Error fetching vacation requirements:', error);
+    }
+  };
+
+  const createVacationRequest = async () => {
+    if (!newVacationRequest.start_date || !newVacationRequest.end_date) {
+      setError('Bitte Start- und Enddatum angeben');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post(`${API}/vacation/requests`, newVacationRequest, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Urlaubsantrag erfolgreich erstellt!');
+      setTimeout(() => setSuccess(''), 3000);
+      setNewVacationRequest({ start_date: '', end_date: '', notes: '' });
+      fetchVacationRequests(currentVacationYear);
+      fetchVacationBalance(currentVacationYear);
+      fetchVacationRequirements(currentVacationYear);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Erstellen des Urlaubsantrags.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteVacationRequest = async (requestId) => {
+    if (!confirm('Möchten Sie diesen Urlaubsantrag wirklich löschen?')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.delete(`${API}/vacation/requests/${requestId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Urlaubsantrag gelöscht!');
+      fetchVacationRequests(currentVacationYear);
+      fetchVacationBalance(currentVacationYear);
+      fetchVacationRequirements(currentVacationYear);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Löschen.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const approveVacationRequest = async (requestId) => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/vacation/requests/${requestId}/approve`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Urlaubsantrag genehmigt!');
+      fetchVacationRequests(currentVacationYear);
+      fetchVacationBalance(currentVacationYear);
+      fetchVacationRequirements(currentVacationYear);
+      fetchTimesheets(); // Refresh timesheets to show new vacation entries
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Genehmigen.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const rejectVacationRequest = async (requestId) => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/vacation/requests/${requestId}/reject`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Urlaubsantrag abgelehnt!');
+      fetchVacationRequests(currentVacationYear);
+      fetchVacationBalance(currentVacationYear);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Ablehnen.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateVacationBalance = async (userId, year, totalDays) => {
+    setLoading(true);
+    try {
+      await axios.put(`${API}/vacation/balance/${userId}/${year}`, { total_days: totalDays }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Urlaubstage aktualisiert!');
+      fetchVacationBalance(currentVacationYear);
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Aktualisieren.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const adminDeleteVacationRequest = async (requestId) => {
+    if (!confirm('Möchten Sie diesen genehmigten Urlaubsantrag wirklich löschen? Das Guthaben wird aktualisiert.')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.delete(`${API}/vacation/requests/${requestId}/admin-delete`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Urlaubsantrag gelöscht!');
+      fetchVacationRequests(currentVacationYear);
+      fetchVacationBalance(currentVacationYear);
+      fetchVacationRequirements(currentVacationYear);
+      fetchTimesheets();
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Fehler beim Löschen.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const editUser = (userItem) => {
     setEditingUser(userItem);
     setEditUserForm({
@@ -1502,21 +1668,24 @@ function App() {
           {/* Desktop Tabs - Hidden on Mobile (Bottom Nav used instead) */}
           <div className="hidden md:block">
             {user?.is_admin || user?.role === 'admin' ? (
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
                 <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
+                <TabsTrigger value="vacation">Urlaubsplaner</TabsTrigger>
                 <TabsTrigger value="stats">Statistiken</TabsTrigger>
                 <TabsTrigger value="admin">Admin</TabsTrigger>
               </TabsList>
             ) : user?.role === 'accounting' ? (
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="timesheets">Alle Stundenzettel</TabsTrigger>
+                <TabsTrigger value="vacation">Urlaubsplaner</TabsTrigger>
                 <TabsTrigger value="accounting">Buchhaltung</TabsTrigger>
               </TabsList>
             ) : (
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="timesheets">Stundenzettel</TabsTrigger>
                 <TabsTrigger value="new-timesheet">Neuer Stundenzettel</TabsTrigger>
+                <TabsTrigger value="vacation">Urlaubsplaner</TabsTrigger>
                 <TabsTrigger value="stats">Statistiken</TabsTrigger>
               </TabsList>
             )}
@@ -1527,6 +1696,7 @@ function App() {
             <h2 className="text-xl font-bold" style={{ color: colors.gray }}>
               {activeTab === 'timesheets' && 'Stundenzettel'}
               {activeTab === 'new-timesheet' && 'Neuer Stundenzettel'}
+              {activeTab === 'vacation' && 'Urlaubsplaner'}
               {activeTab === 'stats' && 'Statistiken'}
               {activeTab === 'admin' && 'Administration'}
               {activeTab === 'accounting' && 'Buchhaltung'}
@@ -2126,6 +2296,389 @@ function App() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          {/* Vacation Planner Tab */}
+          <TabsContent value="vacation">
+            <div className="space-y-6">
+              {/* Year Selector */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Urlaubsplaner</CardTitle>
+                  <CardDescription>
+                    Beantragen Sie Ihren Urlaub und verwalten Sie Ihre Urlaubstage
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4 mb-4">
+                    <Label>Jahr:</Label>
+                    <Select
+                      value={String(currentVacationYear)}
+                      onValueChange={(value) => {
+                        const year = parseInt(value);
+                        setCurrentVacationYear(year);
+                        fetchVacationRequests(year);
+                        fetchVacationBalance(year);
+                        fetchVacationRequirements(year);
+                      }}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(year => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Vacation Balance */}
+                  {vacationBalances.length > 0 && (
+                    <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                      {vacationBalances.filter(b => b.year === currentVacationYear).map(balance => (
+                        <div key={balance.id} className="flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">Verfügbare Urlaubstage: {balance.total_days} Tage</div>
+                            <div className="text-sm text-gray-600">
+                              Genutzt: {balance.used_days} Tage | Verbleibend: {balance.total_days - balance.used_days} Tage
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Requirements Check */}
+                  {vacationRequirements && (
+                    <div className={`mb-4 p-4 rounded-lg ${vacationRequirements.needs_reminder ? 'bg-yellow-50 border border-yellow-200' : 'bg-green-50 border border-green-200'}`}>
+                      <div className="font-medium mb-2">Mindestanforderungen {currentVacationYear}:</div>
+                      <ul className="text-sm space-y-1">
+                        <li className={vacationRequirements.meets_min_consecutive ? 'text-green-600' : 'text-red-600'}>
+                          {vacationRequirements.meets_min_consecutive ? '✓' : '✗'} Mindestens 10 Tage am Stück: {vacationRequirements.max_consecutive} Tage
+                        </li>
+                        <li className={vacationRequirements.meets_min_total ? 'text-green-600' : 'text-red-600'}>
+                          {vacationRequirements.meets_min_total ? '✓' : '✗'} Insgesamt mindestens 20 Tage: {vacationRequirements.total_days} Tage
+                        </li>
+                        <li className={vacationRequirements.meets_deadline ? 'text-green-600' : 'text-red-600'}>
+                          {vacationRequirements.meets_deadline ? '✓' : '✗'} Eingetragen bis 01.02.{currentVacationYear}
+                        </li>
+                      </ul>
+                      {vacationRequirements.needs_reminder && (
+                        <div className="mt-2 text-sm text-orange-600 font-medium">
+                          ⚠️ Bitte vervollständigen Sie Ihre Urlaubsplanung!
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* New Vacation Request Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Neuer Urlaubsantrag</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Startdatum</Label>
+                        <Input
+                          type="date"
+                          value={newVacationRequest.start_date}
+                          onChange={(e) => setNewVacationRequest({ ...newVacationRequest, start_date: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Enddatum</Label>
+                        <Input
+                          type="date"
+                          value={newVacationRequest.end_date}
+                          onChange={(e) => setNewVacationRequest({ ...newVacationRequest, end_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Notizen (optional)</Label>
+                      <Textarea
+                        value={newVacationRequest.notes}
+                        onChange={(e) => setNewVacationRequest({ ...newVacationRequest, notes: e.target.value })}
+                        placeholder="Zusätzliche Informationen..."
+                      />
+                    </div>
+                    <Button
+                      onClick={createVacationRequest}
+                      disabled={loading}
+                      style={{ backgroundColor: colors.primary }}
+                    >
+                      Urlaubsantrag stellen
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Vacation Requests List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Meine Urlaubsanträge</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vacationRequests.length === 0 ? (
+                    <p className="text-gray-500">Noch keine Urlaubsanträge für {currentVacationYear}</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Zeitraum</TableHead>
+                          <TableHead>Werktage</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Aktionen</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vacationRequests.filter(req => req.year === currentVacationYear).map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell>
+                              {request.start_date} bis {request.end_date}
+                            </TableCell>
+                            <TableCell>{request.working_days} Tage</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  request.status === 'approved' ? 'default' :
+                                  request.status === 'rejected' ? 'destructive' : 'outline'
+                                }
+                                style={
+                                  request.status === 'approved' ? { backgroundColor: '#10b981' } :
+                                  request.status === 'rejected' ? { backgroundColor: '#ef4444' } : {}
+                                }
+                              >
+                                {request.status === 'approved' ? 'Genehmigt' :
+                                 request.status === 'rejected' ? 'Abgelehnt' : 'Ausstehend'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {request.status === 'pending' && request.user_id === user?.id && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => deleteVacationRequest(request.id)}
+                                    disabled={loading}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {request.status === 'approved' && (
+                                  <span className="text-sm text-gray-500">Nicht mehr änderbar</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Admin/Accounting: Approval Section */}
+              {(user?.role === 'admin' || user?.role === 'accounting' || user?.is_admin) && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Urlaubsanträge zur Genehmigung</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {vacationRequests.filter(req => req.status === 'pending' && req.year === currentVacationYear).length === 0 ? (
+                        <p className="text-gray-500">Keine ausstehenden Anträge</p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Mitarbeiter</TableHead>
+                              <TableHead>Zeitraum</TableHead>
+                              <TableHead>Werktage</TableHead>
+                              <TableHead>Aktionen</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {vacationRequests.filter(req => req.status === 'pending' && req.year === currentVacationYear).map((request) => (
+                              <TableRow key={request.id}>
+                                <TableCell>{request.user_name}</TableCell>
+                                <TableCell>
+                                  {request.start_date} bis {request.end_date}
+                                </TableCell>
+                                <TableCell>{request.working_days} Tage</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => approveVacationRequest(request.id)}
+                                      disabled={loading}
+                                      style={{ backgroundColor: '#10b981' }}
+                                    >
+                                      ✓ Genehmigen
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => rejectVacationRequest(request.id)}
+                                      disabled={loading}
+                                      className="text-red-600"
+                                    >
+                                      ✗ Ablehnen
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Admin: All Approved Requests */}
+                  {user?.role === 'admin' || user?.is_admin ? (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Alle genehmigten Urlaubsanträge</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {vacationRequests.filter(req => req.status === 'approved' && req.year === currentVacationYear).length === 0 ? (
+                          <p className="text-gray-500">Keine genehmigten Anträge</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Mitarbeiter</TableHead>
+                                <TableHead>Zeitraum</TableHead>
+                                <TableHead>Werktage</TableHead>
+                                <TableHead>Aktionen</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {vacationRequests.filter(req => req.status === 'approved' && req.year === currentVacationYear).map((request) => (
+                                <TableRow key={request.id}>
+                                  <TableCell>{request.user_name}</TableCell>
+                                  <TableCell>
+                                    {request.start_date} bis {request.end_date}
+                                  </TableCell>
+                                  <TableCell>{request.working_days} Tage</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => adminDeleteVacationRequest(request.id)}
+                                      disabled={loading}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  
+                  {/* Admin: Vacation Balance Management */}
+                  {user?.role === 'admin' || user?.is_admin ? (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Urlaubstage verwalten</CardTitle>
+                        <CardDescription>
+                          Verfügbare Urlaubstage pro Mitarbeiter eintragen (Mo-Fr)
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {users.length === 0 ? (
+                          <p className="text-gray-500">Keine Mitarbeiter gefunden</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Mitarbeiter</TableHead>
+                                <TableHead>Verfügbare Tage</TableHead>
+                                <TableHead>Genutzt</TableHead>
+                                <TableHead>Verbleibend</TableHead>
+                                <TableHead>Aktionen</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {users.map((userItem) => {
+                                const balance = vacationBalances.find(b => b.user_id === userItem.id && b.year === currentVacationYear);
+                                return (
+                                  <TableRow key={userItem.id}>
+                                    <TableCell>{userItem.name}</TableCell>
+                                    <TableCell>
+                                      {balance ? balance.total_days : 'Nicht gesetzt'}
+                                    </TableCell>
+                                    <TableCell>{balance?.used_days || 0}</TableCell>
+                                    <TableCell>
+                                      {balance ? balance.total_days - (balance.used_days || 0) : '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                              setEditingBalance(userItem);
+                                              setEditBalanceDays(balance?.total_days || 0);
+                                            }}
+                                          >
+                                            Bearbeiten
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                          <DialogHeader>
+                                            <DialogTitle>Urlaubstage für {userItem.name}</DialogTitle>
+                                          </DialogHeader>
+                                          <div className="space-y-4">
+                                            <div>
+                                              <Label>Verfügbare Urlaubstage (Mo-Fr) für {currentVacationYear}</Label>
+                                              <Input
+                                                type="number"
+                                                min="0"
+                                                value={editBalanceDays}
+                                                onChange={(e) => setEditBalanceDays(parseInt(e.target.value) || 0)}
+                                              />
+                                            </div>
+                                            <Button
+                                              onClick={() => {
+                                                if (editingBalance) {
+                                                  updateVacationBalance(editingBalance.id, currentVacationYear, editBalanceDays);
+                                                  setEditingBalance(null);
+                                                }
+                                              }}
+                                              disabled={loading}
+                                            >
+                                              Speichern
+                                            </Button>
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                </>
+              )}
+            </div>
           </TabsContent>
           
           {/* Accounting Tab */}
