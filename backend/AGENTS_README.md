@@ -50,6 +50,10 @@ Dieses Modul implementiert ein Netzwerk von spezialisierten AI-Agenten zur autom
     - **Aktuelle Spesensätze aus dem Internet** (Web-Suche für aktuelle Daten)
   - **Kategorisierung**: Hotel, Verpflegung, Transport (Maut/Parken/Tanken), etc.
   - **Zusätzliche Berechnung**: Verpflegungsmehraufwand für Reisetage ohne Belege
+  - **Arbeitsstunden-Abgleich**: 
+    - Jeder Reiseeintrag enthält `working_hours` (gutgeschriebene Arbeitsstunden aus Stundenzettel)
+    - Prüft Reisekosten im Verhältnis zu den Arbeitsstunden auf Plausibilität
+    - Stellt sicher, dass Reisekosten nur für Tage mit verifizierten und genehmigten Stundenzetteln abgerechnet werden
   - **Web-Tools Integration**:
     - **Geocoding-Tool**: Bestimmt Ländercode aus Ortsangabe (OpenStreetMap)
     - **Meal Allowance Lookup**: Sucht aktuelle Spesensätze im Internet

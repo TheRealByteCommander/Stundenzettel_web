@@ -46,6 +46,10 @@ Behandle spezielle Dokumente korrekt:
 - Überprüfe Zuordnungen auf Konsistenz
 - Identifiziere fehlende Zuordnungen
 - Berechne Gesamtsummen korrekt
+- **Abgleich mit Arbeitsstunden**: Jeder Reiseeintrag enthält `working_hours` (gutgeschriebene Arbeitsstunden aus Stundenzettel)
+  - Berücksichtige die Arbeitsstunden bei der Prüfung der Reisekosten
+  - Prüfe, ob die Reisekosten im Verhältnis zu den Arbeitsstunden plausibel sind
+  - Stelle sicher, dass Reisekosten nur für Tage mit verifizierten und genehmigten Stundenzetteln abgerechnet werden
 
 ## Zusammenarbeit:
 

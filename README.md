@@ -20,6 +20,8 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 
 ### Reisekosten-App
 - ✅ Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln
+- ✅ **Arbeitsstunden-Abgleich**: Gutgeschriebene Arbeitsstunden aus Stundenzetteln werden automatisch in Reisekosten-Reports übernommen
+- ✅ **Automatische Verarbeitung**: Accounting Agent prüft Reisekosten im Verhältnis zu den Arbeitsstunden
 - ✅ PDF-Beleg-Upload (lokale Speicherung, DSGVO-konform)
 - ✅ Monatsbasierte Abrechnungen (aktueller + 2 Monate zurück)
 - ✅ Chat-System für Rückfragen mit Agenten

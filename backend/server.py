@@ -269,6 +269,7 @@ class TravelExpenseReportEntry(BaseModel):
     customer_project: str  # Kunde/Projekt
     travel_time_minutes: int  # Fahrzeit
     days_count: int = 1  # Anzahl Tage
+    working_hours: float = 0.0  # Gutgeschriebene Arbeitsstunden aus Stundenzettel (für Abgleich mit Reisekosten)
 
 class TravelExpenseReport(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -2748,6 +2749,10 @@ async def initialize_expense_report(
             entry_date = entry.get("date", "")
             if _date_in_year_month(entry_date, year, mon):
                 if entry.get("travel_time_minutes", 0) > 0 or entry.get("location"):
+                    # Berechne Arbeitsstunden für diesen Eintrag
+                    entry_obj = TimeEntry(**entry) if isinstance(entry, dict) else entry
+                    working_hours = _entry_hours(entry_obj)
+                    
                     date_key = entry_date
                     if date_key not in entries_dict:
                         entries_dict[date_key] = {
@@ -2755,11 +2760,13 @@ async def initialize_expense_report(
                             "location": entry.get("location", ""),
                             "customer_project": entry.get("customer_project", ""),
                             "travel_time_minutes": entry.get("travel_time_minutes", 0),
-                            "days_count": 1
+                            "days_count": 1,
+                            "working_hours": working_hours
                         }
                     else:
                         existing = entries_dict[date_key]
                         existing["travel_time_minutes"] += entry.get("travel_time_minutes", 0)
+                        existing["working_hours"] += working_hours
     
     report = TravelExpenseReport(
         user_id=current_user.id,

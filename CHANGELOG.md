@@ -33,6 +33,8 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - E-Mail-Benachrichtigung an Buchhaltung: Unterscheidet zwischen automatisch genehmigt und manuelle Prüfung erforderlich
 - **Reisekosten-App**: Vollständige Implementierung der Reisekostenabrechnung
   - Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln (Ort, Tage, Fahrzeit, Kunde)
+  - **Arbeitsstunden-Abgleich**: Gutgeschriebene Arbeitsstunden werden automatisch aus Stundenzetteln übernommen
+  - **Automatische Verarbeitung**: Accounting Agent prüft Reisekosten im Verhältnis zu den Arbeitsstunden
   - Monatsauswahl (aktueller Monat + max 2 Monate zurück)
   - PDF-Beleg-Upload mit lokaler Speicherung (nicht auf Webserver)
   - Status-Management: Entwurf → Abgeschlossen → In Prüfung → Genehmigt
@@ -60,6 +62,9 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - Statistiken berücksichtigen nur verifizierte, unterschriebene und genehmigte Stundenzettel
   - Reisekosten-Initialisierung verwendet nur verifizierte Stundenzettel
   - Reisekosten-Einreichung validiert Vorhandensein verifizierter Stundenzettel für alle Tage
+  - **Reisekosten-Reports**: `TravelExpenseReportEntry` erweitert um `working_hours` (gutgeschriebene Arbeitsstunden)
+  - **Reisekosten-Abgleich**: Arbeitsstunden werden automatisch aus Stundenzettel-Einträgen extrahiert und in Reports übernommen
+  - **Accounting Agent**: Prüft Reisekosten im Verhältnis zu den Arbeitsstunden (Prompt aktualisiert)
   - **Feiertags-Integration**: 
     - `count_working_days()` Funktion erweitert: Feiertage werden automatisch ausgeschlossen
     - `add_vacation_entries_to_timesheet()` erweitert: Feiertage werden automatisch als "feiertag" eingetragen
