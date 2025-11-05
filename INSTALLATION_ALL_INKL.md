@@ -1,7 +1,19 @@
 # 📘 Installationsanleitung für All-inkl.com
 ## Stundenzettel Web - Zeiterfassungssystem für Schmitz Intralogistik GmbH
 
-**Spezielle Anleitung für All-inkl.com Shared Hosting**
+**⚠️ WICHTIG: Diese Anleitung ist für die PHP-Version (Legacy).**
+
+**Für die aktuelle Architektur (Python/FastAPI + Agents + LLM):**
+- ✅ **Frontend:** All-inkl.com (nur statische Dateien aus React Build)
+- ✅ **Backend:** Proxmox Server (Python/FastAPI) - **NICHT auf All-inkl!**
+- ✅ **Agents:** Proxmox Server (laufen mit Backend zusammen)
+- ✅ **Ollama:** GMKTec evo x2 (Home-Netzwerk)
+
+**Siehe `INSTALLATION_COMPLETE_CORRECT.md` für die vollständige, korrekte Installationsanleitung!**
+
+---
+
+**Spezielle Anleitung für All-inkl.com Shared Hosting (PHP-Version/Legacy)**
 
 ---
 
