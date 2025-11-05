@@ -117,6 +117,9 @@ function App() {
   });
   const [accountingStats, setAccountingStats] = useState([]);
 
+  // Push subscription state
+  const [pushEnabled, setPushEnabled] = useState(false);
+
   // SMTP config form
   const [smtpConfig, setSmtpConfig] = useState({
     smtp_server: '',
@@ -178,6 +181,41 @@ function App() {
       });
     }
   }, []);
+
+  // Register service worker and subscribe to push after login
+  useEffect(() => {
+    async function setupPush() {
+      try {
+        if (!user) return;
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { setPushEnabled(false); return; }
+        const { data } = await axios.get(`${API}/push/public-key`);
+        const vapidKey = data.publicKey;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey)
+        });
+        await axios.post(`${API}/push/subscribe`, sub);
+        setPushEnabled(true);
+      } catch (e) {
+        setPushEnabled(false);
+      }
+    }
+    setupPush();
+  }, [user]);
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
 
   useEffect(() => {
     if (user) {

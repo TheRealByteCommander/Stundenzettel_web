@@ -27,6 +27,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.units import inch
 import json
 import re
+from pywebpush import webpush, WebPushException
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -77,6 +78,69 @@ security = HTTPBearer()
 # Create the main app
 app = FastAPI(title="Schmitz Intralogistik Zeiterfassung")
 api_router = APIRouter(prefix="/api")
+
+# Web Push (VAPID) configuration
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_CLAIM_EMAIL = os.getenv("VAPID_CLAIM_EMAIL", "admin@example.com")
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: Dict[str, str]
+    user_id: Optional[str] = None
+    role: Optional[str] = None  # optional: 'user' | 'admin' | 'accounting'
+
+async def save_push_subscription(sub: Dict[str, Any]):
+    existing = await db.push_subscriptions.find_one({"endpoint": sub.get("endpoint")})
+    if existing:
+        await db.push_subscriptions.update_one({"endpoint": sub.get("endpoint")}, {"$set": sub})
+    else:
+        await db.push_subscriptions.insert_one({**sub, "created_at": datetime.utcnow()})
+
+async def delete_push_subscription(endpoint: str):
+    await db.push_subscriptions.delete_one({"endpoint": endpoint})
+
+def send_web_push(subscription: Dict[str, Any], payload: Dict[str, Any]):
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        logging.warning("VAPID keys not configured - skipping web push")
+        return
+    try:
+        webpush(
+            subscription_info=subscription,
+            data=json.dumps(payload),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": f"mailto:{VAPID_CLAIM_EMAIL}"}
+        )
+    except WebPushException as e:
+        logging.warning(f"WebPush failed: {e}")
+
+async def notify_user(user_id: str, title: str, body: str, data: Optional[Dict[str, Any]] = None):
+    async for sub in db.push_subscriptions.find({"user_id": user_id}):
+        send_web_push({"endpoint": sub["endpoint"], "keys": sub["keys"]}, {"title": title, "body": body, "data": data or {}})
+
+async def notify_role(role: str, title: str, body: str, data: Optional[Dict[str, Any]] = None):
+    async for sub in db.push_subscriptions.find({"role": role}):
+        send_web_push({"endpoint": sub["endpoint"], "keys": sub["keys"]}, {"title": title, "body": body, "data": data or {}})
+
+@api_router.get("/push/public-key")
+async def get_push_public_key():
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+@api_router.post("/push/subscribe")
+async def subscribe_push(subscription: Dict[str, Any], current_user: "User" = Depends(lambda: get_current_user())):
+    sub = {
+        "endpoint": subscription.get("endpoint"),
+        "keys": subscription.get("keys", {}),
+        "user_id": current_user.id,
+        "role": current_user.role
+    }
+    await save_push_subscription(sub)
+    return {"status": "ok"}
+
+@api_router.post("/push/unsubscribe")
+async def unsubscribe_push(endpoint: str, current_user: "User" = Depends(lambda: get_current_user())):
+    await delete_push_subscription(endpoint)
+    return {"status": "ok"}
 
 # Company Information
 COMPANY_INFO = {
@@ -2331,6 +2395,17 @@ async def upload_signed_timesheet(
             resource_id=timesheet_id,
             details={"filename": safe_filename, "local_path": str(local_file_path), "encrypted": True}
         )
+
+        # Push-Benachrichtigung an Buchhaltung
+        try:
+            await notify_role(
+                role="accounting",
+                title="Unterschriebener Stundenzettel hochgeladen",
+                body=f"{timesheet.get('user_name', 'User')} Woche {timesheet.get('week_start', '')}",
+                data={"type": "timesheet_signed_upload", "timesheet_id": timesheet_id}
+            )
+        except Exception as e:
+            logging.warning(f"Push notify (timesheet upload) failed: {e}")
         
         # Get all accounting users
         accounting_users = await db.users.find({"role": "accounting"}).to_list(100)
@@ -3034,6 +3109,17 @@ async def upload_receipt(
         resource_id=receipt.id,
         details={"local_path": str(local_file_path), "encrypted": True}
     )
+
+    # Push-Benachrichtigung an Buchhaltung: Neuer Beleg-Upload
+    try:
+        await notify_role(
+            role="accounting",
+            title="Neuer Beleg hochgeladen",
+            body=f"{report.get('user_name', 'User')} hat einen Beleg für {report.get('month', '')} hochgeladen.",
+            data={"type": "receipt_upload", "report_id": report_id}
+        )
+    except Exception as e:
+        logging.warning(f"Push notify (accounting) failed: {e}")
     
     return {"message": "Receipt uploaded successfully and encrypted", "receipt_id": receipt.id}
 
@@ -3327,6 +3413,17 @@ async def approve_vacation_request(
             }
         )
     
+    # Push-Benachrichtigung an den User
+    try:
+        await notify_user(
+            user_id=request["user_id"],
+            title="Urlaub genehmigt",
+            body=f"{request.get('user_name', 'Ihr')} Urlaub {request.get('start_date', '')} bis {request.get('end_date', '')} wurde genehmigt.",
+            data={"type": "vacation_approved", "request_id": request_id}
+        )
+    except Exception as e:
+        logging.warning(f"Push notify (vacation approved) failed: {e}")
+
     return {"message": "Urlaubsantrag genehmigt"}
 
 @api_router.post("/vacation/requests/{request_id}/reject")

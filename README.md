@@ -260,6 +260,33 @@ OLLAMA_MAX_RETRIES=3
 
 Siehe **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** für Details.
 
+## Push-Benachrichtigungen (PWA)
+
+Die App unterstützt Web-Push. Wichtige Statusänderungen werden als Push gesendet, z.B.:
+- User: Urlaub genehmigt
+- Buchhaltung: neuer Beleg-Upload / unterschriebener Stundenzettel hochgeladen
+
+### Backend (VAPID)
+
+`.env` im Backend:
+```env
+VAPID_PUBLIC_KEY=YOUR_BASE64URL_PUBLIC_KEY
+VAPID_PRIVATE_KEY=YOUR_BASE64URL_PRIVATE_KEY
+VAPID_CLAIM_EMAIL=admin@ihre-domain.de
+```
+
+API:
+- `GET /api/push/public-key` – liefert Public Key
+- `POST /api/push/subscribe` – speichert Subscription des eingeloggten Users
+
+### Frontend
+- Service Worker registriert und abonniert Push nach Login
+- Nutzer erteilen Browser-Berechtigung (Notification permission)
+
+### Auslöser (Beispiele)
+- Urlaub genehmigt → Push an User
+- Beleg-Upload / unterschriebener Stundenzettel → Push an Rolle „accounting“
+
 ## 📚 Weitere Dokumentation
 
 - **Installationsanleitungen:**
