@@ -78,11 +78,23 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 
 ## 📘 Installationsanleitungen
 
-**Wichtiger Hinweis:** Diese Anwendung läuft auf einem All-inkl.com Webserver.
+**⚠️ WICHTIG: Architektur-Verständnis**
 
+Diese Anwendung besteht aus mehreren Komponenten, die auf verschiedenen Servern laufen:
+
+- ✅ **Frontend:** All-inkl.com Webserver (nur statische Dateien aus React Build)
+- ✅ **Backend:** Proxmox Server (Python/FastAPI) - **NICHT auf All-inkl!**
+- ✅ **MongoDB:** Proxmox Server (oder remote)
+- ✅ **Agents:** Proxmox Server (laufen mit Backend zusammen, kein separater Service)
+- ✅ **Ollama (LLM):** GMKTec evo x2 (Home-Netzwerk)
+
+### 📚 Installationsanleitungen
+
+- **⭐ KORREKTE Installationsanleitung:** Siehe **[INSTALLATION_COMPLETE_CORRECT.md](INSTALLATION_COMPLETE_CORRECT.md)** - Vollständige, korrekte Anleitung mit klarer Beschreibung wo was installiert wird
+- **Architektur-Details:** Siehe **[ARCHITEKTUR_ALL_INKL_PROXMOX.md](ARCHITEKTUR_ALL_INKL_PROXMOX.md)** - Ihre spezifische Architektur
+- **LLM-Integration:** Siehe **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** - Ollama Setup auf GMKTec
+- **Legacy PHP-Version:** Siehe **[INSTALLATION_ALL_INKL.md](INSTALLATION_ALL_INKL.md)** - Nur für PHP-Version (Legacy)
 - **Für Windows:** Siehe **[WINDOWS_INSTALLATION.md](WINDOWS_INSTALLATION.md)** - Windows-spezifische Anleitung
-- **Für All-inkl.com:** Siehe **[INSTALLATION_ALL_INKL.md](INSTALLATION_ALL_INKL.md)** - Vollständige, spezifische Anleitung
-- **Architektur All-inkl + Proxmox:** Siehe **[ARCHITEKTUR_ALL_INKL_PROXMOX.md](ARCHITEKTUR_ALL_INKL_PROXMOX.md)** - Ihre spezifische Architektur
 - **Für andere Server:** Siehe **[INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md)** - Allgemeine Installationsanleitung
 - **Schnellstart:** Siehe **[QUICK_START.md](QUICK_START.md)**
 - **Frontend Dependency-Fixes:** Siehe **[frontend/INSTALLATION_FIX.md](frontend/INSTALLATION_FIX.md)**
