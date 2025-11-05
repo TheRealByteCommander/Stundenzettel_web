@@ -100,230 +100,75 @@ Diese Anwendung besteht aus mehreren Komponenten, die auf verschiedenen Servern 
 - **Frontend Dependency-Fixes:** Siehe **[frontend/INSTALLATION_FIX.md](frontend/INSTALLATION_FIX.md)**
 - **Office-Rechner Routing:** Siehe **[OFFICE_RECHNER_ROUTING.md](OFFICE_RECHNER_ROUTING.md)** - Lösungen für dynamische IPs
 
-## Installation auf All-Inkl.com Webserver (Kurzanleitung)
+## ⚠️ Installation auf All-Inkl.com Webserver - NUR Frontend!
 
-### Voraussetzungen
+### ⚠️ WICHTIG: Diese Anleitung ist für die Legacy PHP-Version (nicht empfohlen)
 
-- All-Inkl.com Hosting-Paket mit PHP 7.4+ und MySQL
-- FTP/SFTP-Zugang zum Webserver
-- Datenbank-Zugangsdaten aus dem All-Inkl Control Panel
+**Für die aktuelle Architektur (Python/FastAPI + Agents + LLM):**
+- ✅ **Frontend:** All-inkl.com (nur statische Dateien aus React Build)
+- ✅ **Backend:** Proxmox Server (Python/FastAPI) - **NICHT auf All-inkl!**
+- ✅ **MongoDB:** Proxmox Server (oder remote) - **NICHT MySQL auf All-inkl!**
+- ✅ **Agents:** Proxmox Server (laufen mit Backend zusammen)
+- ✅ **Ollama:** GMKTec evo x2 (Home-Netzwerk)
 
-### Schritt 1: Datenbank erstellen
+**Siehe `INSTALLATION_COMPLETE_CORRECT.md` für die vollständige, korrekte Installationsanleitung!**
 
-1. Loggen Sie sich in Ihr **All-Inkl Kundenmenü** ein
-2. Navigieren Sie zu **"Datenbanken"** oder **"MySQL-Datenbanken"**
-3. Erstellen Sie eine neue MySQL-Datenbank:
-   - Datenbankname: z.B. `kXXXXXX_stundenzettel` (wird automatisch mit Ihrem Kürzel ergänzt)
-   - Notieren Sie sich den vollständigen Datenbanknamen
-4. Erstellen Sie einen Datenbankbenutzer:
-   - Benutzername: z.B. `kXXXXXX_user` (ebenfalls mit Kürzel)
-   - Passwort: starkes Passwort generieren
-   - Benutzer der Datenbank zuordnen
+---
 
-### Schritt 2: Frontend-Dateien hochladen
+### ❌ MySQL auf All-inkl.com ist NICHT notwendig für die aktuelle Architektur!
 
-1. Öffnen Sie einen **FTP-Client** (z.B. FileZilla)
-2. Verbinden Sie sich mit Ihrem All-Inkl-Server:
-   - **Host**: `ftp.kasserver.com` oder die IP aus dem Kundenmenü
-   - **Benutzername**: Ihr All-Inkl-Kürzel (z.B. k123456)
-   - **Passwort**: Ihr FTP-Passwort
-   - **Port**: 21 (FTP) oder 22 (SFTP)
-3. Navigieren Sie zum **öffentlichen Web-Verzeichnis**:
-   - Meist: `/html/` oder `/www/` oder `/`
-4. Laden Sie den gesamten **`frontend/`** Ordner hoch
-5. Optional: Benennen Sie den Ordner um (z.B. `zeiterfassung`)
+**MySQL wird nur verwendet für:**
+1. **Migration:** Import aus alter MySQL-Datenbank (einmalig, via Migration-Tool)
+2. **Legacy PHP-Version:** Falls Sie die PHP-Version aus `webapp/` verwenden (nicht empfohlen, nicht aktuell)
 
-**Wichtig:** Stellen Sie sicher, dass die `build/` Dateien aus dem Frontend-Build-Prozess hochgeladen werden (siehe Schritt 3).
+**Die aktuelle Python/FastAPI-Version nutzt NUR MongoDB:**
+- MongoDB läuft auf Proxmox (oder remote/Cloud)
+- Keine MySQL-Datenbank nötig für die aktuelle Architektur
+- Keine Datenbank auf All-inkl.com nötig
 
-### Schritt 3: Frontend bauen
+---
 
-Lokal auf Ihrem Computer:
+### ✅ Frontend auf All-inkl.com installieren (Kurzanleitung)
 
+**NUR für Frontend (statische Dateien):**
+
+1. **Frontend lokal bauen:**
 ```bash
 cd frontend/
 npm install
-# oder
-yarn install
-
-# Erstellen Sie eine .env Datei mit:
-REACT_APP_BACKEND_URL=https://ihre-domain.de/api
-
-# Build erstellen
+# .env Datei erstellen:
+echo "REACT_APP_BACKEND_URL=https://proxmox-domain.de:8000" > .env
 npm run build
-# oder
-yarn build
 ```
 
-Laden Sie dann den Inhalt des **`frontend/build/`** Ordners ins Web-Verzeichnis hoch.
+2. **Frontend-Dateien hochladen:**
+   - Inhalt von `frontend/build/` auf All-inkl hochladen
+   - `.htaccess` für React Router hochladen
 
-### Schritt 4: Backend-Dateien hochladen
+3. **Fertig!** Backend läuft auf Proxmox, nicht auf All-inkl.
 
-1. Laden Sie den **`backend/`** Ordner auf den Server hoch
-2. Empfohlener Ort: **außerhalb des öffentlichen Web-Verzeichnisses** (z.B. `/private/backend/`)
-3. Alternativ: In einen **geschützten Ordner** innerhalb des Web-Verzeichnisses (z.B. `/html/api/`)
+---
 
-### Schritt 5: Backend-Umgebung konfigurieren
+### ❌ Legacy PHP-Version (nur falls Sie wirklich PHP verwenden wollen)
 
-1. Erstellen Sie eine **`.env`** Datei im `backend/` Ordner:
+**⚠️ Hinweis:** Die PHP-Version ist Legacy und wird nicht mehr aktiv entwickelt. Sie unterstützt NICHT:
+- Agent-System
+- LLM-Integration
+- Automatische Stundenzettel-Verifikation
+- Reisekosten-App mit Agents
+- Urlaubsplaner mit Feiertags-Integration
 
-```env
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=stundenzettel
-SECRET_KEY=ihr-sehr-geheimes-secret-key-min-32-zeichen
-```
+**Falls Sie die PHP-Version trotzdem verwenden wollen:**
 
-**Wichtig für All-Inkl:**
-- Falls MongoDB nicht verfügbar ist, müssen Sie die MySQL/PHP-Version verwenden (siehe `webapp/` Ordner)
-- All-Inkl bietet normalerweise **nur MySQL**, nicht MongoDB
+1. MySQL-Datenbank auf All-inkl erstellen (siehe `INSTALLATION_ALL_INKL.md`)
+2. `webapp/` Ordner auf All-inkl hochladen
+3. PHP-Konfiguration anpassen
 
-### Schritt 6: PHP-Version (Alternative zu Python Backend)
+**Empfehlung:** Verwenden Sie die aktuelle Python/FastAPI-Version auf Proxmox!
 
-Da All-Inkl.com in der Regel **keine Python-Umgebung** bietet, verwenden Sie bitte die **PHP-Implementation** aus dem `webapp/` Ordner:
+---
 
-1. Laden Sie den **`webapp/`** Ordner ins Web-Verzeichnis hoch (z.B. `/html/api/`)
-2. Navigieren Sie zu: **All-Inkl Kundenmenü → PHP-Einstellungen**
-3. Stellen Sie sicher, dass **PHP 7.4 oder höher** aktiviert ist
-4. Aktivieren Sie folgende PHP-Erweiterungen (falls verfügbar):
-   - `pdo`
-   - `pdo_mysql`
-   - `mbstring`
-   - `openssl`
-   - `json`
-   - `gd`
-   - `curl`
-   - `zip`
-
-### Schritt 7: Datenbank-Konfiguration (PHP-Version)
-
-1. Bearbeiten Sie `webapp/api/config/database.php`:
-
-```php
-<?php
-class Database {
-    // All-Inkl Datenbankdetails
-    private $host = 'localhost';  // Meistens localhost bei All-Inkl
-    private $database = 'kXXXXXX_stundenzettel';  // Ihr vollständiger DB-Name
-    private $username = 'kXXXXXX_user';  // Ihr vollständiger DB-User
-    private $password = 'ihr-db-passwort';  // Ihr DB-Passwort
-    
-    // ... Rest bleibt gleich
-}
-?>
-```
-
-2. Stellen Sie sicher, dass die Dateiberechtigungen korrekt sind (meist 644 für Dateien, 755 für Ordner)
-
-### Schritt 8: Installation ausführen
-
-1. Öffnen Sie in Ihrem Browser:
-   ```
-   https://ihre-domain.de/api/install.php
-   ```
-2. Das Installationsskript führt automatisch aus:
-  ⬜ Datenbank-Tabellen erstellen
-   - Standard-Admin-Account anlegen
-   - System-Checks durchführen
-
-### Schritt 9: Frontend mit Backend verbinden
-
-1. Erstellen/bearbeiten Sie `frontend/.env` oder setzen Sie die Umgebungsvariable:
-   ```
-   REACT_APP_BACKEND_URL=https://ihre-domain.de/api
-   ```
-2. Builden Sie das Frontend neu (siehe Schritt 3)
-
-### Schritt 10: .htaccess konfigurieren (Apache)
-
-All-Inkl verwendet meist Apache. Erstellen Sie eine `.htaccess` Datei im Root-Verzeichnis:
-
-```apache
-# PHP-Version setzen
-AddHandler application/x-httpd-php74 .php
-
-# URL-Rewriting für API
-RewriteEngine On
-RewriteBase /
-
-# API-Routes weiterleiten
-RewriteRule ^api/(.*)$ api/index.php [QSA,L]
-
-# Frontend-Routes (React Router)
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [L]
-
-# Sicherheit
-<Files "config/database.php">
-    Order allow,deny
-    Deny from all
-</Files>
-```
-
-### Schritt 11: Sicherheitseinstellungen
-
-1. **Installationsskript löschen** (nach erfolgreicher Installation):
-   ```bash
-   # Via FTP: Löschen Sie api/install.php
-   ```
-
-2. **Dateiberechtigungen setzen**:
-   - Ordner: 755
-   - Dateien: 644
-   - Konfigurationsdateien: 600 (falls möglich)
-
-3. **HTTPS aktivieren**:
-   - All-Inkl bietet kostenlose SSL-Zertifikate (Let's Encrypt)
-   - Aktivieren Sie HTTPS im Kundenmenü
-
-### Schritt 12: SMTP-Konfiguration
-
-1. Loggen Sie sich in die Anwendung ein (Standard: `admin@schmitz-intralogistik.de` / `admin123`)
-2. Gehen Sie zu **Admin → SMTP Konfiguration**
-3. Verwenden Sie All-Inkl Mail-Server:
-   ```
-   SMTP Server: mail.kasserver.com
-   SMTP Port: 587
-   Benutzername: ihre-email@ihre-domain.de
-   Passwort: ihr-email-passwort
-   Admin E-Mail: admin@ihre-domain.de
-   ```
-
-### All-Inkl spezifische Hinweise
-
-- **Datenbank-Hostname**: Meist `localhost` (nicht die externe IP)
-- **MySQL-Socket**: Falls `localhost` nicht funktioniert, versuchen Sie `127.0.0.1`
-- **Datei-Upload-Limit**: Standard sind meist 10-50MB (ausreichend für PDFs)
-- **PHP Memory Limit**: Kann über `.htaccess` erhöht werden:
-  ```apache
-  php_value memory_limit 256M
-  ```
-- **Cronjobs**: Für regelmäßige Backups können Sie Cronjobs im All-Inkl Kundenmenü einrichten
-
-### Fehlerbehebung bei All-Inkl
-
-**Problem: "Datenbankverbindung fehlgeschlagen"**
-- Überprüfen Sie, ob der Datenbankname das korrekte Kürzel enthält
-- Hostname sollte `localhost` sein, nicht die externe IP
-- MySQL-Socket könnte erforderlich sein
-
-**Problem: "Composer nicht gefunden"**
-- All-Inkl bietet meist kein CLI-Zugang
-- Laden Sie die `vendor/` Ordner manuell hoch oder verwenden Sie den Composer-Autoloader lokal
-
-**Problem: "403 Forbidden" bei API-Aufrufen**
-- Überprüfen Sie `.htaccess` Datei
-- Stellen Sie sicher, dass `mod_rewrite` aktiviert ist
-- Kontaktieren Sie All-Inkl Support bei Problemen
-
-**Problem: "CORS-Fehler"**
-- API muss CORS-Header senden
-- Überprüfen Sie Backend-CORS-Konfiguration
-- Falls nötig, fügen Sie Header in `.htaccess` hinzu:
-  ```apache
-  Header set Access-Control-Allow-Origin "*"
-  Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-  Header set Access-Control-Allow-Headers "Content-Type, Authorization"
-  ```
+**Für Details zur Legacy PHP-Version siehe:** `INSTALLATION_ALL_INKL.md`
 
 ## Standard-Anmeldedaten
 
