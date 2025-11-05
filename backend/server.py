@@ -1,7 +1,12 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Form, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Form, UploadFile, File, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -75,8 +80,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
-# Create the main app
+# Rate Limiting
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Schmitz Intralogistik Zeiterfassung")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 api_router = APIRouter(prefix="/api")
 
 # Web Push (VAPID) configuration
@@ -1184,6 +1193,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
         "role": current_user.role
     }
 
+@limiter.limit("5/minute")  # Max 5 Login-Versuche pro Minute
 @api_router.post("/auth/login")
 async def login(user_login: UserLogin):
     user = await db.users.find_one({"email": user_login.email})
@@ -1243,6 +1253,7 @@ async def login(user_login: UserLogin):
         }
     }
 
+@limiter.limit("3/hour")  # Max 3 Registrierungen pro Stunde
 @api_router.post("/auth/register")
 async def register(user_create: UserCreate, current_user: User = Depends(get_admin_user)):
     # Check if user exists
@@ -2274,6 +2285,7 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
         )
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
+@limiter.limit("10/hour")  # Max 10 Uploads pro Stunde
 @api_router.post("/timesheets/{timesheet_id}/upload-signed")
 async def upload_signed_timesheet(
     timesheet_id: str,
@@ -2537,19 +2549,66 @@ async def create_admin_user():
         print("Admin user created: admin@schmitz-intralogistik.de / admin123")
         print("NOTE: Admin must setup 2FA on first login (2FA is mandatory)")
 
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Security Headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        # Content Security Policy (CSP) - Anpassen je nach Bedarf
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # unsafe-inline/eval nur wenn nötig
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https:; "
+            "frame-ancestors 'none';"
+        )
+        response.headers["Content-Security-Policy"] = csp
+        
+        # HTTPS Strict Transport Security (HSTS) - nur wenn HTTPS aktiv
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        
+        return response
+
+# HTTPS Redirect Middleware (nur in Produktion)
+class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Nur in Produktion umleiten (nicht bei localhost)
+        if os.getenv("ENFORCE_HTTPS", "false").lower() == "true":
+            if request.url.scheme == "http" and "localhost" not in str(request.url.hostname):
+                from starlette.responses import RedirectResponse
+                url = str(request.url).replace("http://", "https://", 1)
+                return RedirectResponse(url=url, status_code=301)
+        return await call_next(request)
+
 # Include router
 app.include_router(api_router)
 
+# Middleware-Reihenfolge ist wichtig: Security Headers zuletzt
+app.add_middleware(HTTPSRedirectMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS-Konfiguration aus Umgebungsvariablen
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://stundenzettel.byte-commander.de,http://localhost:3000,http://localhost:8000").split(",")
+CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=False,
-    allow_origins=[
-        "https://stundenzettel.byte-commander.de",
-        "http://localhost:3000",
-        "http://localhost:8000"
-    ],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,  # Aus Sicherheitsgründen: Keine Credentials über CORS
+    allow_origins=CORS_ORIGINS,  # Nur erlaubte Origins aus .env
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explizite Methoden, nicht "*"
+    allow_headers=["Content-Type", "Authorization"],  # Explizite Headers, nicht "*"
+    expose_headers=["X-Request-ID"],  # Nur notwendige Headers exponieren
+    max_age=3600,  # Preflight-Cache: 1 Stunde
 )
 
 # Configure logging
@@ -3007,6 +3066,7 @@ async def submit_expense_report(
     
     return {"message": "Report submitted and queued for review"}
 
+@limiter.limit("20/hour")  # Max 20 Belege-Uploads pro Stunde
 @api_router.post("/travel-expense-reports/{report_id}/upload-receipt")
 async def upload_receipt(
     report_id: str,
