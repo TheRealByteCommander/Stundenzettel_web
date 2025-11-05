@@ -5,6 +5,25 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 ## [Unreleased]
 
 ### Hinzugefügt
+- **Strukturierte Ordner-Speicherung für PDF-Dateien:**
+  - Reisekosten-Belege werden in eindeutigen Ordnern gespeichert: `User_Name_Monat_ReportID/`
+  - Unterschriebene Stundenzettel werden in eindeutigen Ordnern gespeichert: `User_Name_Woche_TimesheetID/`
+  - Alle Belege einer Reisekosten-Abrechnung sind in einem separaten Ordner
+  - Beim Löschen einer Abrechnung wird der gesamte Ordner gelöscht
+  - Ordner-Struktur: `LOCAL_RECEIPTS_PATH/reisekosten/` und `LOCAL_RECEIPTS_PATH/stundenzettel/`
+
+### Geändert
+- **Backend:**
+  - `upload_receipt`: Erstellt jetzt Ordner pro Reisekosten-Abrechnung
+  - `upload_signed_timesheet`: Erstellt jetzt Ordner pro Stundenzettel
+  - `delete_expense_report`: Löscht jetzt den gesamten Ordner der Abrechnung
+  - Ordner-Namen: `User_Name_Monat_ReportID` für Reisekosten, `User_Name_Woche_TimesheetID` für Stundenzettel
+
+---
+
+## [Frühere Versionen]
+
+### Hinzugefügt
 - **Urlaubsplaner**: Vollständige Implementierung
   - Urlaubsanträge stellen (Start-/Enddatum, Notizen)
   - Automatische Werktage-Berechnung (Mo-Fr) **mit Ausschluss von Feiertagen**
