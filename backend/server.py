@@ -2252,13 +2252,20 @@ async def upload_signed_timesheet(
     if not safe_filename:
         safe_filename = f"unterschrieben_{timesheet_id}.pdf"
     
+    # Erstelle eindeutigen Ordner pro Stundenzettel: User_Woche_TimesheetID
+    user_name_safe = re.sub(r'[^\w\-_]', '_', timesheet.get("user_name", "Unknown"))
+    week_start = timesheet.get("week_start", "unknown")
+    # Ordner-Name: User_Woche_TimesheetID (z.B. Max_Mustermann_2024-01-01_abc123)
+    timesheet_folder = f"{user_name_safe}_{week_start}_{timesheet_id}"
+    timesheet_folder_path = Path(LOCAL_RECEIPTS_PATH) / "stundenzettel" / timesheet_folder
+    
+    # Erstelle Ordner falls nicht vorhanden
+    timesheet_folder_path.mkdir(parents=True, exist_ok=True)
+    
     # Generate unique filename
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"{timesheet_id}_signed_{timestamp}_{safe_filename}"
-    local_file_path = Path(LOCAL_RECEIPTS_PATH) / "signed_timesheets" / filename
-    
-    # Ensure directory exists
-    local_file_path.parent.mkdir(parents=True, exist_ok=True)
+    local_file_path = timesheet_folder_path / filename
     
     try:
         # Save file to local storage (DSGVO-compliant)
@@ -2964,8 +2971,20 @@ async def upload_receipt(
     receipt_id = str(uuid.uuid4())
     # Sanitize filename for security
     safe_filename = re.sub(r'[^\w\-_\.]', '_', file.filename)
-    filename = f"{report_id}_{receipt_id}_{safe_filename}"
-    local_file_path = Path(LOCAL_RECEIPTS_PATH) / filename
+    
+    # Erstelle eindeutigen Ordner pro Reisekosten-Abrechnung: User_Monat_ReportID
+    user_name_safe = re.sub(r'[^\w\-_]', '_', report.get("user_name", "Unknown"))
+    month = report.get("month", "unknown")
+    # Ordner-Name: User_Monat_ReportID (z.B. Max_Mustermann_2024-01_abc123)
+    report_folder = f"{user_name_safe}_{month}_{report_id}"
+    report_folder_path = Path(LOCAL_RECEIPTS_PATH) / "reisekosten" / report_folder
+    
+    # Erstelle Ordner falls nicht vorhanden
+    report_folder_path.mkdir(parents=True, exist_ok=True)
+    
+    # Speichere PDF im Ordner der Abrechnung
+    filename = f"{receipt_id}_{safe_filename}"
+    local_file_path = report_folder_path / filename
     
     try:
         # Save file to local storage (office computer only)
@@ -3077,6 +3096,7 @@ async def delete_expense_report(
     if report.get("status") != "draft":
         raise HTTPException(status_code=400, detail="Can only delete draft reports")
     
+    # Lösche alle Belege und den gesamten Ordner der Abrechnung
     receipts = report.get("receipts", [])
     for receipt in receipts:
         try:
@@ -3085,6 +3105,21 @@ async def delete_expense_report(
                 local_path.unlink()
         except Exception as e:
             logging.warning(f"Failed to delete local file: {e}")
+    
+    # Lösche den gesamten Ordner der Abrechnung (falls leer oder mit Belegen)
+    try:
+        user_name_safe = re.sub(r'[^\w\-_]', '_', report.get("user_name", "Unknown"))
+        month = report.get("month", "unknown")
+        report_folder = f"{user_name_safe}_{month}_{report_id}"
+        report_folder_path = Path(LOCAL_RECEIPTS_PATH) / "reisekosten" / report_folder
+        
+        # Lösche Ordner und alle Inhalte
+        if report_folder_path.exists():
+            import shutil
+            shutil.rmtree(report_folder_path)
+            logging.info(f"Deleted report folder: {report_folder_path}")
+    except Exception as e:
+        logging.warning(f"Failed to delete report folder: {e}")
     
     await db.travel_expense_reports.delete_one({"id": report_id})
     return {"message": "Report deleted successfully"}

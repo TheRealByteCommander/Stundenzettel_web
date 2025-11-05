@@ -190,7 +190,7 @@ Bei Problemen:
 
 ### Lokaler Speicherpfad für Belege
 
-Die Reisekosten-App speichert PDF-Belege **nicht auf dem Webserver**, sondern auf einem lokalen Bürorechner.
+Die Reisekosten-App speichert **alle PDF-Dateien** (Reisekosten-Belege und unterschriebene Stundenzettel) **nicht auf dem Webserver**, sondern auf einem lokalen Bürorechner in strukturierten Ordnern.
 
 Konfigurieren Sie den Pfad in der `.env` Datei des Backends:
 
@@ -203,6 +203,44 @@ LOCAL_RECEIPTS_PATH=C:/Reisekosten_Belege
 - Der Server benötigt Schreibrechte auf diesem Verzeichnis
 - Unter Windows: Verwenden Sie absolute Pfade mit Laufwerksbuchstaben (z.B. `C:/Reisekosten_Belege`)
 - Unter Linux: Verwenden Sie absolute Pfade (z.B. `/var/receipts`)
+
+### Ordner-Struktur für PDF-Dateien
+
+**Alle vom User hochgeladenen PDF-Dateien werden in eindeutigen Ordnern gespeichert:**
+
+#### Reisekosten-Belege
+```
+LOCAL_RECEIPTS_PATH/
+└── reisekosten/
+    └── User_Name_Monat_ReportID/
+        ├── receipt_id_1_beleg.pdf
+        ├── receipt_id_2_beleg.pdf
+        └── ...
+```
+
+**Beispiel:**
+- `Max_Mustermann_2024-01_abc123def456/`
+  - `receipt_1_benzinkosten.pdf`
+  - `receipt_2_hotel.pdf`
+  - `receipt_3_parkplatz.pdf`
+
+#### Unterschriebene Stundenzettel
+```
+LOCAL_RECEIPTS_PATH/
+└── stundenzettel/
+    └── User_Name_Woche_TimesheetID/
+        └── timesheet_id_signed_20240101_120000_unterschrieben.pdf
+```
+
+**Beispiel:**
+- `Max_Mustermann_2024-01-01_xyz789/`
+  - `xyz789_signed_20240115_143000_stundenzettel_kunde.pdf`
+
+**Vorteile:**
+- ✅ Alle Belege einer Reisekosten-Abrechnung sind in einem Ordner
+- ✅ Eindeutige Ordner-Namen (User_Monat_ReportID)
+- ✅ Übersichtliche Struktur für Archivierung
+- ✅ Beim Löschen einer Abrechnung wird der gesamte Ordner gelöscht
 
 ### Ollama LLM Integration
 
