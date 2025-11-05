@@ -34,8 +34,13 @@
 - **Python:** 3.11 oder höher
 - **Node.js:** 18.x oder höher
 - **npm/yarn:** neueste Version
-- **MongoDB:** 6.0 oder höher (oder MySQL 8.0+ für PHP-Version)
+- **MongoDB:** 6.0 oder höher (⚠️ NICHT MySQL - aktuelle Architektur nutzt nur MongoDB)
 - **Git:** für Repository-Clone
+
+**⚠️ Hinweis zu MySQL:**
+- MySQL wird **NUR** für Migration (einmalig) ODER Legacy PHP-Version verwendet
+- Aktuelle Python/FastAPI-Version nutzt **NUR MongoDB**
+- Siehe `DATENBANK_ARCHITEKTUR.md` für Details
 
 **Optional (für Production):**
 - **Nginx** oder **Apache** als Reverse Proxy
