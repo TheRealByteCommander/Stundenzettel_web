@@ -17,11 +17,14 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - Genehmigung/Ablehnung durch Admin/Buchhaltung
   - Urlaubstage-Verwaltung: Admin kann verfügbare Tage pro Mitarbeiter eintragen
   - Automatischer Eintrag genehmigter Urlaubstage in Stundenzettel
-  - Validierung: Mindestens 10 Tage am Stück (ohne Feiertage), 20 gesamt (ohne Feiertage), Deadline 01.02.
-  - Wöchentliche Erinnerungsmails bei fehlenden Mindestanforderungen
+  - **Validierung und gesetzliche Anforderungen**: 
+    - **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
+    - **Insgesamt mindestens 20 Urlaubstage geplant** (ohne Feiertage) pro Jahr
+    - **Deadline: 01.02. jedes Jahres** - Urlaub muss bis dahin für das laufende Jahr geplant sein
+  - Wöchentliche Erinnerungsmails bei fehlenden Mindestanforderungen (bis Deadline)
   - Genehmigte Urlaubstage sind nicht mehr änderbar (User)
-  - Admin kann genehmigte Urlaubsanträge löschen (aktualisiert Guthaben)
-  - UI: Urlaubsplaner-Tab mit Jahr-Auswahl, Guthaben-Anzeige, Validierungshinweisen
+  - Admin kann genehmigte Urlaubsanträge löschen (aktualisiert Guthaben automatisch)
+  - UI: Urlaubsplaner-Tab mit Jahr-Auswahl, Guthaben-Anzeige, Validierungshinweisen, Status-Übersicht
 - **Stundenzettel-Verifikation und automatische Genehmigung**: 
   - Upload unterschriebener Stundenzettel (vom Kunden unterzeichnet, vom User hochgeladen)
   - **Automatische Verifikation der Unterschrift durch Dokumenten-Agent** (PDF-Text-Analyse)

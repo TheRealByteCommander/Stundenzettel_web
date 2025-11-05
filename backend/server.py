@@ -569,7 +569,7 @@ async def add_vacation_entries_to_timesheet(entries: List[TimeEntry], week_start
 
 async def check_vacation_requirements(year: int, user_id: str, db) -> Dict[str, Any]:
     """Prüft, ob Mindestanforderungen erfüllt sind:
-    - Mindestens 10 Tage (14 Werktage) am Stück
+    - Mindestens 2 Wochen am Stück (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
     - Mindestens 20 Tage insgesamt
     - Eingetragen bis 01.02. des Jahres
     """
@@ -593,10 +593,12 @@ async def check_vacation_requirements(year: int, user_id: str, db) -> Dict[str, 
         sorted_requests = sorted(approved_requests, key=lambda x: x.get("start_date", ""))
         for req in sorted_requests:
             days = req.get("working_days", 0)
+            # 2 Wochen = 10 Werktage (Mo-Fr ohne Feiertage)
             if days >= 10:
                 max_consecutive = max(max_consecutive, days)
             current_consecutive = max(current_consecutive, days)
     
+    # 2 Wochen am Stück = 10 Werktage (gesetzlicher Jahresurlaub)
     meets_min_consecutive = max_consecutive >= 10
     meets_min_total = total_days >= 20
     meets_deadline = today <= deadline
@@ -3476,11 +3478,11 @@ async def send_vacation_reminders(current_user: User = Depends(get_admin_user)):
 diese E-Mail erinnert Sie daran, Ihre Urlaubsplanung für das Jahr {current_year} zu vervollständigen.
 
 **Aktueller Status:**
-- Mindestens 10 Tage am Stück: {'✓' if requirements['meets_min_consecutive'] else '✗'} (aktuell: {requirements['max_consecutive']} Tage)
-- Insgesamt mindestens 20 Tage: {'✓' if requirements['meets_min_total'] else '✗'} (aktuell: {requirements['total_days']} Tage)
-- Eingetragen bis 01.02.{current_year}: {'✓' if requirements['meets_deadline'] else '✗'}
+- Mindestens 2 Wochen am Stück (gesetzlicher Jahresurlaub): {'✓' if requirements['meets_min_consecutive'] else '✗'} (aktuell: {requirements['max_consecutive']} Tage)
+- Insgesamt mindestens 20 Tage geplant: {'✓' if requirements['meets_min_total'] else '✗'} (aktuell: {requirements['total_days']} Tage)
+- Geplant bis 01.02.{current_year}: {'✓' if requirements['meets_deadline'] else '✗'}
 
-**Bitte tragen Sie Ihre Urlaubstage bis zum 01.02.{current_year} ein.**
+**Bitte planen Sie Ihre Urlaubstage bis zum 01.02.{current_year} ein.**
 
 Sie können Ihre Urlaubsanträge im System unter "Urlaubsplaner" stellen.
 

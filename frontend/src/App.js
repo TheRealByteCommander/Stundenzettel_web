@@ -2355,13 +2355,13 @@ function App() {
                       <div className="font-medium mb-2">Mindestanforderungen {currentVacationYear}:</div>
                       <ul className="text-sm space-y-1">
                         <li className={vacationRequirements.meets_min_consecutive ? 'text-green-600' : 'text-red-600'}>
-                          {vacationRequirements.meets_min_consecutive ? '✓' : '✗'} Mindestens 10 Tage am Stück: {vacationRequirements.max_consecutive} Tage
+                          {vacationRequirements.meets_min_consecutive ? '✓' : '✗'} Mindestens 2 Wochen am Stück (gesetzlicher Jahresurlaub): {vacationRequirements.max_consecutive} Tage
                         </li>
                         <li className={vacationRequirements.meets_min_total ? 'text-green-600' : 'text-red-600'}>
-                          {vacationRequirements.meets_min_total ? '✓' : '✗'} Insgesamt mindestens 20 Tage: {vacationRequirements.total_days} Tage
+                          {vacationRequirements.meets_min_total ? '✓' : '✗'} Insgesamt mindestens 20 Tage geplant: {vacationRequirements.total_days} Tage
                         </li>
                         <li className={vacationRequirements.meets_deadline ? 'text-green-600' : 'text-red-600'}>
-                          {vacationRequirements.meets_deadline ? '✓' : '✗'} Eingetragen bis 01.02.{currentVacationYear}
+                          {vacationRequirements.meets_deadline ? '✓' : '✗'} Geplant bis 01.02.{currentVacationYear}
                         </li>
                       </ul>
                       {vacationRequirements.needs_reminder && (

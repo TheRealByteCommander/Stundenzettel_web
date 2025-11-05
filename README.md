@@ -54,10 +54,10 @@ Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 - ✅ **Automatischer Eintrag in Stundenzettel**: 
   - Genehmigte Urlaubstage werden automatisch als "Urlaub" eingetragen
   - Feiertage werden automatisch als "Feiertag" eingetragen (auch ohne genehmigten Urlaub)
-- ✅ **Validierung**: 
-  - Mindestens 10 Tage am Stück (14 Werktage, ohne Feiertage) pro Jahr
-  - Insgesamt mindestens 20 Urlaubstage (ohne Feiertage) pro Jahr
-  - Deadline: 01.02. jedes Jahres für das laufende Jahr
+- ✅ **Validierung und gesetzliche Anforderungen**: 
+  - **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
+  - **Insgesamt mindestens 20 Urlaubstage geplant** (ohne Feiertage) pro Jahr
+  - **Deadline: 01.02. jedes Jahres** - Urlaub muss bis dahin für das laufende Jahr geplant sein
 - ✅ **Wöchentliche Erinnerungsmails**: Automatische Erinnerung an User, die Mindestanforderungen noch nicht erfüllt haben
 - ✅ **Nicht mehr änderbar**: Genehmigte Urlaubstage können vom User nicht mehr verändert werden
 - ✅ **Admin-Löschung**: Admin kann genehmigte Urlaubsanträge löschen (Guthaben wird aktualisiert)
