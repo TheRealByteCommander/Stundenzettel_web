@@ -820,8 +820,7 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
     )
     
     company_info = f"""<b>Byte Commander</b><br/>
-    Grüner Weg 3<br/>
-    04827 Machern, Deutschland"""
+    Tick Guard - Zeiterfassung & Reisekosten"""
     
     story.append(Paragraph(company_info, company_style))
     story.append(Spacer(1, 10))
@@ -1038,8 +1037,7 @@ def generate_accounting_report_pdf(stats_response: AccountingStatsResponse) -> b
     )
     
     company_info = f"""<b>Byte Commander</b><br/>
-    Grüner Weg 3<br/>
-    04827 Machern, Deutschland"""
+    Tick Guard - Zeiterfassung & Reisekosten"""
     
     story.append(Paragraph(company_info, company_style))
     story.append(Spacer(1, 20))
