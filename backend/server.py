@@ -641,10 +641,10 @@ async def add_vacation_entries_to_timesheet(entries: List[TimeEntry], week_start
     return all_entries
 
 async def check_vacation_requirements(year: int, user_id: str, db) -> Dict[str, Any]:
-    """Prüft, ob Mindestanforderungen erfüllt sind:
-    - Mindestens 2 Wochen am Stück (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
-    - Mindestens 20 Tage insgesamt
-    - Eingetragen bis 01.02. des Jahres
+    """Prüft, ob gesetzliche und betriebliche Anforderungen erfüllt sind:
+    - Gesetzlich (BUrlG §7): Mindestens 2 Wochen am Stück (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Erholungsurlaub
+    - Betrieblich: Mindestens 20 Tage insgesamt geplant - betriebliche Vorgabe
+    - Betrieblich: Eingetragen bis 01.02. des Jahres - betriebliche Vorgabe
     """
     from datetime import date
     today = date.today()
@@ -3732,9 +3732,9 @@ async def send_vacation_reminders(current_user: User = Depends(get_admin_user)):
 diese E-Mail erinnert Sie daran, Ihre Urlaubsplanung für das Jahr {current_year} zu vervollständigen.
 
 **Aktueller Status:**
-- Mindestens 2 Wochen am Stück (gesetzlicher Jahresurlaub): {'✓' if requirements['meets_min_consecutive'] else '✗'} (aktuell: {requirements['max_consecutive']} Tage)
-- Insgesamt mindestens 20 Tage geplant: {'✓' if requirements['meets_min_total'] else '✗'} (aktuell: {requirements['total_days']} Tage)
-- Geplant bis 01.02.{current_year}: {'✓' if requirements['meets_deadline'] else '✗'}
+- Mindestens 2 Wochen am Stück (gesetzlicher Erholungsurlaub - BUrlG §7): {'✓' if requirements['meets_min_consecutive'] else '✗'} (aktuell: {requirements['max_consecutive']} Tage)
+- Insgesamt mindestens 20 Tage geplant (betriebliche Vorgabe): {'✓' if requirements['meets_min_total'] else '✗'} (aktuell: {requirements['total_days']} Tage)
+- Geplant bis 01.02.{current_year} (betriebliche Vorgabe): {'✓' if requirements['meets_deadline'] else '✗'}
 
 **Bitte planen Sie Ihre Urlaubstage bis zum 01.02.{current_year} ein.**
 

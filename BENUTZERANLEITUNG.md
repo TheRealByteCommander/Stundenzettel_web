@@ -294,18 +294,23 @@ Enddatum: 2024-07-14 (Sonntag)
 
 ### Urlaubsanforderungen prüfen
 
-Das System prüft automatisch, ob Sie die **gesetzlichen Anforderungen** erfüllen:
+Das System prüft automatisch, ob Sie die **gesetzlichen und betrieblichen Anforderungen** erfüllen:
 
-**Anforderungen:**
-- ✅ **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
-- ✅ **Insgesamt mindestens 20 Urlaubstage** geplant (ohne Feiertage)
-- ✅ **Deadline: 01.02.** - Urlaub muss bis dahin für das laufende Jahr geplant sein
+**Gesetzliche Anforderung (Bundesurlaubsgesetz):**
+- ✅ **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - **gesetzlicher Erholungsurlaub** (§7 BUrlG)
+
+**Betriebliche Vorgaben:**
+- ✅ **Insgesamt mindestens 20 Urlaubstage** geplant (ohne Feiertage) - betriebliche Vorgabe
+- ✅ **Deadline: 01.02.** - Urlaub muss bis dahin für das laufende Jahr geplant sein - betriebliche Vorgabe
 
 **Status-Anzeige:**
 - 🟢 **"Anforderungen erfüllt"**: Alle Anforderungen sind erfüllt
 - 🔴 **"Anforderungen nicht erfüllt"**: Mindestens eine Anforderung fehlt
 
-**Wichtig:** Wenn Sie die Anforderungen nicht bis zum **01.02.** erfüllen, erhalten Sie wöchentlich eine Erinnerungs-E-Mail.
+**Wichtig:** 
+- Die **2 Wochen am Stück** sind **gesetzlich vorgeschrieben** (Erholungsurlaub)
+- Die **20 Tage verplant** und die **Deadline 01.02.** sind **betriebliche Vorgaben**
+- Wenn Sie die Anforderungen nicht bis zum **01.02.** erfüllen, erhalten Sie wöchentlich eine Erinnerungs-E-Mail
 
 ### Urlaubsantrag löschen
 
@@ -528,13 +533,18 @@ Genehmigte Urlaubstage werden **automatisch** in Ihre Stundenzettel eingetragen:
 
 ### Urlaubsrecht
 
-**Gesetzliche Anforderungen:**
-- **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
-- **Insgesamt mindestens 20 Urlaubstage** pro Jahr
-- **Deadline**: Urlaub muss bis zum **01.02.** für das laufende Jahr geplant sein
+**Gesetzliche Anforderung (Bundesurlaubsgesetz - BUrlG):**
+- **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - **gesetzlicher Erholungsurlaub** (§7 BUrlG)
+  - Der Erholungsurlaub muss zusammenhängend gewährt werden, wenn der Arbeitnehmer dies wünscht
+  - Mindestens 12 Werktage müssen zusammenhängend gewährt werden (bei 6-Tage-Woche)
+  - Bei 5-Tage-Woche entspricht dies mindestens 10 Werktagen (2 Wochen)
+
+**Betriebliche Vorgaben (nicht gesetzlich):**
+- **Insgesamt mindestens 20 Urlaubstage** pro Jahr geplant - betriebliche Vorgabe
+- **Deadline: 01.02.** - Urlaub muss bis dahin für das laufende Jahr geplant sein - betriebliche Vorgabe
 
 **In Tick Guard:**
-- Das System prüft automatisch, ob Sie die Anforderungen erfüllen
+- Das System prüft automatisch, ob Sie die **gesetzlichen und betrieblichen Anforderungen** erfüllen
 - **Feiertage werden automatisch ausgeschlossen** (nicht als Urlaub gezählt)
 - Bei fehlenden Anforderungen erhalten Sie **wöchentliche Erinnerungs-E-Mails**
 
@@ -603,7 +613,10 @@ A: Ja, alle Belege werden **verschlüsselt** gespeichert (DSGVO-konform) und in 
 ### Urlaub
 
 **F: Warum muss ich 2 Wochen am Stück Urlaub nehmen?**
-A: Das ist eine **gesetzliche Anforderung** (Jahresurlaub). Mindestens 2 Wochen (10 Werktage) müssen am Stück genommen werden.
+A: Das ist eine **gesetzliche Anforderung** nach dem Bundesurlaubsgesetz (BUrlG §7 - Erholungsurlaub). Mindestens 2 Wochen (10 Werktage bei 5-Tage-Woche) müssen am Stück genommen werden, um eine ausreichende Erholung zu gewährleisten.
+
+**F: Warum müssen 20 Tage bis zum 01.02. verplant sein?**
+A: Das ist eine **betriebliche Vorgabe** (nicht gesetzlich). Sie dient der besseren Planbarkeit und Organisation. Die gesetzliche Anforderung ist nur, dass mindestens 2 Wochen am Stück genommen werden müssen.
 
 **F: Warum werden Feiertage nicht als Urlaub gezählt?**
 A: Feiertage sind **keine Urlaubstage** (gesetzlich). Sie werden automatisch erkannt und ausgeschlossen.

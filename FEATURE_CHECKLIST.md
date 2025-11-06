@@ -167,11 +167,11 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
   - Feiertage werden nicht als Urlaubstage gezählt
   - Feiertage werden automatisch in Stundenzettel eingetragen
 
-- [x] **Validierung & gesetzliche Anforderungen**
+- [x] **Validierung & Anforderungen**
   - `GET /vacation/requirements/{year}` - Anforderungen prüfen
-  - Mindestens 2 Wochen am Stück (10 Werktage) - gesetzlicher Jahresurlaub
-  - Mindestens 20 Tage insgesamt geplant
-  - Deadline: 01.02. jedes Jahres
+  - Gesetzlich (BUrlG §7): Mindestens 2 Wochen am Stück (10 Werktage) - gesetzlicher Erholungsurlaub
+  - Betrieblich: Mindestens 20 Tage insgesamt geplant - betriebliche Vorgabe
+  - Betrieblich: Deadline: 01.02. jedes Jahres - betriebliche Vorgabe
 
 - [x] **Erinnerungsmails**
   - `POST /vacation/send-reminders` - Wöchentliche Erinnerungen (Admin)

@@ -54,10 +54,10 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 - ✅ **Automatischer Eintrag in Stundenzettel**: 
   - Genehmigte Urlaubstage werden automatisch als "Urlaub" eingetragen
   - Feiertage werden automatisch als "Feiertag" eingetragen (auch ohne genehmigten Urlaub)
-- ✅ **Validierung und gesetzliche Anforderungen**: 
-  - **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
-  - **Insgesamt mindestens 20 Urlaubstage geplant** (ohne Feiertage) pro Jahr
-  - **Deadline: 01.02. jedes Jahres** - Urlaub muss bis dahin für das laufende Jahr geplant sein
+- ✅ **Validierung und Anforderungen**: 
+  - **Gesetzlich (Bundesurlaubsgesetz)**: **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Erholungsurlaub (§7 BUrlG)
+  - **Betrieblich**: **Insgesamt mindestens 20 Urlaubstage geplant** (ohne Feiertage) pro Jahr - betriebliche Vorgabe
+  - **Betrieblich**: **Deadline: 01.02. jedes Jahres** - Urlaub muss bis dahin für das laufende Jahr geplant sein - betriebliche Vorgabe
 - ✅ **Wöchentliche Erinnerungsmails**: Automatische Erinnerung an User, die Mindestanforderungen noch nicht erfüllt haben
 - ✅ **Nicht mehr änderbar**: Genehmigte Urlaubstage können vom User nicht mehr verändert werden
 - ✅ **Admin-Löschung**: Admin kann genehmigte Urlaubsanträge löschen (Guthaben wird aktualisiert)

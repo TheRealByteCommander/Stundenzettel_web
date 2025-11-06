@@ -37,9 +37,9 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - Urlaubstage-Verwaltung: Admin kann verfügbare Tage pro Mitarbeiter eintragen
   - Automatischer Eintrag genehmigter Urlaubstage in Stundenzettel
   - **Validierung und gesetzliche Anforderungen**: 
-    - **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Jahresurlaub
-    - **Insgesamt mindestens 20 Urlaubstage geplant** (ohne Feiertage) pro Jahr
-    - **Deadline: 01.02. jedes Jahres** - Urlaub muss bis dahin für das laufende Jahr geplant sein
+    - **Gesetzlich (BUrlG §7)**: **Mindestens 2 Wochen am Stück** (10 Werktage, Mo-Fr ohne Feiertage) - gesetzlicher Erholungsurlaub
+    - **Betrieblich**: **Insgesamt mindestens 20 Urlaubstage geplant** (ohne Feiertage) pro Jahr - betriebliche Vorgabe
+    - **Betrieblich**: **Deadline: 01.02. jedes Jahres** - Urlaub muss bis dahin für das laufende Jahr geplant sein - betriebliche Vorgabe
   - Wöchentliche Erinnerungsmails bei fehlenden Mindestanforderungen (bis Deadline)
   - Genehmigte Urlaubstage sind nicht mehr änderbar (User)
   - Admin kann genehmigte Urlaubsanträge löschen (aktualisiert Guthaben automatisch)
