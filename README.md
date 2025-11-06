@@ -1,6 +1,6 @@
 # Tick Guard - Zeiterfassung & Reisekosten-Management
 
-Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
+Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System von Byte Commander.
 
 ## Features
 

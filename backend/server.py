@@ -819,7 +819,7 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
         alignment=2,  # Right align
     )
     
-    company_info = f"""<b>Schmitz Intralogistik GmbH</b><br/>
+    company_info = f"""<b>Byte Commander</b><br/>
     Grüner Weg 3<br/>
     04827 Machern, Deutschland"""
     
@@ -1037,7 +1037,7 @@ def generate_accounting_report_pdf(stats_response: AccountingStatsResponse) -> b
         alignment=2,  # Right align
     )
     
-    company_info = f"""<b>Schmitz Intralogistik GmbH</b><br/>
+    company_info = f"""<b>Byte Commander</b><br/>
     Grüner Weg 3<br/>
     04827 Machern, Deutschland"""
     
