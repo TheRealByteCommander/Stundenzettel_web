@@ -1,4 +1,4 @@
-# Stundenzettel Web - Zeiterfassungssystem
+# Tick Guard - Zeiterfassung & Reisekosten-Management
 
 Web-basiertes Zeiterfassungssystem für Schmitz Intralogistik GmbH.
 

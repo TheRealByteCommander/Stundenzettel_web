@@ -1309,7 +1309,7 @@ function App() {
             <div className="flex items-center justify-center mb-4">
               <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
               <CardTitle className="text-2xl font-bold" style={{ color: colors.gray }}>
-                Schmitz Intralogistik
+                Tick Guard
               </CardTitle>
             </div>
             <CardDescription>Bitte wählen Sie eine Anwendung</CardDescription>
@@ -1353,7 +1353,7 @@ function App() {
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <Calendar className="h-6 w-6 mr-2" style={{ color: colors.primary }} />
-                    Stundenzettel App
+                    Tick Guard
                   </CardTitle>
                   <CardDescription>
                     Wöchentliche Zeiterfassung und Stundenzettel-Verwaltung
@@ -1420,7 +1420,7 @@ function App() {
             <div className="flex items-center justify-center mb-4">
               <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
               <CardTitle className="text-2xl font-bold" style={{ color: colors.gray }}>
-                Schmitz Intralogistik
+                Tick Guard
               </CardTitle>
             </div>
             <CardDescription>Zeiterfassung System</CardDescription>
@@ -1475,7 +1475,7 @@ function App() {
             </form>
             <div className="mt-4 text-center text-sm" style={{ color: colors.gray }}>
               <p>Standard Admin:</p>
-              <p>admin@schmitz-intralogistik.de / admin123</p>
+              <p>admin@app.byte-commander.de / admin123</p>
             </div>
           </CardContent>
         </Card>
@@ -1509,7 +1509,7 @@ function App() {
           <div className="p-4 border-b flex items-center justify-between">
             <div className="flex items-center">
               <Building className="h-6 w-6 mr-2" style={{ color: colors.primary }} />
-              <span className="font-bold" style={{ color: colors.gray }}>Schmitz</span>
+              <span className="font-bold" style={{ color: colors.gray }}>Tick Guard</span>
             </div>
             <button onClick={() => setMobileMenuOpen(false)}>
               <X className="h-6 w-6" />
@@ -1648,7 +1648,7 @@ function App() {
               <div className="flex items-center">
                 <Building className="h-6 w-6 sm:h-8 sm:w-8 mr-2" style={{ color: colors.primary }} />
                 <h1 className="text-base sm:text-xl font-bold hidden sm:block" style={{ color: colors.gray }}>
-                  Schmitz Intralogistik GmbH - Zeiterfassung
+                  Tick Guard GmbH - Zeiterfassung
                 </h1>
                 <h1 className="text-base font-bold sm:hidden" style={{ color: colors.gray }}>
                   Zeiterfassung
@@ -3366,7 +3366,7 @@ function App() {
               <div className="flex items-center">
                 <Building className="h-8 w-8 mr-2" style={{ color: colors.primary }} />
                 <h1 className="text-xl font-bold" style={{ color: colors.gray }}>
-                  Schmitz Intralogistik GmbH - Reisekosten
+                  Tick Guard GmbH - Reisekosten
                 </h1>
               </div>
               <div className="flex items-center space-x-4">

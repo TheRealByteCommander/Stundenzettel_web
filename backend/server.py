@@ -82,7 +82,7 @@ security = HTTPBearer()
 
 # Rate Limiting
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="Schmitz Intralogistik Zeiterfassung")
+app = FastAPI(title="Tick Guard - Zeiterfassung & Reisekosten")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -153,9 +153,9 @@ async def unsubscribe_push(endpoint: str, current_user: "User" = Depends(lambda:
 
 # Company Information
 COMPANY_INFO = {
-    "name": "Schmitz Intralogistik GmbH",
-    "address": "Grüner Weg 3",
-    "city": "04827 Machern",
+    "name": "Byte Commander",
+    "address": "",
+    "city": "",
     "country": "Deutschland"
 }
 
@@ -2595,12 +2595,12 @@ async def startup_tasks():
     logger.info("EU-AI-Act Compliance: AI transparency logging enabled")
 
 async def create_admin_user():
-    admin = await db.users.find_one({"email": "admin@schmitz-intralogistik.de"})
+    admin = await db.users.find_one({"email": "admin@app.byte-commander.de"})
     if not admin:
         # Generate 2FA secret for admin (2FA is mandatory)
         two_fa_secret = pyotp.random_base32()
         admin_user = User(
-            email="admin@schmitz-intralogistik.de",
+            email="admin@app.byte-commander.de",
             name="Administrator",
             role="admin",
             hashed_password=get_password_hash("admin123"),
@@ -2610,7 +2610,7 @@ async def create_admin_user():
         admin_dict = admin_user.model_dump()
         admin_dict["is_admin"] = True  # Backward compatibility
         await db.users.insert_one(admin_dict)
-        print("Admin user created: admin@schmitz-intralogistik.de / admin123")
+        print("Admin user created: admin@app.byte-commander.de / admin123")
         print("NOTE: Admin must setup 2FA on first login (2FA is mandatory)")
 
 # Security Headers Middleware
@@ -2662,7 +2662,7 @@ app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS-Konfiguration aus Umgebungsvariablen
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://stundenzettel.byte-commander.de,http://localhost:3000,http://localhost:8000").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://app.byte-commander.de,http://localhost:3000,http://localhost:8000").split(",")
 CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS if origin.strip()]
 
 app.add_middleware(

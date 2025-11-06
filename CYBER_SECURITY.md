@@ -158,7 +158,7 @@ window.open('https://proxmox-ip:8000/api/timesheets/123/pdf');
 ### Backend (.env)
 ```env
 # CORS-Origins (für Referrer-Check)
-CORS_ORIGINS=https://stundenzettel.byte-commander.de,http://localhost:3000
+CORS_ORIGINS=https://app.byte-commander.de,http://localhost:3000
 
 # Optional: Referrer-Check im Proxy aktivieren
 ENFORCE_REFERRER_CHECK=true

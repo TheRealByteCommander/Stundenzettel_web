@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Dieses Dokument beschreibt die Sicherheitsmaßnahmen für die Stundenzettel-Web-Anwendung, einschließlich Datenverschlüsselung, Übertragungssicherheit und Zugriffskontrolle.
+Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Tick Guard, einschließlich Datenverschlüsselung, Übertragungssicherheit und Zugriffskontrolle.
 
 ---
 

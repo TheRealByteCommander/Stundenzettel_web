@@ -1,7 +1,7 @@
 {
-  "short_name": "Stundenzettel",
-  "name": "Schmitz Intralogistik - Zeiterfassung",
-  "description": "Zeiterfassungs- und Reisekosten-App für Schmitz Intralogistik",
+  "short_name": "Tick Guard",
+  "name": "Tick Guard - Zeiterfassung & Reisekosten",
+  "description": "Tick Guard - Zeiterfassung & Reisekosten-Management",
   "icons": [
     {
       "src": "favicon.ico",
@@ -40,7 +40,7 @@
     {
       "name": "Neuer Stundenzettel",
       "short_name": "Stundenzettel",
-      "description": "Neuen Stundenzettel erstellen",
+      "description": "Neuen Stundenzettel in Tick Guard erstellen",
       "url": "/?app=timesheets",
       "icons": [{ "src": "icon-timesheet.png", "sizes": "96x96" }]
     },

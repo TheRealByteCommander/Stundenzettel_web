@@ -16,7 +16,7 @@ header('Content-Type: application/json');
 // Konfiguration
 $BACKEND_URL = getenv('BACKEND_URL') ?: 'https://proxmox-domain.de:8000';  // Echte Proxmox-URL (NICHT im Frontend!)
 $ALLOWED_ORIGINS = [
-    'https://stundenzettel.byte-commander.de',
+    'https://app.byte-commander.de',
     'http://localhost:3000',
     'http://localhost:8000'
 ];
