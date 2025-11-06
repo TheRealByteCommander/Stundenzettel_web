@@ -1970,9 +1970,23 @@ async def reject_timesheet(timesheet_id: str, current_user: User = Depends(get_a
 @api_router.get("/accounting/monthly-report-pdf")
 async def get_accounting_monthly_report_pdf(
     month: str,
+    request: Request,
     current_user: User = Depends(get_accounting_or_admin_user)
 ):
-    """Generate PDF report for accounting monthly statistics"""
+    """
+    Generate PDF report for accounting monthly statistics.
+    Cyber-Security: Referrer-Check und Origin-Validation.
+    """
+    # Cyber-Security: Referrer-Check
+    referer = request.headers.get("referer", "")
+    origin = request.headers.get("origin", "")
+    
+    allowed_origins = CORS_ORIGINS
+    if origin and not any(allowed in origin for allowed in allowed_origins):
+        if referer and not any(allowed in referer for allowed in allowed_origins):
+            logging.warning(f"Blocked PDF download - invalid origin/referer: {origin}/{referer}")
+            raise HTTPException(status_code=403, detail="Access denied: Invalid origin")
+    
     # Get statistics
     stats_response = await get_accounting_monthly_stats(month, current_user)
     
@@ -1989,7 +2003,11 @@ async def get_accounting_monthly_report_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}"
+            "Content-Disposition": f"attachment; filename={filename}",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
         }
     )
 
@@ -2097,7 +2115,26 @@ async def delete_timesheet(timesheet_id: str, current_user: User = Depends(get_c
     return {"message": "Timesheet deleted successfully"}
 
 @api_router.get("/timesheets/{timesheet_id}/pdf")
-async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_current_user)):
+async def get_timesheet_pdf(
+    timesheet_id: str, 
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Download PDF - Nur für authentifizierte Benutzer, keine direkten Links.
+    Cyber-Security: Referrer-Check und Origin-Validation.
+    """
+    # Cyber-Security: Referrer-Check (muss von erlaubter Domain kommen)
+    referer = request.headers.get("referer", "")
+    origin = request.headers.get("origin", "")
+    
+    # Erlaubte Origins aus CORS-Konfiguration
+    allowed_origins = CORS_ORIGINS
+    if origin and not any(allowed in origin for allowed in allowed_origins):
+        if referer and not any(allowed in referer for allowed in allowed_origins):
+            logging.warning(f"Blocked PDF download - invalid origin/referer: {origin}/{referer}")
+            raise HTTPException(status_code=403, detail="Access denied: Invalid origin")
+    
     timesheet = await db.timesheets.find_one({"id": timesheet_id})
     if not timesheet:
         raise HTTPException(status_code=404, detail="Timesheet not found")
@@ -2114,18 +2151,40 @@ async def get_timesheet_pdf(timesheet_id: str, current_user: User = Depends(get_
     # Generate new filename format
     filename = await generate_pdf_filename(timesheet_obj, timesheet_obj.user_name)
     
+    # Cyber-Security: Keine direkten Links - Download nur über API
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}"
+            "Content-Disposition": f"attachment; filename={filename}",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, no-cache, must-revalidate",  # Verhindert Caching
+            "Pragma": "no-cache",
+            "Expires": "0"
         }
     )
 
 @api_router.post("/timesheets/{timesheet_id}/download-and-email")
-async def download_and_email_timesheet(timesheet_id: str, current_user: User = Depends(get_current_user)):
-    """Download PDF and automatically send copy to admin"""
+async def download_and_email_timesheet(
+    timesheet_id: str, 
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Download PDF and automatically send copy to admin.
+    Cyber-Security: Referrer-Check und Origin-Validation.
+    """
+    # Cyber-Security: Referrer-Check
+    referer = request.headers.get("referer", "")
+    origin = request.headers.get("origin", "")
+    
+    allowed_origins = CORS_ORIGINS
+    if origin and not any(allowed in origin for allowed in allowed_origins):
+        if referer and not any(allowed in referer for allowed in allowed_origins):
+            logging.warning(f"Blocked PDF download - invalid origin/referer: {origin}/{referer}")
+            raise HTTPException(status_code=403, detail="Access denied: Invalid origin")
+    
     # Get timesheet
     timesheet = await db.timesheets.find_one({"id": timesheet_id})
     if not timesheet:
@@ -2199,12 +2258,17 @@ async def download_and_email_timesheet(timesheet_id: str, current_user: User = D
         # Continue with download even if email fails
     
     # Return PDF for download with new filename
+    # Cyber-Security: Keine direkten Links - Download nur über API
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}"
+            "Content-Disposition": f"attachment; filename={filename}",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
         }
     )
 
