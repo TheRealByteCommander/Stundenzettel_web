@@ -34,6 +34,7 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
   - Zeitliche Konsistenz-Prüfung (z.B. Übernachtung ohne Anreise)
   - Orts-Konsistenz-Prüfung
   - Betrags-Plausibilitäts-Prüfung
+- ✅ **Fremdwährungs-Nachweis**: Bei Fremdwährungen muss ein Nachweis über den tatsächlichen Euro-Betrag hochgeladen werden (z.B. Kontoauszug)
 - ✅ Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln
 - ✅ **Arbeitsstunden-Abgleich**: Gutgeschriebene Arbeitsstunden aus Stundenzetteln werden automatisch in Reisekosten-Reports übernommen
 - ✅ **Automatische Verarbeitung**: Accounting Agent prüft Reisekosten im Verhältnis zu den Arbeitsstunden

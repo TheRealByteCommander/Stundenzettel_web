@@ -5,6 +5,15 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 ## [Unreleased]
 
 ### Hinzugefügt
+- **Fremdwährungs-Nachweis für Reisekosten-Belege**:
+  - Automatische Erkennung von Fremdwährungen (nicht EUR)
+  - Erforderlicher Nachweis über tatsächlichen Euro-Betrag (z.B. Kontoauszug)
+  - Upload-Funktion für Fremdwährungs-Nachweis
+  - Frontend: Gelbe Warnung und Upload-Button bei Fremdwährung
+  - Automatische Validierung und Anzeige des Nachweis-Status
+  - GoBD-konform: Nachweis wird verschlüsselt gespeichert
+
+### Geändert
 - **Reisekosten-App: Vereinfachte Bedienung und automatische Datenextraktion**
   - User lädt nur PDF-Belege hoch - alle Daten werden automatisch extrahiert
   - Automatische Extraktion von Betrag, Datum, Typ, Währung aus PDFs

@@ -339,6 +339,24 @@ function App() {
     }
   };
 
+  const uploadExchangeProof = async (reportId, receiptId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await axios.post(
+      `${API}/travel-expense-reports/${reportId}/receipts/${receiptId}/upload-exchange-proof`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+    
+    return response;
+  };
+
   const uploadReceipt = async (reportId, file) => {
     setLoading(true);
     setError('');
@@ -3667,6 +3685,46 @@ function App() {
                                               <li key={idx}>{issue}</li>
                                             ))}
                                           </ul>
+                                        </div>
+                                      )}
+                                      {/* Fremdwährungs-Nachweis */}
+                                      {(receipt.needs_exchange_proof || (analysis.extracted_data?.currency && analysis.extracted_data.currency.toUpperCase() !== 'EUR')) && (
+                                        <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                                          <div className="text-xs font-semibold mb-1" style={{ color: '#d97706' }}>
+                                            ⚠️ Fremdwährung erkannt ({analysis.extracted_data?.currency || receipt.currency})
+                                          </div>
+                                          <div className="text-xs mb-2" style={{ color: '#92400e' }}>
+                                            Bitte laden Sie einen Nachweis über den tatsächlichen Euro-Betrag hoch (z.B. Kontoauszug).
+                                          </div>
+                                          {receipt.exchange_proof_filename ? (
+                                            <div className="text-xs" style={{ color: '#10b981' }}>
+                                              ✅ Nachweis hochgeladen: {receipt.exchange_proof_filename}
+                                            </div>
+                                          ) : (
+                                            currentExpenseReport.status === 'draft' && (
+                                              <Input
+                                                type="file"
+                                                accept=".pdf"
+                                                className="text-xs"
+                                                onChange={async (e) => {
+                                                  const file = e.target.files[0];
+                                                  if (file) {
+                                                    setLoading(true);
+                                                    try {
+                                                      await uploadExchangeProof(currentExpenseReport.id, receipt.id, file);
+                                                      await fetchExpenseReport(currentExpenseReport.id);
+                                                      alert('Nachweis erfolgreich hochgeladen.');
+                                                    } catch (error) {
+                                                      alert('Fehler beim Hochladen: ' + (error.response?.data?.detail || error.message));
+                                                    } finally {
+                                                      setLoading(false);
+                                                      e.target.value = '';
+                                                    }
+                                                  }
+                                                }}
+                                              />
+                                            )
+                                          )}
                                         </div>
                                       )}
                                     </div>

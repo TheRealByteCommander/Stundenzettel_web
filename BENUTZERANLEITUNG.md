@@ -230,12 +230,20 @@ Für jeden Tag können Sie Reisekosten eintragen:
   - Erkannte **Kategorie** (Hotel, Restaurant, etc.)
   - **Hinweise** bei Problemen (rot markiert)
 
+**Fremdwährungs-Nachweis:**
+- Wenn eine **Fremdwährung** (nicht EUR) erkannt wird, müssen Sie einen **Nachweis über den tatsächlichen Euro-Betrag** hochladen
+- **Akzeptierte Nachweise**: Kontoauszug, Bankbeleg, oder ähnliche Dokumente, die den tatsächlichen Euro-Betrag zeigen
+- Der Nachweis wird **automatisch erkannt** und angezeigt, wenn eine Fremdwährung im Beleg gefunden wird
+- Sie sehen eine **gelbe Warnung** mit Upload-Button für den Nachweis
+- Nach erfolgreichem Upload wird der Nachweis als **✓ Nachweis hochgeladen** angezeigt
+
 **Wichtig:**
 - Nur **PDF-Dateien** sind erlaubt
 - Maximale Dateigröße: **10 MB**
 - Belege werden **verschlüsselt** gespeichert
 - Belege werden in strukturierten Ordnern gespeichert: `User_Monat_ReportID/`
 - **Keine manuellen Eingaben nötig** - alles wird automatisch extrahiert!
+- **Fremdwährungs-Nachweis ist erforderlich** für alle Belege in Fremdwährung (GoBD)
 
 ### Abrechnung abschließen
 

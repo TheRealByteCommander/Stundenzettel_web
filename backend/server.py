@@ -335,6 +335,8 @@ class TravelExpenseReceipt(BaseModel):
     local_path: str  # Pfad auf lokalem Bürorechner
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     file_size: int  # in Bytes
+    exchange_proof_path: Optional[str] = None  # Pfad zum Nachweis des Euro-Betrags (z.B. Kontoauszug) bei Fremdwährung
+    exchange_proof_filename: Optional[str] = None  # Dateiname des Nachweises
 
 class TravelExpenseReportEntry(BaseModel):
     date: str  # YYYY-MM-DD
@@ -3321,6 +3323,23 @@ async def upload_receipt(
             else:
                 logic_issues.append(f"Kein passender Reiseeintrag für Hotelrechnung am {doc_date} gefunden")
         
+        # Prüfe auf Fremdwährung - Nachweis erforderlich
+        currency = analysis.extracted_data.get("currency", "EUR")
+        if currency and currency.upper() != "EUR":
+            # Fremdwährung erkannt - Nachweis erforderlich
+            if not logic_issues:
+                logic_issues = []
+            logic_issues.append(f"Fremdwährung ({currency}) erkannt. Bitte laden Sie einen Nachweis über den tatsächlichen Euro-Betrag hoch (z.B. Kontoauszug).")
+            # Markiere Receipt als benötigt Nachweis
+            receipt_dict = receipt.model_dump()
+            receipt_dict["needs_exchange_proof"] = True
+            receipt_dict["currency"] = currency
+            # Update Receipt im Report
+            for i, r in enumerate(report_receipts):
+                if r.get("id") == receipt.id:
+                    report_receipts[i] = receipt_dict
+                    break
+        
         # Speichere Logik-Prüfung in der Analyse
         if logic_issues:
             analysis.validation_issues.extend(logic_issues)
@@ -3328,12 +3347,13 @@ async def upload_receipt(
             analysis_dict["logic_issues"] = logic_issues
             report_document_analyses[-1]["analysis"] = analysis_dict
         
-        # Update Report mit Analysen
+        # Update Report mit Analysen und aktualisierten Receipts
         await db.travel_expense_reports.update_one(
             {"id": report_id},
             {
                 "$set": {
                     "document_analyses": report_document_analyses,
+                    "receipts": report_receipts,
                     "updated_at": datetime.utcnow()
                 }
             }
@@ -3393,6 +3413,118 @@ async def upload_receipt(
         "has_issues": len(analysis.validation_issues) > 0 if 'analysis' in locals() else False
     }
 
+@limiter.limit("20/hour")  # Max 20 Nachweis-Uploads pro Stunde
+@api_router.post("/travel-expense-reports/{report_id}/receipts/{receipt_id}/upload-exchange-proof")
+async def upload_exchange_proof(
+    report_id: str,
+    receipt_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload exchange proof (Kontoauszug) for foreign currency receipts
+    DSGVO-Compliant: Encrypted storage, audit logging
+    """
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    report = await db.travel_expense_reports.find_one({"id": report_id})
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    if not current_user.can_view_all_data() and report["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    if report.get("status") != "draft":
+        raise HTTPException(status_code=400, detail="Can only upload exchange proof to draft reports")
+    
+    receipts = report.get("receipts", [])
+    receipt = next((r for r in receipts if r.get("id") == receipt_id), None)
+    
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    
+    # Prüfe ob Receipt Fremdwährung hat
+    if not receipt.get("needs_exchange_proof") and not receipt.get("currency"):
+        raise HTTPException(status_code=400, detail="This receipt does not require an exchange proof (not a foreign currency receipt)")
+    
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+    
+    # DSGVO: Audit logging
+    audit_logger.log_access(
+        action="upload_exchange_proof",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id=receipt_id,
+        details={"filename": file.filename, "size": len(contents), "receipt_id": receipt_id}
+    )
+    
+    # Erstelle eindeutigen Ordner pro Reisekosten-Abrechnung
+    user_name_safe = re.sub(r'[^\w\-_]', '_', report.get("user_name", "Unknown"))
+    month = report.get("month", "unknown")
+    report_folder = f"{user_name_safe}_{month}_{report_id}"
+    report_folder_path = Path(LOCAL_RECEIPTS_PATH) / "reisekosten" / report_folder
+    
+    # Erstelle Ordner falls nicht vorhanden
+    report_folder_path.mkdir(parents=True, exist_ok=True)
+    
+    # Speichere PDF im Ordner der Abrechnung
+    safe_filename = re.sub(r'[^\w\-_\.]', '_', file.filename)
+    proof_filename = f"exchange_proof_{receipt_id}_{safe_filename}"
+    local_file_path = report_folder_path / proof_filename
+    
+    try:
+        # Save file to local storage
+        with open(local_file_path, 'wb') as f:
+            f.write(contents)
+        
+        # DSGVO Art. 32: Encrypt sensitive data
+        data_encryption.encrypt_file(local_file_path)
+        
+        # Verify file is encrypted
+        try:
+            data_encryption.decrypt_file(local_file_path)
+        except Exception as e:
+            logging.error(f"File encryption verification failed: {e}")
+            local_file_path.unlink()
+            raise HTTPException(status_code=500, detail="File encryption failed")
+        
+    except Exception as e:
+        if local_file_path.exists():
+            local_file_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # Update Receipt mit Nachweis
+    receipt["exchange_proof_path"] = str(local_file_path)
+    receipt["exchange_proof_filename"] = file.filename
+    
+    # Update Report
+    await db.travel_expense_reports.update_one(
+        {"id": report_id},
+        {
+            "$set": {
+                "receipts": receipts,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Update audit log
+    audit_logger.log_access(
+        action="upload_exchange_proof_complete",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id=receipt_id,
+        details={"local_path": str(local_file_path), "encrypted": True}
+    )
+    
+    return {
+        "message": "Exchange proof uploaded successfully and encrypted",
+        "receipt_id": receipt_id
+    }
+
 @api_router.delete("/travel-expense-reports/{report_id}/receipts/{receipt_id}")
 async def delete_receipt(
     report_id: str,
@@ -3420,6 +3552,12 @@ async def delete_receipt(
         local_path = Path(receipt_to_delete.get("local_path", ""))
         if local_path.exists():
             local_path.unlink()
+        # Lösche auch den Fremdwährungs-Nachweis falls vorhanden
+        exchange_proof_path = receipt_to_delete.get("exchange_proof_path")
+        if exchange_proof_path:
+            proof_path = Path(exchange_proof_path)
+            if proof_path.exists():
+                proof_path.unlink()
     except Exception as e:
         logging.warning(f"Failed to delete local file: {e}")
     
