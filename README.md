@@ -2,6 +2,10 @@
 
 Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System von Byte Commander.
 
+## 📘 Benutzeranleitung
+
+**👉 [Benutzeranleitung (BENUTZERANLEITUNG.md)](BENUTZERANLEITUNG.md)** - Vollständige Anleitung für alle Benutzer mit detaillierten Erklärungen zu allen Funktionen, gesetzlichen Hinweisen und FAQs.
+
 ## Features
 
 ### Stundenzettel-App

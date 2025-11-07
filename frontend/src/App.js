@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from './components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table';
 import { Checkbox } from './components/ui/checkbox';
-import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X, Menu, Home, LogOut, ChevronLeft, Upload } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Building, Send, Download, Plus, Settings, Edit, Trash2, Key, MessageSquare, X, Menu, Home, LogOut, ChevronLeft, Upload, BookOpen } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
 import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
@@ -1533,6 +1533,17 @@ function App() {
             <button
               className="mobile-menu-item w-full text-left"
               onClick={() => {
+                window.open('https://github.com/TheRealByteCommander/Stundenzettel_web/blob/main/BENUTZERANLEITUNG.md', '_blank');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <BookOpen className="h-5 w-5" />
+              <span>Benutzeranleitung</span>
+            </button>
+
+            <button
+              className="mobile-menu-item w-full text-left"
+              onClick={() => {
                 setSelectedApp(null);
                 setMobileMenuOpen(false);
               }}
@@ -1656,6 +1667,15 @@ function App() {
               </div>
               {/* Desktop Header Actions */}
               <div className="hidden md:flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.open('https://github.com/TheRealByteCommander/Stundenzettel_web/blob/main/BENUTZERANLEITUNG.md', '_blank')}
+                  title="Benutzeranleitung öffnen"
+                >
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  Anleitung
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -3370,6 +3390,15 @@ function App() {
                 </h1>
               </div>
               <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.open('https://github.com/TheRealByteCommander/Stundenzettel_web/blob/main/BENUTZERANLEITUNG.md', '_blank')}
+                  title="Benutzeranleitung öffnen"
+                >
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  Anleitung
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
