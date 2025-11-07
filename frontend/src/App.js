@@ -3493,9 +3493,12 @@ function App() {
                     )}
                   </div>
 
-                  {/* Entries from Timesheets */}
+                  {/* Entries from Timesheets - Nur Anzeige, keine Bearbeitung */}
                   <div className="space-y-2">
-                    <h4 className="font-medium">Einträge aus Stundenzetteln (automatisch)</h4>
+                    <h4 className="font-medium">Reiseeinträge aus Stundenzetteln (automatisch erstellt)</h4>
+                    <p className="text-xs text-gray-500">
+                      Diese Einträge werden automatisch aus Ihren genehmigten und unterschriebenen Stundenzetteln erstellt.
+                    </p>
                     {/* Übersicht: Abgedeckte vs. fehlende Tage */}
                     {currentExpenseReport && (
                       (() => {
@@ -3527,8 +3530,8 @@ function App() {
                             <TableHead>Ort</TableHead>
                             <TableHead>Kunde/Projekt</TableHead>
                             <TableHead>Fahrzeit</TableHead>
+                            <TableHead>Arbeitsstunden</TableHead>
                             <TableHead>Tage</TableHead>
-                            {currentExpenseReport.status === 'draft' && <TableHead>Aktionen</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -3538,21 +3541,8 @@ function App() {
                               <TableCell>{entry.location || '-'}</TableCell>
                               <TableCell>{entry.customer_project || '-'}</TableCell>
                               <TableCell>{entry.travel_time_minutes} Min</TableCell>
+                              <TableCell>{entry.working_hours || 0.0} Std</TableCell>
                               <TableCell>{entry.days_count}</TableCell>
-                              {currentExpenseReport.status === 'draft' && (
-                                <TableCell>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={async () => {
-                                      const updatedEntries = currentExpenseReport.entries.filter((_, i) => i !== idx);
-                                      await updateExpenseReport(currentExpenseReport.id, { entries: updatedEntries });
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TableCell>
-                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -3562,9 +3552,12 @@ function App() {
                     )}
                   </div>
 
-                  {/* Receipts */}
+                  {/* Receipts - Nur Upload, automatische Extraktion */}
                   <div className="space-y-2">
-                    <h4 className="font-medium">Belege (PDFs)</h4>
+                    <h4 className="font-medium">Belege hochladen</h4>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Laden Sie einfach Ihre Belege (PDFs) hoch. Alle Daten werden automatisch aus den Dokumenten extrahiert und den Reiseeinträgen zugeordnet.
+                    </p>
                     {currentExpenseReport.status === 'draft' && (
                       <div className="mb-4">
                         <Input
@@ -3573,38 +3566,98 @@ function App() {
                           onChange={async (e) => {
                             const file = e.target.files[0];
                             if (file) {
-                              await uploadReceipt(currentExpenseReport.id, file);
+                              setLoading(true);
+                              try {
+                                const response = await uploadReceipt(currentExpenseReport.id, file);
+                                if (response.data.has_issues) {
+                                  alert('Beleg wurde hochgeladen, aber es wurden Probleme festgestellt. Bitte prüfen Sie den Chat.');
+                                }
+                                // Lade Report neu, um Analysen anzuzeigen
+                                await fetchExpenseReport(currentExpenseReport.id);
+                              } catch (error) {
+                                alert('Fehler beim Hochladen: ' + (error.response?.data?.detail || error.message));
+                              } finally {
+                                setLoading(false);
+                                e.target.value = ''; // Reset file input
+                              }
                             }
                           }}
                         />
-                        <p className="text-xs text-gray-500 mt-1">Nur PDF-Dateien möglich</p>
+                        <p className="text-xs text-gray-500 mt-1">Nur PDF-Dateien möglich. Daten werden automatisch extrahiert.</p>
                       </div>
                     )}
                     {currentExpenseReport.receipts && currentExpenseReport.receipts.length > 0 ? (
                       <div className="space-y-2">
-                        {currentExpenseReport.receipts.map((receipt) => (
-                          <Card key={receipt.id} className="p-3">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <span className="font-medium">{receipt.filename}</span>
-                                <span className="text-sm text-gray-500 ml-2">
-                                  ({Math.round(receipt.file_size / 1024)} KB)
-                                </span>
+                        {currentExpenseReport.receipts.map((receipt) => {
+                          // Finde zugehörige Analyse
+                          const analysis = currentExpenseReport.document_analyses?.find(
+                            a => a.receipt_id === receipt.id
+                          )?.analysis;
+                          
+                          return (
+                            <Card key={receipt.id} className="p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{receipt.filename}</span>
+                                    <span className="text-sm text-gray-500">
+                                      ({Math.round(receipt.file_size / 1024)} KB)
+                                    </span>
+                                    {analysis && (
+                                      <Badge variant={analysis.confidence > 0.7 ? "default" : "secondary"}>
+                                        {analysis.document_type === 'hotel_receipt' ? 'Hotel' :
+                                         analysis.document_type === 'restaurant_bill' ? 'Restaurant' :
+                                         analysis.document_type === 'toll_receipt' ? 'Maut' :
+                                         analysis.document_type === 'parking' ? 'Parken' :
+                                         analysis.document_type === 'fuel' ? 'Tanken' :
+                                         analysis.document_type === 'train_ticket' ? 'Bahn' :
+                                         'Sonstiges'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {analysis && (
+                                    <div className="mt-2 text-sm">
+                                      {analysis.extracted_data?.amount && (
+                                        <div>
+                                          <strong>Betrag:</strong> {analysis.extracted_data.amount} {analysis.extracted_data.currency || 'EUR'}
+                                        </div>
+                                      )}
+                                      {analysis.extracted_data?.date && (
+                                        <div>
+                                          <strong>Datum:</strong> {new Date(analysis.extracted_data.date).toLocaleDateString('de-DE')}
+                                        </div>
+                                      )}
+                                      {(analysis.validation_issues?.length > 0 || analysis.logic_issues?.length > 0) && (
+                                        <div className="mt-2 text-xs" style={{ color: '#ef4444' }}>
+                                          <strong>Hinweise:</strong>
+                                          <ul className="list-disc list-inside">
+                                            {analysis.validation_issues?.map((issue, idx) => (
+                                              <li key={idx}>{issue}</li>
+                                            ))}
+                                            {analysis.logic_issues?.map((issue, idx) => (
+                                              <li key={idx}>{issue}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {currentExpenseReport.status === 'draft' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={async () => {
+                                      await deleteReceipt(currentExpenseReport.id, receipt.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </div>
-                              {currentExpenseReport.status === 'draft' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={async () => {
-                                    await deleteReceipt(currentExpenseReport.id, receipt.id);
-                                  }}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </Card>
-                        ))}
+                            </Card>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500">Noch keine Belege hochgeladen</p>

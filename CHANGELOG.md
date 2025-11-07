@@ -5,6 +5,19 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 ## [Unreleased]
 
 ### Hinzugefügt
+- **Reisekosten-App: Vereinfachte Bedienung und automatische Datenextraktion**
+  - User lädt nur PDF-Belege hoch - alle Daten werden automatisch extrahiert
+  - Automatische Extraktion von Betrag, Datum, Typ, Währung aus PDFs
+  - Automatische Zuordnung zu Reiseeinträgen basierend auf Datum
+  - **Logik- und Machbarkeitsprüfung**:
+    - Überlappende Hotelrechnungen werden automatisch erkannt
+    - Datum-Abgleich mit Arbeitsstunden aus Stundenzetteln
+    - Zeitliche Konsistenz-Prüfung (z.B. Übernachtung ohne Anreise)
+    - Orts-Konsistenz-Prüfung
+    - Betrags-Plausibilitäts-Prüfung
+  - Chat-Agent wird automatisch bei Problemen aktiviert
+  - Frontend: Anzeige extrahierter Daten und Probleme direkt bei jedem Beleg
+  - Frontend: Reiseeinträge sind nur noch Anzeige (keine Bearbeitung mehr)
 - **Strukturierte Ordner-Speicherung für PDF-Dateien:**
   - Reisekosten-Belege werden in eindeutigen Ordnern gespeichert: `User_Name_Monat_ReportID/`
   - Unterschriebene Stundenzettel werden in eindeutigen Ordnern gespeichert: `User_Name_Woche_TimesheetID/`
@@ -14,10 +27,21 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 
 ### Geändert
 - **Backend:**
-  - `upload_receipt`: Erstellt jetzt Ordner pro Reisekosten-Abrechnung
+  - `upload_receipt`: 
+    - Automatische Dokumentenanalyse beim Upload
+    - Automatische Zuordnung zu Reiseeinträgen
+    - Logik-Prüfung (überlappende Hotelrechnungen, Datum-Abgleich)
+    - Automatische Chat-Agent-Benachrichtigung bei Problemen
+  - `DocumentAgent`: Erweitert um Logik-Prüfung (überlappende Rechnungen, Datum-Abgleich mit Arbeitsstunden)
+  - `AccountingAgent`: Erweitert um Machbarkeitsprüfung (überlappende Hotelrechnungen, Datum-Konsistenz, zeitliche Machbarkeit)
   - `upload_signed_timesheet`: Erstellt jetzt Ordner pro Stundenzettel
   - `delete_expense_report`: Löscht jetzt den gesamten Ordner der Abrechnung
   - Ordner-Namen: `User_Name_Monat_ReportID` für Reisekosten, `User_Name_Woche_TimesheetID` für Stundenzettel
+- **Frontend:**
+  - Reisekosten-UI vereinfacht: Nur Upload, keine manuellen Eingabefelder
+  - Reiseeinträge: Nur Anzeige (keine Bearbeitung mehr)
+  - Belege: Anzeige extrahierter Daten (Betrag, Datum, Typ) und Probleme
+  - Automatische Aktualisierung nach Upload
 
 ---
 

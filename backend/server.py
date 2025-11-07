@@ -3232,6 +3232,149 @@ async def upload_receipt(
         details={"local_path": str(local_file_path), "encrypted": True}
     )
 
+    # Automatische Analyse des hochgeladenen Dokuments
+    try:
+        from agents import DocumentAgent, AgentOrchestrator
+        from ollama_llm import OllamaLLM
+        
+        llm = OllamaLLM()
+        document_agent = DocumentAgent(llm, db=db)
+        await document_agent.initialize()
+        
+        # Entschlüssele Datei temporär für Analyse (wird danach wieder verschlüsselt)
+        from compliance import DataEncryption
+        data_encryption_temp = DataEncryption()
+        try:
+            data_encryption_temp.decrypt_file(local_file_path)
+        except Exception as e:
+            logging.warning(f"Datei konnte nicht entschlüsselt werden für Analyse: {e}")
+        
+        # Analysiere das Dokument
+        analysis = await document_agent.analyze_document(
+            str(local_file_path),
+            file.filename,
+            encryption=None
+        )
+        
+        # Verschlüssele Datei wieder nach Analyse
+        try:
+            data_encryption_temp.encrypt_file(local_file_path)
+        except Exception as e:
+            logging.warning(f"Datei konnte nach Analyse nicht wieder verschlüsselt werden: {e}")
+        
+        # Speichere Analyse im Report
+        report_document_analyses = report.get("document_analyses", [])
+        report_document_analyses.append({
+            "receipt_id": receipt.id,
+            "analysis": analysis.model_dump()
+        })
+        
+        # Automatische Zuordnung zu Report-Einträgen basierend auf Datum
+        report_entries = report.get("entries", [])
+        doc_date = analysis.extracted_data.get("date")
+        
+        if doc_date and report_entries:
+            # Finde passenden Eintrag basierend auf Datum
+            matching_entry = None
+            for entry in report_entries:
+                if entry.get("date") == doc_date:
+                    matching_entry = entry
+                    break
+            
+            # Wenn kein exaktes Datum-Match, suche nach ähnlichem Datum (±1 Tag)
+            if not matching_entry:
+                from datetime import datetime, timedelta
+                try:
+                    doc_date_obj = datetime.strptime(doc_date, "%Y-%m-%d")
+                    for entry in report_entries:
+                        entry_date_obj = datetime.strptime(entry.get("date"), "%Y-%m-%d")
+                        if abs((doc_date_obj - entry_date_obj).days) <= 1:
+                            matching_entry = entry
+                            break
+                except:
+                    pass
+        
+        # Logik-Prüfung: Überlappende Hotelrechnungen, Datum-Abgleich mit Arbeitsstunden
+        logic_issues = []
+        if analysis.document_type == "hotel_receipt" and doc_date:
+            # Prüfe auf überlappende Hotelrechnungen
+            for existing_analysis in report_document_analyses[:-1]:  # Alle außer dem aktuellen
+                existing_analysis_obj = existing_analysis.get("analysis", {})
+                if existing_analysis_obj.get("document_type") == "hotel_receipt":
+                    existing_date = existing_analysis_obj.get("extracted_data", {}).get("date")
+                    if existing_date:
+                        try:
+                            from datetime import datetime
+                            doc_date_obj = datetime.strptime(doc_date, "%Y-%m-%d")
+                            existing_date_obj = datetime.strptime(existing_date, "%Y-%m-%d")
+                            # Prüfe auf Überlappung (±3 Tage = mögliche Überlappung)
+                            if abs((doc_date_obj - existing_date_obj).days) <= 3:
+                                logic_issues.append(f"Mögliche überlappende Hotelrechnung: {existing_date} und {doc_date}")
+                        except:
+                            pass
+            
+            # Prüfe Datum-Abgleich mit Arbeitsstunden
+            if matching_entry:
+                working_hours = matching_entry.get("working_hours", 0.0)
+                if working_hours == 0.0:
+                    logic_issues.append(f"Für {doc_date} sind keine Arbeitsstunden im Stundenzettel verzeichnet")
+            else:
+                logic_issues.append(f"Kein passender Reiseeintrag für Hotelrechnung am {doc_date} gefunden")
+        
+        # Speichere Logik-Prüfung in der Analyse
+        if logic_issues:
+            analysis.validation_issues.extend(logic_issues)
+            analysis_dict = analysis.model_dump()
+            analysis_dict["logic_issues"] = logic_issues
+            report_document_analyses[-1]["analysis"] = analysis_dict
+        
+        # Update Report mit Analysen
+        await db.travel_expense_reports.update_one(
+            {"id": report_id},
+            {
+                "$set": {
+                    "document_analyses": report_document_analyses,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # Wenn Probleme gefunden, Chat-Agent benachrichtigen
+        if analysis.validation_issues or logic_issues:
+            try:
+                from agents import ChatAgent
+                chat_agent = ChatAgent(llm, db=db)
+                await chat_agent.initialize()
+                
+                # Erstelle Chat-Nachricht für User
+                issues_text = "\n".join(analysis.validation_issues + logic_issues)
+                chat_message = f"Beim Hochladen von '{file.filename}' wurden folgende Punkte festgestellt:\n\n{issues_text}\n\nBitte klären Sie diese Punkte."
+                
+                # Speichere Chat-Nachricht
+                chat_messages = report.get("chat_messages", [])
+                chat_messages.append({
+                    "id": str(uuid.uuid4()),
+                    "sender": "agent",
+                    "message": chat_message,
+                    "created_at": datetime.utcnow().isoformat()
+                })
+                
+                await db.travel_expense_reports.update_one(
+                    {"id": report_id},
+                    {
+                        "$set": {
+                            "chat_messages": chat_messages,
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
+            except Exception as e:
+                logging.warning(f"Chat-Agent Benachrichtigung fehlgeschlagen: {e}")
+        
+    except Exception as e:
+        logging.warning(f"Automatische Dokumentenanalyse fehlgeschlagen: {e}")
+        # Fehler nicht kritisch - Dokument wurde trotzdem hochgeladen
+    
     # Push-Benachrichtigung an Buchhaltung: Neuer Beleg-Upload
     try:
         await notify_role(
@@ -3243,7 +3386,12 @@ async def upload_receipt(
     except Exception as e:
         logging.warning(f"Push notify (accounting) failed: {e}")
     
-    return {"message": "Receipt uploaded successfully and encrypted", "receipt_id": receipt.id}
+    return {
+        "message": "Receipt uploaded successfully and encrypted",
+        "receipt_id": receipt.id,
+        "analysis_completed": True,
+        "has_issues": len(analysis.validation_issues) > 0 if 'analysis' in locals() else False
+    }
 
 @api_router.delete("/travel-expense-reports/{report_id}/receipts/{receipt_id}")
 async def delete_receipt(

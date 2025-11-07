@@ -43,6 +43,14 @@ Identifiziere Probleme:
 - Verdächtige oder fehlerhafte Angaben
 - Fehlende Pflichtangaben (z.B. Steuernummer bei Rechnungen)
 
+### 6. Logik-Prüfung und Machbarkeitsprüfung
+Prüfe zusätzlich auf logische Konsistenz:
+- **Überlappende Hotelrechnungen**: Erkenne, wenn mehrere Hotelrechnungen für denselben oder überlappende Zeiträume vorhanden sind
+- **Datum-Abgleich mit Arbeitsstunden**: Prüfe, ob für das Dokument-Datum Arbeitsstunden im Stundenzettel verzeichnet sind
+- **Zeitliche Konsistenz**: Prüfe, ob Rechnungsdatum und Leistungsdatum logisch sind
+- **Orts-Konsistenz**: Prüfe, ob Dokument-Ort mit Reiseort übereinstimmt
+- **Betrags-Plausibilität**: Prüfe, ob Beträge für den Dokumenttyp plausibel sind
+
 ## Ausgabe-Format:
 
 Gib strukturierte JSON-Antworten mit:

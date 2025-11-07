@@ -19,21 +19,32 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 - ✅ **Urlaubsplaner**: Urlaub beantragen, Genehmigung, automatischer Eintrag in Stundenzettel
 
 ### Reisekosten-App
+- ✅ **Vereinfachte Bedienung**: User lädt nur PDF-Belege hoch - alle Daten werden automatisch extrahiert
+- ✅ **Automatische Datenextraktion**: 
+  - Betrag, Datum, Typ, Währung werden automatisch aus PDFs extrahiert
+  - Automatische Zuordnung zu Reiseeinträgen basierend auf Datum
+  - Keine manuellen Eingaben mehr nötig
+- ✅ **Logik- und Machbarkeitsprüfung**:
+  - Überlappende Hotelrechnungen werden automatisch erkannt
+  - Datum-Abgleich mit Arbeitsstunden aus Stundenzetteln
+  - Zeitliche Konsistenz-Prüfung (z.B. Übernachtung ohne Anreise)
+  - Orts-Konsistenz-Prüfung
+  - Betrags-Plausibilitäts-Prüfung
 - ✅ Automatische Befüllung aus genehmigten, **verifizierten** Stundenzetteln
 - ✅ **Arbeitsstunden-Abgleich**: Gutgeschriebene Arbeitsstunden aus Stundenzetteln werden automatisch in Reisekosten-Reports übernommen
 - ✅ **Automatische Verarbeitung**: Accounting Agent prüft Reisekosten im Verhältnis zu den Arbeitsstunden
 - ✅ PDF-Beleg-Upload (lokale Speicherung, DSGVO-konform)
 - ✅ Monatsbasierte Abrechnungen (aktueller + 2 Monate zurück)
-- ✅ Chat-System für Rückfragen mit Agenten
+- ✅ **Chat-System für Klärung**: Bei Problemen oder offenen Punkten wird automatisch der Chat-Agent aktiviert
 - ✅ Status-Management (Entwurf, In Prüfung, Genehmigt)
 - ✅ **Validierung vor Einreichen**: Prüfung, ob alle Tage verifizierte Stundenzettel haben
 - ✅ **Übersicht abgedeckte/fehlende Tage** in der UI
 - ✅ **Reisekosten nur für verifizierte Stundenzettel** - fehlende Tage werden nicht berücksichtigt
 - ✅ Automatische Prüfung mit Ollama LLM-Agenten
-  - Dokumentenanalyse (OCR, Kategorisierung, Validierung)
+  - Dokumentenanalyse (OCR, Kategorisierung, Validierung, **Logik-Prüfung**)
   - **Automatische Verifikation unterschriebener Stundenzettel** (PDF-Text-Analyse)
-  - Buchhaltungszuordnung (Verpflegungsmehraufwand, Spesensätze)
-  - Chat-Agent für Rückfragen
+  - Buchhaltungszuordnung (Verpflegungsmehraufwand, Spesensätze, **Machbarkeitsprüfung**)
+  - Chat-Agent für Rückfragen und Klärung
   - **Memory-System**: Agenten lernen aus früheren Erfahrungen (bis zu 10.000 Einträge pro Agent)
   - **Web-Tools**: Zugriff auf aktuelle Daten
     - Aktuelle Spesensätze aus dem Internet

@@ -202,16 +202,40 @@ Für jeden Tag können Sie Reisekosten eintragen:
 
 **Gesetzliche Anforderung:** Alle Reisekosten müssen mit Belegen dokumentiert werden (GoBD).
 
-1. Klicken Sie auf **"Beleg hochladen"** bei einem Eintrag
+**Vereinfachte Bedienung:** Sie müssen nur PDF-Belege hochladen - alle Daten werden automatisch extrahiert!
+
+1. Klicken Sie auf **"Beleg hochladen"** (Datei-Auswahl)
 2. Wählen Sie die **PDF-Datei** des Belegs aus
-3. Die Datei wird verschlüsselt gespeichert (DSGVO-konform)
-4. Der Beleg wird dem Eintrag zugeordnet
+3. Das System extrahiert automatisch:
+   - **Betrag** aus dem Beleg
+   - **Datum** aus dem Beleg
+   - **Typ** (Hotel, Restaurant, Maut, Parken, Tanken, Bahn, etc.)
+   - **Währung** (falls nicht EUR)
+4. Der Beleg wird automatisch dem passenden Reiseeintrag zugeordnet (basierend auf Datum)
+5. Die Datei wird verschlüsselt gespeichert (DSGVO-konform)
+
+**Automatische Prüfung:**
+- Das System prüft automatisch auf **Logik-Probleme**:
+  - Überlappende Hotelrechnungen (mehrere Rechnungen für denselben Zeitraum)
+  - Datum-Abgleich mit Arbeitsstunden (fehlende Arbeitsstunden im Stundenzettel)
+  - Zeitliche Konsistenz (z.B. Übernachtung ohne Anreise)
+  - Orts-Konsistenz (Hotel-Ort passt zu Reiseort)
+  - Betrags-Plausibilität
+- Bei Problemen wird automatisch der **Chat-Agent** aktiviert und informiert Sie
+
+**Anzeige extrahierter Daten:**
+- Nach dem Upload sehen Sie direkt:
+  - Extrahierter **Betrag** und **Währung**
+  - Extrahierter **Datum**
+  - Erkannte **Kategorie** (Hotel, Restaurant, etc.)
+  - **Hinweise** bei Problemen (rot markiert)
 
 **Wichtig:**
 - Nur **PDF-Dateien** sind erlaubt
 - Maximale Dateigröße: **10 MB**
 - Belege werden **verschlüsselt** gespeichert
 - Belege werden in strukturierten Ordnern gespeichert: `User_Monat_ReportID/`
+- **Keine manuellen Eingaben nötig** - alles wird automatisch extrahiert!
 
 ### Abrechnung abschließen
 

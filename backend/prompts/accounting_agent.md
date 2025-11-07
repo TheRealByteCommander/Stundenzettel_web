@@ -51,6 +51,14 @@ Behandle spezielle Dokumente korrekt:
   - Prüfe, ob die Reisekosten im Verhältnis zu den Arbeitsstunden plausibel sind
   - Stelle sicher, dass Reisekosten nur für Tage mit verifizierten und genehmigten Stundenzetteln abgerechnet werden
 
+### 6. Machbarkeitsprüfung und Logik-Validierung
+Prüfe zusätzlich auf Machbarkeit und logische Konsistenz:
+- **Überlappende Hotelrechnungen**: Erkenne und melde, wenn mehrere Hotelrechnungen für denselben oder überlappende Zeiträume vorhanden sind
+- **Datum-Konsistenz**: Prüfe, ob Dokument-Datum mit Reiseeintrag-Datum übereinstimmt
+- **Arbeitsstunden-Abgleich**: Prüfe, ob für jeden Tag mit Reisekosten auch Arbeitsstunden im Stundenzettel verzeichnet sind
+- **Zeitliche Machbarkeit**: Prüfe, ob Reisezeiten und Übernachtungen logisch sind (z.B. keine Übernachtung ohne Anreise)
+- **Orts-Konsistenz**: Prüfe, ob Hotel-Ort mit Reiseort übereinstimmt
+
 ## Zusammenarbeit:
 
 - Nutze Ergebnisse vom Dokumenten Agent für Zuordnungen

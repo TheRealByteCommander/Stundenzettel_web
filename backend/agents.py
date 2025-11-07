@@ -1630,6 +1630,46 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
             report.get("receipts", [])
         )
         
+        # Machbarkeitsprüfung: Überlappende Hotelrechnungen, Datum-Abgleich
+        feasibility_issues = []
+        
+        # Prüfe auf überlappende Hotelrechnungen
+        hotel_assignments = [a for a in assignments if a.category == "hotel"]
+        hotel_dates = {}
+        for assignment in hotel_assignments:
+            entry_date = assignment.entry_date
+            if entry_date in hotel_dates:
+                hotel_dates[entry_date].append(assignment)
+            else:
+                hotel_dates[entry_date] = [assignment]
+        
+        for date, date_assignments in hotel_dates.items():
+            if len(date_assignments) > 1:
+                feasibility_issues.append(f"Mehrere Hotelrechnungen für {date} gefunden - mögliche Überlappung")
+        
+        # Prüfe Datum-Abgleich mit Arbeitsstunden
+        for assignment in assignments:
+            entry_date = assignment.entry_date
+            matching_entry = next((e for e in report_entries if e.get("date") == entry_date), None)
+            if matching_entry:
+                working_hours = matching_entry.get("working_hours", 0.0)
+                if working_hours == 0.0:
+                    feasibility_issues.append(f"Für {entry_date} sind keine Arbeitsstunden im Stundenzettel verzeichnet, aber Reisekosten vorhanden")
+        
+        # Prüfe zeitliche Machbarkeit (Übernachtung ohne Anreise)
+        entries_by_date = {e.get("date"): e for e in report_entries}
+        for assignment in hotel_assignments:
+            entry_date = assignment.entry_date
+            from datetime import datetime, timedelta
+            try:
+                entry_date_obj = datetime.strptime(entry_date, "%Y-%m-%d")
+                prev_date = (entry_date_obj - timedelta(days=1)).strftime("%Y-%m-%d")
+                # Prüfe, ob es einen Reiseeintrag am Tag davor gibt
+                if prev_date not in entries_by_date:
+                    feasibility_issues.append(f"Hotelrechnung für {entry_date}, aber kein Reiseeintrag am Tag davor - mögliche fehlende Anreise")
+            except:
+                pass
+        
         # Calculate totals
         total_expenses = sum(a.amount for a in assignments)
         total_meal_allowance = sum(a.meal_allowance_added or 0.0 for a in assignments)
@@ -1649,12 +1689,16 @@ Antworte mit JSON: {{"entry_date": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason"
             "assignments": [a.model_dump() for a in assignments],
             "total_expenses": round(total_expenses, 2),
             "total_meal_allowance": round(total_meal_allowance, 2),
+            "feasibility_issues": feasibility_issues,
             "summary": f"Zuordnung abgeschlossen: {len(assignments)} Dokumente zugeordnet, Gesamtausgaben: {total_expenses:.2f} EUR, Verpflegungsmehraufwand: {total_meal_allowance:.2f} EUR"
         }
         
+        if feasibility_issues:
+            result["summary"] += f"\n⚠️ {len(feasibility_issues)} Machbarkeitsprobleme gefunden - bitte prüfen!"
+        
         # Speichere Zusammenfassung im Memory
         await self.memory.add_insight(
-            f"Buchhaltungszuordnung abgeschlossen: {len(assignments)} Dokumente, Gesamtausgaben: {total_expenses:.2f} EUR, Verpflegungsmehraufwand: {total_meal_allowance:.2f} EUR",
+            f"Buchhaltungszuordnung abgeschlossen: {len(assignments)} Dokumente, Gesamtausgaben: {total_expenses:.2f} EUR, Verpflegungsmehraufwand: {total_meal_allowance:.2f} EUR, Probleme: {len(feasibility_issues)}",
             source="process_completion"
         )
         

@@ -109,9 +109,13 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
   - Ort, Tage, Fahrzeit, Kunde/Projekt
   - **Arbeitsstunden** werden automatisch übernommen (`working_hours`)
 
-- [x] **PDF-Beleg-Upload**
-  - `POST /travel-expense-reports/{report_id}/upload-receipt` - Beleg hochladen
+- [x] **PDF-Beleg-Upload (Vereinfacht)**
+  - `POST /travel-expense-reports/{report_id}/upload-receipt` - Beleg hochladen (mit automatischer Analyse)
   - `DELETE /travel-expense-reports/{report_id}/receipts/{receipt_id}` - Beleg löschen
+  - **Automatische Datenextraktion**: Betrag, Datum, Typ, Währung werden automatisch extrahiert
+  - **Automatische Zuordnung** zu Reiseeinträgen (basierend auf Datum)
+  - **Logik-Prüfung**: Überlappende Hotelrechnungen, Datum-Abgleich mit Arbeitsstunden
+  - **Chat-Agent-Benachrichtigung** bei Problemen
   - Lokale Speicherung (DSGVO-konform)
   - Verschlüsselung
 
@@ -217,6 +221,8 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
   - Automatische Verifikation unterschriebener Stundenzettel
   - Dokumenttyp-Erkennung
   - Vollständigkeitsprüfung
+  - **Logik- und Machbarkeitsprüfung** (überlappende Hotelrechnungen, Datum-Abgleich mit Arbeitsstunden, zeitliche/örtliche Konsistenz)
+  - **Automatische Zuordnung** zu Reiseeinträgen (basierend auf Datum)
   - Memory-System (bis zu 10.000 Einträge)
 
 - [x] **Buchhaltung-Agent**
@@ -224,6 +230,7 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
   - Verpflegungsmehraufwand berechnen
   - Kategorisierung (Hotel, Verpflegung, Transport)
   - Arbeitsstunden-Abgleich
+  - **Machbarkeitsprüfung** (überlappende Hotelrechnungen, Datum-Konsistenz, zeitliche Machbarkeit)
   - Web-Tools (Geocoding, Spesensätze, Währungsumrechnung)
   - Memory-System
 

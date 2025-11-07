@@ -35,6 +35,13 @@ Dieses Modul implementiert ein Netzwerk von spezialisierten AI-Agenten zur autom
     - Betrag klar erkennbar?
     - Datum vorhanden?
   - **Validierung**: Identifiziert Probleme und Unstimmigkeiten
+  - **Logik- und Machbarkeitsprüfung**:
+    - **Überlappende Hotelrechnungen**: Erkennt, wenn mehrere Hotelrechnungen für denselben oder überlappende Zeiträume vorhanden sind
+    - **Datum-Abgleich mit Arbeitsstunden**: Prüft, ob für das Dokument-Datum Arbeitsstunden im Stundenzettel verzeichnet sind
+    - **Zeitliche Konsistenz**: Prüft, ob Rechnungsdatum und Leistungsdatum logisch sind
+    - **Orts-Konsistenz**: Prüft, ob Dokument-Ort mit Reiseort übereinstimmt
+    - **Betrags-Plausibilität**: Prüft, ob Beträge für den Dokumenttyp plausibel sind
+  - **Automatische Zuordnung**: Ordnet Dokumente automatisch Reiseeinträgen zu (basierend auf Datum)
   - **Memory-System**: 
     - Speichert Analyseergebnisse und erkennt Muster
     - Lernt aus erfolgreichen Analysen für bessere Genauigkeit
@@ -54,6 +61,12 @@ Dieses Modul implementiert ein Netzwerk von spezialisierten AI-Agenten zur autom
     - Jeder Reiseeintrag enthält `working_hours` (gutgeschriebene Arbeitsstunden aus Stundenzettel)
     - Prüft Reisekosten im Verhältnis zu den Arbeitsstunden auf Plausibilität
     - Stellt sicher, dass Reisekosten nur für Tage mit verifizierten und genehmigten Stundenzetteln abgerechnet werden
+  - **Machbarkeitsprüfung und Logik-Validierung**:
+    - **Überlappende Hotelrechnungen**: Erkennt und meldet, wenn mehrere Hotelrechnungen für denselben oder überlappende Zeiträume vorhanden sind
+    - **Datum-Konsistenz**: Prüft, ob Dokument-Datum mit Reiseeintrag-Datum übereinstimmt
+    - **Arbeitsstunden-Abgleich**: Prüft, ob für jeden Tag mit Reisekosten auch Arbeitsstunden im Stundenzettel verzeichnet sind
+    - **Zeitliche Machbarkeit**: Prüft, ob Reisezeiten und Übernachtungen logisch sind (z.B. keine Übernachtung ohne Anreise)
+    - **Orts-Konsistenz**: Prüft, ob Hotel-Ort mit Reiseort übereinstimmt
   - **Web-Tools Integration**:
     - **Geocoding-Tool**: Bestimmt Ländercode aus Ortsangabe (OpenStreetMap)
     - **Meal Allowance Lookup**: Sucht aktuelle Spesensätze im Internet
