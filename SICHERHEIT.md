@@ -396,6 +396,6 @@ audit_logger.log_access(
 
 ---
 
-**Letzte Aktualisierung:** 2024
+**Letzte Aktualisierung:** 2025
 **Verantwortlich:** Entwicklungsteam
 

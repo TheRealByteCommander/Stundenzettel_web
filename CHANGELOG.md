@@ -4,6 +4,15 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 
 ## [Unreleased]
 
+### Geändert
+- **Daten aktualisiert**: Alle Dokumente auf Stand 2025 aktualisiert (BENUTZERANLEITUNG.md, SICHERHEIT.md, CYBER_SECURITY.md, README.md)
+- **Fahrzeit-Regelung präzisiert**:
+  - Nur die **Anreise zum Arbeitsort** wird als Arbeitszeit gewertet
+  - Die **tägliche Fahrt Hotel-Kunde** ist **KEINE Arbeitszeit** und sollte nicht als Fahrzeit erfasst werden
+  - Frontend: Hinweis bei Fahrzeit-Eingabe hinzugefügt
+  - Backend: Kommentare und PDF-Beschriftung aktualisiert ("Fahrzeit Anreise")
+  - Dokumentation: Regelung in BENUTZERANLEITUNG.md und README.md klarstellt
+
 ### Hinzugefügt
 - **Fremdwährungs-Nachweis für Reisekosten-Belege**:
   - Automatische Erkennung von Fremdwährungen (nicht EUR)

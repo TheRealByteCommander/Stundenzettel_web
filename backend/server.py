@@ -689,7 +689,12 @@ async def check_vacation_requirements(year: int, user_id: str, db) -> Dict[str, 
     }
 
 def _entry_hours(entry: TimeEntry) -> float:
-    """Calculate working hours including travel time if include_travel_time is True"""
+    """
+    Calculate working hours including travel time if include_travel_time is True
+    
+    WICHTIG: Nur die Anreise zum Arbeitsort wird als Arbeitszeit gewertet.
+    Die tägliche Fahrt Hotel-Kunde ist KEINE Arbeitszeit und sollte nicht als Fahrzeit erfasst werden.
+    """
     hours = 0.0
     
     # Calculate regular working hours from start/end time
@@ -704,8 +709,9 @@ def _entry_hours(entry: TimeEntry) -> float:
         except Exception:
             pass
     
-    # Add travel time if checkbox is checked (always add to DB working hours)
+    # Add travel time if checkbox is checked (only for travel to work location, not daily hotel-customer trips)
     # Note: This is always counted in DB for statistics, but only shown on PDF if include_travel_time is True
+    # WICHTIG: Nur Anreise zum Arbeitsort zählt, nicht tägliche Fahrten Hotel-Kunde
     if entry.travel_time_minutes and entry.travel_time_minutes > 0:
         hours += entry.travel_time_minutes / 60.0
     
@@ -912,19 +918,21 @@ def generate_timesheet_pdf(timesheet: WeeklyTimesheet) -> bytes:
                 daily_hours = worked_minutes / 60
                 
                 # Add travel time to displayed hours only if include_travel_time is True
+                # WICHTIG: Nur Anreise zum Arbeitsort zählt, nicht tägliche Fahrten Hotel-Kunde
                 if entry.include_travel_time and entry.travel_time_minutes and entry.travel_time_minutes > 0:
                     daily_hours += entry.travel_time_minutes / 60.0
                     # Add travel time info to description
                     travel_hours = entry.travel_time_minutes / 60.0
                     if entry.tasks:
-                        row[4] = f"{entry.tasks} (Fahrzeit: {travel_hours:.1f}h)"
+                        row[4] = f"{entry.tasks} (Fahrzeit Anreise: {travel_hours:.1f}h)"
                     else:
-                        row[4] = f"Fahrzeit: {travel_hours:.1f}h"
+                        row[4] = f"Fahrzeit Anreise: {travel_hours:.1f}h"
                 else:
                     # Regular description without travel time
                     row[4] = entry.tasks if entry.tasks else ""
                 
                 # Note: Travel time is ALWAYS counted in DB (_entry_hours), but only shown on PDF if include_travel_time=True
+                # WICHTIG: Nur Anreise zum Arbeitsort zählt als Arbeitszeit, nicht tägliche Fahrten Hotel-Kunde
                 total_hours += daily_hours
                 row[5] = f"{daily_hours:.1f}h"  # Arbeitszeit
             else:
@@ -3174,7 +3182,7 @@ async def upload_receipt(
     # Erstelle eindeutigen Ordner pro Reisekosten-Abrechnung: User_Monat_ReportID
     user_name_safe = re.sub(r'[^\w\-_]', '_', report.get("user_name", "Unknown"))
     month = report.get("month", "unknown")
-    # Ordner-Name: User_Monat_ReportID (z.B. Max_Mustermann_2024-01_abc123)
+    # Ordner-Name: User_Monat_ReportID (z.B. Max_Mustermann_2025-01_abc123)
     report_folder = f"{user_name_safe}_{month}_{report_id}"
     report_folder_path = Path(LOCAL_RECEIPTS_PATH) / "reisekosten" / report_folder
     

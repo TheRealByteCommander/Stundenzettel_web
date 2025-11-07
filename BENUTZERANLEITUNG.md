@@ -1,7 +1,7 @@
 # 📘 Tick Guard - Benutzeranleitung
 
 **Version:** 1.0  
-**Stand:** 2024  
+**Stand:** 2025  
 **Herausgeber:** Byte Commander
 
 ---
@@ -78,18 +78,20 @@ Für jeden Arbeitstag können Sie mehrere Einträge erfassen:
 
 **Optionale Felder:**
 - **Fahrzeit**: Fahrzeit in Minuten (z.B. "30" für 30 Minuten)
-- **Weiterberechnen**: Checkbox, um Fahrzeit zur Arbeitszeit hinzuzufügen
+  - **Wichtig**: Nur die **Anreise zum Arbeitsort** wird als Arbeitszeit gewertet
+  - Die **tägliche Fahrt Hotel-Kunde** ist **KEINE Arbeitszeit** und sollte nicht als Fahrzeit erfasst werden
+- **Weiterberechnen**: Checkbox, um Fahrzeit zur Arbeitszeit hinzuzufügen (nur für Anreise zum Arbeitsort)
 
 **Beispiel:**
 ```
-Datum: 2024-01-15
+Datum: 2025-01-15
 Startzeit: 08:00
 Endzeit: 17:00
 Pause: 60
 Aufgaben: Software-Entwicklung, Code-Review
 Kunde/Projekt: Projekt Alpha
 Ort: Büro
-Fahrzeit: 0
+Fahrzeit: 0 (nur Anreise zum Arbeitsort, nicht tägliche Fahrten Hotel-Kunde)
 ```
 
 ### Abwesenheitstage eintragen
@@ -311,8 +313,8 @@ Der Urlaubsplaner ermöglicht es Ihnen, Urlaub zu beantragen und Ihren Urlaubsst
 
 **Beispiel:**
 ```
-Startdatum: 2024-07-01 (Montag)
-Enddatum: 2024-07-14 (Sonntag)
+Startdatum: 2025-07-01 (Montag)
+Enddatum: 2025-07-14 (Sonntag)
 → 10 Werktage (ohne Feiertage)
 ```
 
@@ -621,6 +623,11 @@ A: Der Dokumenten-Agent konnte die Unterschrift nicht automatisch verifizieren. 
 **F: Wie zähle ich Fahrzeit?**
 A: Geben Sie die Fahrzeit in Minuten ein (z.B. "30" für 30 Minuten). Aktivieren Sie **"Weiterberechnen"**, um die Fahrzeit zur Arbeitszeit hinzuzufügen.
 
+**Wichtig:** 
+- Nur die **Anreise zum Arbeitsort** wird als Arbeitszeit gewertet
+- Die **tägliche Fahrt Hotel-Kunde** ist **KEINE Arbeitszeit** und sollte nicht als Fahrzeit erfasst werden
+- Beispiel: Wenn Sie von zu Hause zum Kunden fahren (Anreise), zählt diese Fahrzeit. Die tägliche Fahrt vom Hotel zum Kunden zählt nicht.
+
 **F: Werden Feiertage automatisch erkannt?**
 A: Ja, deutsche Feiertage (bundesweit) und sächsische Feiertage werden automatisch erkannt und als "Feiertag" eingetragen. Feiertage werden **nicht als Urlaub** gezählt.
 
@@ -706,7 +713,7 @@ A: Nein, genehmigter Urlaub kann **nicht mehr geändert** werden. Kontaktieren S
 
 ---
 
-**Letzte Aktualisierung:** 2024  
+**Letzte Aktualisierung:** 2025  
 **Version:** 1.0  
 **Herausgeber:** Byte Commander
 
@@ -724,5 +731,5 @@ Diese Software wird von Byte Commander bereitgestellt. Die Nutzung erfolgt auf e
 
 ---
 
-**© 2024 Byte Commander - Tick Guard**
+**© 2025 Byte Commander - Tick Guard**
 

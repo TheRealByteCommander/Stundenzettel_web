@@ -2088,6 +2088,9 @@ function App() {
                                     min="0"
                                     placeholder="0"
                                   />
+                                  <p className="text-xs text-gray-500">
+                                    ⚠️ Nur Anreise zum Arbeitsort zählt. Tägliche Fahrt Hotel-Kunde ist keine Arbeitszeit.
+                                  </p>
                                 </div>
                                 
                                 <div className="space-y-2 flex items-end">
@@ -2098,7 +2101,7 @@ function App() {
                                       onCheckedChange={(checked) => updateEntry(index, 'include_travel_time', checked)}
                                     />
                                     <Label htmlFor={`include_travel_${index}`} className="cursor-pointer">
-                                      Weiterberechnen
+                                      Weiterberechnen (nur für Anreise)
                                     </Label>
                                   </div>
                                 </div>

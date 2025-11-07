@@ -13,7 +13,7 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 - ✅ PDF-Generierung für Stundenzettel
 - ✅ E-Mail-Versand mit PDF-Anhang
 - ✅ Urlaub, Krankheit, Feiertag-Tracking
-- ✅ Fahrzeit-Erfassung mit optionaler Weiterberechnung
+- ✅ Fahrzeit-Erfassung mit optionaler Weiterberechnung (nur Anreise zum Arbeitsort, nicht tägliche Fahrt Hotel-Kunde)
 - ✅ Monatsstatistiken und Rang-System
 - ✅ **Automatische Genehmigung durch Agent**: Wenn Dokumenten-Agent die Unterschrift verifiziert, wird automatisch als Arbeitszeit gutgeschrieben
 - ✅ **Buchhaltung genehmigt nur in Ausnahmefällen**: Wenn Agent Unterschrift nicht verifizieren konnte oder nur Abwesenheitstage
@@ -235,7 +235,7 @@ LOCAL_RECEIPTS_PATH/
 ```
 
 **Beispiel:**
-- `Max_Mustermann_2024-01_abc123def456/`
+- `Max_Mustermann_2025-01_abc123def456/`
   - `receipt_1_benzinkosten.pdf`
   - `receipt_2_hotel.pdf`
   - `receipt_3_parkplatz.pdf`
@@ -245,12 +245,12 @@ LOCAL_RECEIPTS_PATH/
 LOCAL_RECEIPTS_PATH/
 └── stundenzettel/
     └── User_Name_Woche_TimesheetID/
-        └── timesheet_id_signed_20240101_120000_unterschrieben.pdf
+        └── timesheet_id_signed_20250101_120000_unterschrieben.pdf
 ```
 
 **Beispiel:**
-- `Max_Mustermann_2024-01-01_xyz789/`
-  - `xyz789_signed_20240115_143000_stundenzettel_kunde.pdf`
+- `Max_Mustermann_2025-01-01_xyz789/`
+  - `xyz789_signed_20250115_143000_stundenzettel_kunde.pdf`
 
 **Vorteile:**
 - ✅ Alle Belege einer Reisekosten-Abrechnung sind in einem Ordner

@@ -270,6 +270,6 @@ WARNING: Blocked PDF download - invalid origin/referer: https://evil.com / https
 
 ---
 
-**Letzte Aktualisierung:** 2024
+**Letzte Aktualisierung:** 2025
 **Verantwortlich:** Entwicklungsteam
 
