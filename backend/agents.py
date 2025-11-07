@@ -417,7 +417,7 @@ class WebSearchTool(AgentTool):
             parameters={
                 "query": {
                     "type": "string",
-                    "description": "Suchanfrage (z.B. 'aktuelle Verpflegungsmehraufwand Sätze 2024 Deutschland')"
+                    "description": "Suchanfrage (z.B. 'aktuelle Verpflegungsmehraufwand Sätze 2025 Deutschland')"
                 },
                 "max_results": {
                     "type": "integer",

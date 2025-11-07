@@ -2403,7 +2403,7 @@ async def upload_signed_timesheet(
     # Erstelle eindeutigen Ordner pro Stundenzettel: User_Woche_TimesheetID
     user_name_safe = re.sub(r'[^\w\-_]', '_', timesheet.get("user_name", "Unknown"))
     week_start = timesheet.get("week_start", "unknown")
-    # Ordner-Name: User_Woche_TimesheetID (z.B. Max_Mustermann_2024-01-01_abc123)
+    # Ordner-Name: User_Woche_TimesheetID (z.B. Max_Mustermann_2025-01-01_abc123)
     timesheet_folder = f"{user_name_safe}_{week_start}_{timesheet_id}"
     timesheet_folder_path = Path(LOCAL_RECEIPTS_PATH) / "stundenzettel" / timesheet_folder
     
