@@ -215,11 +215,11 @@ Für die automatische Prüfung von Reisekostenabrechnungen:
 
 **Architektur:**
 - Agents laufen auf Proxmox-Server
-- LLMs laufen auf GMKTec evo x2 Rechner im lokalen Netzwerk
+- LLMs laufen auf GMKTec evo x2 Rechner im lokalen Netzwerk (Referenz-IP `192.168.178.155`)
 
 **Konfiguration:**
 ```env
-OLLAMA_BASE_URL=http://192.168.1.100:11434  # IP des GMKTec-Servers
+OLLAMA_BASE_URL=http://192.168.178.155:11434  # IP des GMKTec-Servers
 OLLAMA_MODEL=llama3.2
 OLLAMA_MODEL_CHAT=llama3.2
 OLLAMA_MODEL_DOCUMENT=mistral-nemo
@@ -227,6 +227,7 @@ OLLAMA_MODEL_ACCOUNTING=llama3.1
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3
 ```
+> Beispiel-IP-Plan: Frontend-CT `192.168.178.150`, Backend-CT `192.168.178.151`, GMKTec `192.168.178.155`. Passe die Werte bei eigenem Netz an.
 
 Siehe **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** für Details.
 

@@ -3,10 +3,10 @@
 Diese Anleitung beschreibt Schritt für Schritt, wie du das System vollständig lokal in zwei Proxmox-Containern (CT) mit Ubuntu 22.04 (Minimal) installierst und weltweit via DDNS erreichst. Zielbild:
 
 ```
-Internet → DDNS → CT-Frontend (Nginx + React Build + TLS)
+Internet → DDNS → CT-Frontend 192.168.178.150 (Nginx + React Build + TLS)
                          ↘︎ interne Bridge (LAN/VPN)
-                           CT-Backend (FastAPI + MongoDB + Storage)
-                                     ↘︎ GMKTec evo x2 (Ollama, Port 11434)
+                           CT-Backend 192.168.178.151 (FastAPI + MongoDB + Storage)
+                                     ↘︎ GMKTec evo x2 192.168.178.155 (Ollama, Port 11434)
 ```
 
 ---
@@ -19,6 +19,16 @@ Internet → DDNS → CT-Frontend (Nginx + React Build + TLS)
 - Öffentliche IP + Portweiterleitung (443/tcp) oder Reverse Proxy Upstream
 - DynDNS-Account (z. B. `ddns.meinedomain.de`)
 - SSH-Keys für den Zugriff auf die Container
+
+**Referenz-IP-Plan**
+
+| Rolle                | Hostname        | IP-Adresse       |
+|----------------------|-----------------|------------------|
+| Frontend-CT          | `tick-frontend` | `192.168.178.150` |
+| Backend-CT           | `tick-backend`  | `192.168.178.151` |
+| GMKTec evo x2/Ollama | `gmktec`        | `192.168.178.155` |
+
+> Verwende identische IPs oder passe die folgenden Befehle entsprechend an.
 
 ---
 
@@ -33,7 +43,7 @@ Internet → DDNS → CT-Frontend (Nginx + React Build + TLS)
 | CPUs                    | 4 vCPU                            |
 | RAM                     | 6–8 GB                            |
 | Storage                 | 40 GB (SSD), Backup-geeignet      |
-| Netzwerk                | Bridge (z. B. `vmbr0`), statische IP im LAN |
+| Netzwerk                | Bridge (z. B. `vmbr0`), statische IP `192.168.178.151/24` |
 | Nesting                 | aktivieren (für Python venv)      |
 | Unprivileged            | ✅                                |
 
@@ -46,7 +56,7 @@ Internet → DDNS → CT-Frontend (Nginx + React Build + TLS)
 | CPUs                    | 2 vCPU                            |
 | RAM                     | 2 GB                              |
 | Storage                 | 15 GB                             |
-| Netzwerk                | Gleiche Bridge, statische IP      |
+| Netzwerk                | Gleiche Bridge, statische IP `192.168.178.150/24` |
 | Nesting                 | optional                          |
 | Unprivileged            | ✅                                |
 
@@ -72,7 +82,7 @@ ufw allow OpenSSH
 ufw enable
 ```
 
-Frontend-CT: später `ufw allow 443/tcp`. Backend-CT: nur lokale IPs z. B. `ufw allow from 192.168.178.0/24 to any port 8000`.
+Frontend-CT: später `ufw allow 443/tcp`. Backend-CT: nur Frontend-IP zulassen, z. B. `ufw allow from 192.168.178.150 to any port 8000 proto tcp`.
 
 ---
 
@@ -118,7 +128,7 @@ LOCAL_RECEIPTS_PATH=/var/tick-guard/receipts
 SECRET_KEY=$(openssl rand -hex 32)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 
-OLLAMA_BASE_URL=http://192.168.178.50:11434
+OLLAMA_BASE_URL=http://192.168.178.155:11434
 OLLAMA_MODEL=llama3.2
 OLLAMA_MODEL_CHAT=llama3.2
 OLLAMA_MODEL_DOCUMENT=mistral-nemo
@@ -133,7 +143,7 @@ VAPID_CLAIM_EMAIL=admin@meinedomain.de
 EOF
 ```
 
-> IP von GMKTec (`OLLAMA_BASE_URL`) anpassen! VAPID-Keys nach Bedarf generieren.
+> IPs verwenden: Frontend `192.168.178.150`, Backend `192.168.178.151`, GMKTec `192.168.178.155`. VAPID-Keys nach Bedarf generieren.
 
 ### 4.5 Systemuser & Rechte
 
@@ -233,7 +243,7 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://192.168.178.154:8000/api/; # Backend-Container-IP
+        proxy_pass http://192.168.178.151:8000/api/; # Backend-Container-IP
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -264,9 +274,9 @@ systemctl reload nginx
 
 ## 6. Netzwerk & Sicherheit
 
-1. **Router**: Port 443 → Frontend-CT (oder per DMZ/Reverse Proxy).
+1. **Router**: Port 443 → Frontend-CT `192.168.178.150` (oder per vorgelagertem Proxy).
 2. **WireGuard**: Für Admin/SFTP/SSH Zugänge einrichten (optional).
-3. **GMKTec Firewall**: `ufw allow from <Backend-IP> to any port 11434 proto tcp`.
+3. **GMKTec Firewall**: `ufw allow from 192.168.178.151 to any port 11434 proto tcp`.
 4. **Fail2ban/CrowdSec** auf Frontend-CT aktivieren (`jail.local` für Nginx).
 5. **Backups**:
    - `mongodump` per Systemd-Timer oder Cron.
@@ -301,7 +311,7 @@ systemctl reload nginx
 |---------------------------------------|------------------------------------------------------|
 | Frontend 502/504                      | Nginx-Logs (`/var/log/nginx/error.log`), Backend up? |
 | Backend 500                           | `journalctl -u tick-guard-backend`                   |
-| Ollama nicht erreichbar               | `curl http://192.168.178.50:11434/api/tags`          |
+| Ollama nicht erreichbar               | `curl http://192.168.178.155:11434/api/tags`         |
 | Zertifikat schlägt fehl               | Port 80 offen? DNS korrekt? Certbot-Logs prüfen      |
 | Downloads blockiert                   | `CORS_ORIGINS` / Referrer-Checks / JWT-Erneuerung    |
 

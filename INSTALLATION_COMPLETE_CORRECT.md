@@ -107,7 +107,7 @@ DB_NAME=stundenzettel
 LOCAL_RECEIPTS_PATH=/var/tick-guard/receipts
 SECRET_KEY=<openssl rand -hex 32>
 ENCRYPTION_KEY=<openssl rand -hex 32>
-OLLAMA_BASE_URL=http://192.168.100.10:11434
+OLLAMA_BASE_URL=http://192.168.178.155:11434
 OLLAMA_MODEL=llama3.2
 OLLAMA_MODEL_CHAT=llama3.2
 OLLAMA_MODEL_DOCUMENT=mistral-nemo
@@ -117,7 +117,7 @@ OLLAMA_MAX_RETRIES=3
 CORS_ORIGINS=https://ddns-beispiel.meinedomain.de,https://frontend.local
 ```
 
-> Hinweis: `CORS_ORIGINS` sollte die externe DDNS-Adresse und interne Admin-Hosts enthalten (Komma-separiert).
+> Referenz-IP-Plan: Frontend-CT `192.168.178.150`, Backend-CT `192.168.178.151`, GMKTec `192.168.178.155`. `CORS_ORIGINS` auf deine Domains/IPs anpassen.
 
 #### Systemd-Service
 
@@ -205,7 +205,7 @@ server {
 
     # API-Proxy ins interne Backend (Container 2)
     location /api/ {
-        proxy_pass http://backend-container.lan:8000/api/;
+        proxy_pass http://192.168.178.151:8000/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
