@@ -41,6 +41,9 @@ MEMORY_SUMMARY_INTERVAL = int(os.getenv('AGENT_MEMORY_SUMMARY_INTERVAL', '100'))
 # Network: http://GMKTEC_IP:11434 (e.g. http://192.168.1.100:11434)
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
+OLLAMA_MODEL_CHAT = os.getenv('OLLAMA_MODEL_CHAT', OLLAMA_MODEL)
+OLLAMA_MODEL_DOCUMENT = os.getenv('OLLAMA_MODEL_DOCUMENT', OLLAMA_MODEL)
+OLLAMA_MODEL_ACCOUNTING = os.getenv('OLLAMA_MODEL_ACCOUNTING', OLLAMA_MODEL)
 OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '300'))  # 5 minutes default
 OLLAMA_MAX_RETRIES = int(os.getenv('OLLAMA_MAX_RETRIES', '3'))
 OLLAMA_RETRY_DELAY = float(os.getenv('OLLAMA_RETRY_DELAY', '2.0'))  # seconds
@@ -1708,33 +1711,44 @@ class AgentOrchestrator:
     """Orchestrates the agent network for expense report review"""
     
     def __init__(self, llm: Optional[OllamaLLM] = None, db=None):
-        self.llm = llm or OllamaLLM()
+        base_url = (llm.base_url if isinstance(llm, OllamaLLM) else OLLAMA_BASE_URL)
+        self.chat_llm = OllamaLLM(base_url=base_url, model=OLLAMA_MODEL_CHAT)
+        self.document_llm = OllamaLLM(base_url=base_url, model=OLLAMA_MODEL_DOCUMENT)
+        self.accounting_llm = OllamaLLM(base_url=base_url, model=OLLAMA_MODEL_ACCOUNTING)
+        self._llms = {
+            "ChatAgent": self.chat_llm,
+            "DocumentAgent": self.document_llm,
+            "AccountingAgent": self.accounting_llm,
+        }
         self.db = db
         self.message_bus = AgentMessageBus()
         # Initialisiere Tool-Registry
         self.tools = get_tool_registry()
         # Initialisiere Agenten mit Memory und Tools
-        self.chat_agent = ChatAgent(self.llm, db=db)
-        self.document_agent = DocumentAgent(self.llm, self.message_bus, db=db)
-        self.accounting_agent = AccountingAgent(self.llm, self.message_bus, db=db, tools=self.tools)
+        self.chat_agent = ChatAgent(self.chat_llm, db=db)
+        self.document_agent = DocumentAgent(self.document_llm, self.message_bus, db=db)
+        self.accounting_agent = AccountingAgent(self.accounting_llm, self.message_bus, db=db, tools=self.tools)
         self._llm_health_checked = False
         self._memory_initialized = False
     
     async def ensure_llm_available(self):
         """Check LLM availability and warn if not reachable"""
         if not self._llm_health_checked:
-            is_healthy = await self.llm.health_check()
-            if not is_healthy:
-                logger.error(f"⚠️ Ollama LLM nicht erreichbar: {self.llm.base_url}")
-                logger.error("Bitte überprüfen Sie:")
-                logger.error(f"  1. Ollama läuft auf dem GMKTec-Server")
-                logger.error(f"  2. Netzwerk-Verbindung zum GMKTec-Server")
-                logger.error(f"  3. Firewall-Regeln erlauben Zugriff")
-                logger.error(f"  4. OLLAMA_BASE_URL ist korrekt konfiguriert")
-            else:
-                logger.info(f"✅ Ollama LLM erreichbar: {self.llm.base_url}")
+            all_healthy = True
+            for agent_name, agent_llm in self._llms.items():
+                is_healthy = await agent_llm.health_check()
+                if not is_healthy:
+                    all_healthy = False
+                    logger.error(f"⚠️ Ollama LLM für {agent_name} nicht erreichbar: {agent_llm.base_url} (Modell: {agent_llm.model})")
+                    logger.error("Bitte überprüfen Sie:")
+                    logger.error("  1. Ollama läuft auf dem GMKTec-Server")
+                    logger.error("  2. Netzwerk-Verbindung zum GMKTec-Server")
+                    logger.error("  3. Firewall-Regeln erlauben Zugriff")
+                    logger.error("  4. OLLAMA_BASE_URL und agentenspezifische Modelle sind korrekt konfiguriert")
+                else:
+                    logger.info(f"✅ Ollama LLM erreichbar für {agent_name}: {agent_llm.base_url} (Modell: {agent_llm.model})")
             self._llm_health_checked = True
-            return is_healthy
+            return all_healthy
         return True
     
     async def initialize_memory(self):
@@ -1756,7 +1770,8 @@ class AgentOrchestrator:
     
     async def close(self):
         """Clean up resources"""
-        await self.llm.close()
+        for agent_llm in self._llms.values():
+            await agent_llm.close()
         # Schließe alle Tools
         await self.tools.close()
     

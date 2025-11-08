@@ -81,7 +81,7 @@ Frontend-CT: später `ufw allow 443/tcp`. Backend-CT: nur lokale IPs z. B. `uf
 ### 4.1 Pakete & Python
 
 ```bash
-apt install -y python3.11 python3.11-venv python3-pip git build-essential mongodb
+apt install -y python3 python3-venv python3-pip git build-essential mongodb
 systemctl enable --now mongodb
 ```
 
@@ -93,7 +93,7 @@ git clone <REPO_URL> stundenzettel_web
 chown -R $USER:$USER stundenzettel_web
 cd stundenzettel_web/backend
 
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -120,6 +120,9 @@ ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 OLLAMA_BASE_URL=http://192.168.178.50:11434
 OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL_CHAT=llama3.2
+OLLAMA_MODEL_DOCUMENT=mistral-nemo
+OLLAMA_MODEL_ACCOUNTING=llama3.1
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3
 
@@ -164,6 +167,8 @@ WantedBy=multi-user.target
 ```bash
 systemctl daemon-reload
 systemctl enable --now tick-guard-backend
+systemctl status tick-guard-backend --no-pager
+sudo -u tickguard /opt/tick-guard/stundenzettel_web/backend/venv/bin/uvicorn --version
 curl http://localhost:8000/health
 ```
 

@@ -69,7 +69,7 @@ Alle Komponenten bleiben innerhalb des lokalen Netzwerks, lediglich Port `443` d
 ```bash
 # Basis-Pakete
 sudo apt update
-sudo apt install -y python3.11 python3.11-venv python3-pip git build-essential
+sudo apt install -y python3 python3-venv python3-pip git build-essential
 
 # Projekt ablegen
 sudo mkdir -p /opt/tick-guard && sudo chown $USER:$USER /opt/tick-guard
@@ -109,6 +109,9 @@ SECRET_KEY=<openssl rand -hex 32>
 ENCRYPTION_KEY=<openssl rand -hex 32>
 OLLAMA_BASE_URL=http://192.168.100.10:11434
 OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL_CHAT=llama3.2
+OLLAMA_MODEL_DOCUMENT=mistral-nemo
+OLLAMA_MODEL_ACCOUNTING=llama3.1
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3
 CORS_ORIGINS=https://ddns-beispiel.meinedomain.de,https://frontend.local
@@ -142,6 +145,8 @@ sudo useradd --system --home /opt/tick-guard --shell /usr/sbin/nologin tickguard
 sudo chown -R tickguard:tickguard /opt/tick-guard
 sudo systemctl daemon-reload
 sudo systemctl enable --now tick-guard-backend
+sudo systemctl status tick-guard-backend --no-pager
+sudo -u tickguard /opt/tick-guard/stundenzettel_web/backend/venv/bin/uvicorn --version
 curl http://localhost:8000/health   # Funktionstest
 ```
 

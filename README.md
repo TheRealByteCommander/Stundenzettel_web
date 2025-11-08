@@ -221,6 +221,9 @@ Für die automatische Prüfung von Reisekostenabrechnungen:
 ```env
 OLLAMA_BASE_URL=http://192.168.1.100:11434  # IP des GMKTec-Servers
 OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL_CHAT=llama3.2
+OLLAMA_MODEL_DOCUMENT=mistral-nemo
+OLLAMA_MODEL_ACCOUNTING=llama3.1
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3
 ```
