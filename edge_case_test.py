@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta
 
 # Test edge cases for Monday date bug
-base_url = "https://b7cbdad9-3b55-4681-afe7-7771b233d6c0.preview.emergentagent.com"
+base_url = "http://localhost:8000"
 api_url = f"{base_url}/api"
 
 # Login first

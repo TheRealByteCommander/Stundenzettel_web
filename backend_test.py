@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 import json
 
 class SchmitzTimesheetAPITester:
-    def __init__(self, base_url="https://b7cbdad9-3b55-4681-afe7-7771b233d6c0.preview.emergentagent.com"):
-        self.base_url = base_url
+    def __init__(self, base_url="http://localhost:8000"):
+        self.base_url = base_url.rstrip("/")
         self.api_url = f"{base_url}/api"
         self.token = None
         self.user_info = None
