@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-frontend] %s\n' -1 "$*"; }
+warn() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-frontend][WARN] %s\n' -1 "$*" >&2; }
+abort() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-frontend][ERROR] %s\n' -1 "$*" >&2; exit 1; }
+
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  abort "Bitte als root bzw. mit sudo ausführen."
+fi
+
+umask 022
+
+REPO_URL="${REPO_URL:-https://github.com/TheRealByteCommander/Stundenzettel_web.git}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/tick-guard}"
+PROJECT_DIR="${PROJECT_DIR:-$INSTALL_DIR/Stundenzettel_web}"
+FRONTEND_DIR="$PROJECT_DIR/frontend"
+WEB_ROOT="${WEB_ROOT:-/var/www/tick-guard}"
+DDNS_DOMAIN="${DDNS_DOMAIN:-ddns.example.tld}"
+BACKEND_HOST="${BACKEND_HOST:-192.168.178.151}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+RUN_CERTBOT="${RUN_CERTBOT:-false}"
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
+
+log "Installationsparameter:"
+log "  Repository:        $REPO_URL (Branch: $REPO_BRANCH)"
+log "  Installationspfad: $PROJECT_DIR"
+log "  DDNS-Domain:       $DDNS_DOMAIN"
+log "  Backend-Service:   http://$BACKEND_HOST:$BACKEND_PORT"
+
+export DEBIAN_FRONTEND=noninteractive
+log "Pakete aktualisieren…"
+apt-get update -y
+apt-get install -y curl git rsync ufw nginx
+
+install_node() {
+  log "Node.js >= 18 installieren (NodeSource 20.x)…"
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+}
+
+if command -v node >/dev/null 2>&1; then
+  NODE_MAJOR="$(node -v | sed 's/^v//' | cut -d. -f1)"
+  if (( NODE_MAJOR < 18 )); then
+    install_node
+  fi
+else
+  install_node
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  abort "npm konnte nicht gefunden werden. Prüfe bitte die Node.js-Installation."
+fi
+
+log "Repository vorbereiten…"
+mkdir -p "$INSTALL_DIR"
+if [[ -d "$PROJECT_DIR/.git" ]]; then
+  git -C "$PROJECT_DIR" fetch --all --prune
+  git -C "$PROJECT_DIR" reset --hard "origin/$REPO_BRANCH"
+else
+  git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$PROJECT_DIR"
+fi
+
+cd "$FRONTEND_DIR"
+
+log "Frontend-Abhängigkeiten installieren…"
+if [[ -f package-lock.json ]]; then
+  npm ci --legacy-peer-deps
+else
+  npm install --legacy-peer-deps
+fi
+
+ENV_FILE="$FRONTEND_DIR/.env.production"
+log ".env.production schreiben ($ENV_FILE)…"
+cat >"$ENV_FILE" <<EOF
+REACT_APP_BACKEND_URL=https://$DDNS_DOMAIN
+EOF
+
+log "Frontend build ausführen…"
+npm run build
+
+log "Build nach $WEB_ROOT deployen…"
+mkdir -p "$WEB_ROOT"
+rsync -a --delete "$FRONTEND_DIR/build/" "$WEB_ROOT/"
+chown -R www-data:www-data "$WEB_ROOT"
+
+log "Nginx-Konfiguration erstellen…"
+cat >/etc/nginx/conf.d/tick-guard-rate-limit.conf <<'EOF'
+limit_req_zone $binary_remote_addr zone=tick_guard_api:10m rate=10r/s;
+EOF
+
+COMMON_SNIPPET=/etc/nginx/snippets/tick-guard-common.conf
+cat >"$COMMON_SNIPPET" <<EOF
+root $WEB_ROOT;
+index index.html;
+
+location /api/ {
+    proxy_pass http://$BACKEND_HOST:$BACKEND_PORT/api/;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    limit_req zone=tick_guard_api burst=20 nodelay;
+}
+
+location / {
+    try_files \$uri /index.html;
+}
+
+location /.well-known/acme-challenge/ {
+    root /var/www/letsencrypt;
+    default_type "text/plain";
+}
+EOF
+
+mkdir -p /var/www/letsencrypt
+
+NGINX_SITE=/etc/nginx/sites-available/tick-guard
+cat >"$NGINX_SITE" <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DDNS_DOMAIN;
+
+    include snippets/tick-guard-common.conf;
+}
+EOF
+
+CERT_PATH="/etc/letsencrypt/live/$DDNS_DOMAIN/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/$DDNS_DOMAIN/privkey.pem"
+
+if [[ -f "$CERT_PATH" && -f "$KEY_PATH" ]]; then
+  log "Bestehendes TLS-Zertifikat gefunden – HTTPS-Serverblock aktivieren."
+  cat >>"$NGINX_SITE" <<EOF
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $DDNS_DOMAIN;
+
+    ssl_certificate $CERT_PATH;
+    ssl_certificate_key $KEY_PATH;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header Referrer-Policy no-referrer;
+
+    include snippets/tick-guard-common.conf;
+}
+EOF
+fi
+
+ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/tick-guard
+
+log "Nginx Konfiguration testen…"
+nginx -t
+systemctl enable --now nginx
+systemctl reload nginx
+
+if command -v ufw >/dev/null 2>&1; then
+  ufw allow 80/tcp >/dev/null 2>&1 || true
+  ufw allow 443/tcp >/dev/null 2>&1 || true
+  if ufw status | grep -q "inactive"; then
+    ufw --force enable >/dev/null 2>&1 || true
+  fi
+fi
+
+if [[ "${RUN_CERTBOT,,}" == "true" ]]; then
+  if [[ -z "$CERTBOT_EMAIL" ]]; then
+    abort "RUN_CERTBOT=true gesetzt, aber CERTBOT_EMAIL fehlt."
+  fi
+  log "Certbot ausführen…"
+  apt-get install -y certbot python3-certbot-nginx
+  certbot --nginx -d "$DDNS_DOMAIN" -m "$CERTBOT_EMAIL" --agree-tos --non-interactive --redirect || warn "Certbot konnte kein Zertifikat ausstellen."
+  nginx -t && systemctl reload nginx
+fi
+
+log "Installation abgeschlossen. Teste Frontend unter http://$DDNS_DOMAIN/"
+
+cat <<SUMMARY
+
+Automatische Installation abgeschlossen.
+
+Wichtige Pfade:
+  Projektpfad:  $PROJECT_DIR
+  Frontend:     $FRONTEND_DIR
+  Build-Ziel:   $WEB_ROOT
+  Nginx-Site:   $NGINX_SITE
+  Common Rules: $COMMON_SNIPPET
+
+Falls TLS benötigt wird:
+  sudo RUN_CERTBOT=true CERTBOT_EMAIL=admin@$DDNS_DOMAIN DDNS_DOMAIN=$DDNS_DOMAIN bash scripts/install_frontend_ct.sh
+
+SUMMARY
+

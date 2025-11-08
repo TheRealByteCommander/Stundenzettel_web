@@ -57,8 +57,31 @@ Alle Komponenten bleiben innerhalb des lokalen Netzwerks, lediglich Port `443` d
    - Frontend-Container: 1 vCPU, 1–2 GB RAM, 10 GB SSD.
    - Backend-Container: 2–4 vCPU, 4–8 GB RAM, 40 GB SSD (abhängig von Datenvolumen).
 3. **GMKTec vorbereiten**
-   - Statische IP oder DHCP-Reservierung vergeben (z. B. `192.168.100.10`).
+   - Statische IP oder DHCP-Reservierung vergeben (z. B. `192.168.178.155`).
    - WireGuard/VLAN festlegen, falls GMKTec nicht im gleichen Netzsegment steht.
+
+---
+
+## ⚙️ Automatisierte Installation (Empfohlen)
+
+Wer die komplette Einrichtung ohne manuelle Zwischenschritte durchführen möchte, kann die Shell-Skripte aus `scripts/` direkt auf den Containern ausführen. Standardmäßig wird von folgender Topologie ausgegangen: Frontend-CT `192.168.178.150`, Backend-CT `192.168.178.151`, GMKTec/Ollama `192.168.178.155`. Abweichende Werte lassen sich per Umgebungsvariablen setzen.
+
+**Backend-CT**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 \
+   OLLAMA_IP=192.168.178.155 bash
+```
+
+**Frontend-CT**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 bash
+```
+
+Für eine automatische Let’s-Encrypt-Integration `RUN_CERTBOT=true` sowie `CERTBOT_EMAIL=<adresse>` ergänzen. Die nachfolgenden Abschnitte beschreiben weiterhin sämtliche Arbeitsschritte, falls einzelne Komponenten manuell angepasst werden sollen.
 
 ---
 
@@ -241,13 +264,13 @@ ollama pull llama3.2
 Firewall anpassen:
 
 ```bash
-sudo ufw allow from 192.168.100.0/24 to any port 11434 proto tcp
+sudo ufw allow from 192.168.178.151 to any port 11434 proto tcp
 ```
 
 Test vom Backend-Container:
 
 ```bash
-curl http://192.168.100.10:11434/api/tags
+curl http://192.168.178.155:11434/api/tags
 ```
 
 ---

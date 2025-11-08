@@ -114,6 +114,36 @@ Diese Anwendung ist für einen vollständig lokalen Betrieb auf Proxmox ausgeleg
 - **Frontend Dependency-Fixes:** **[frontend/INSTALLATION_FIX.md](frontend/INSTALLATION_FIX.md)**
 - **Netzwerk-Routing/Tunnel:** **[OFFICE_RECHNER_ROUTING.md](OFFICE_RECHNER_ROUTING.md)**
 
+### ⚙️ Vollautomatische Installation auf Proxmox-CTs
+
+Für die Referenz-IPs `192.168.178.150` (Frontend), `192.168.178.151` (Backend) und `192.168.178.155` (GMKTec/Ollama) stehen zwei Skripte zur Verfügung. Die Skripte können direkt aus dem Repository geladen und gestartet werden; erforderliche Parameter werden über Umgebungsvariablen gesetzt.
+
+**Backend-CT (FastAPI + MongoDB)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 bash
+```
+
+Optional lassen sich weitere Variablen wie `CORS_ORIGINS`, `SECRET_KEY`, `LOCAL_RECEIPTS_PATH` oder `REPO_BRANCH` mitgeben.
+
+**Frontend-CT (Nginx + React Build)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 bash
+```
+
+Sobald ein gültiges Zertifikat per Let’s Encrypt ausgestellt werden soll, den Aufruf ergänzen:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 \
+   RUN_CERTBOT=true CERTBOT_EMAIL=admin@my.ddns.example bash
+```
+
+Die Skripte legen alle benötigten Pakete, Konfigurationen und systemd-Dienste automatisch an. Details und manuelle Alternativen sind in `INSTALLATION_PROXMOX_CT.md` beschrieben.
+
 ---
 
 ### ❌ Legacy PHP-Version (nur falls zwingend erforderlich)

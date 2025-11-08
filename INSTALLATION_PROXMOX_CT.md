@@ -32,7 +32,38 @@ Internet → DDNS → CT-Frontend 192.168.178.150 (Nginx + React Build + TLS)
 
 ---
 
-## 2. Container anlegen
+## 2. Automatisierte Installation (Empfohlen)
+
+Die Skripte aus dem Repository automatisieren sämtliche Schritte (Pakete, Konfiguration, Dienste). Sie können direkt auf den jeweiligen Containern ausgeführt werden. Bei Bedarf Variablen wie `DDNS_DOMAIN`, `FRONTEND_IP`, `BACKEND_IP`, `OLLAMA_IP`, `CORS_ORIGINS`, `CERTBOT_EMAIL` anpassen.
+
+**Backend-Container (`192.168.178.151`)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 \
+   OLLAMA_IP=192.168.178.155 LOCAL_RECEIPTS_PATH=/var/tick-guard/receipts bash
+```
+
+**Frontend-Container (`192.168.178.150`)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 bash
+```
+
+Für die automatische Ausstellung eines TLS-Zertifikats via Let’s Encrypt:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
+ | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 \
+   RUN_CERTBOT=true CERTBOT_EMAIL=admin@my.ddns.example bash
+```
+
+Die folgenden Abschnitte beschreiben die manuellen Schritte im Detail und dienen als Referenz, falls einzelne Komponenten individuell angepasst werden sollen.
+
+---
+
+## 3. Container anlegen
 
 ### 2.1 Backend-Container (`ct-backend`)
 
@@ -64,7 +95,7 @@ Internet → DDNS → CT-Frontend 192.168.178.150 (Nginx + React Build + TLS)
 
 ---
 
-## 3. Basis-Konfiguration (beide CTs)
+## 4. Basis-Konfiguration (beide CTs)
 
 ```bash
 apt update
@@ -86,7 +117,7 @@ Frontend-CT: später `ufw allow 443/tcp`. Backend-CT: nur Frontend-IP zulassen, 
 
 ---
 
-## 4. Backend-Container installieren
+## 5. Backend-Container installieren
 
 ### 4.1 Pakete & Python
 
@@ -184,7 +215,7 @@ curl http://localhost:8000/health
 
 ---
 
-## 5. Frontend-Container installieren
+## 6. Frontend-Container installieren
 
 ### 5.1 Pakete
 
@@ -272,7 +303,7 @@ systemctl reload nginx
 
 ---
 
-## 6. Netzwerk & Sicherheit
+## 7. Netzwerk & Sicherheit
 
 1. **Router**: Port 443 → Frontend-CT `192.168.178.150` (oder per vorgelagertem Proxy).
 2. **WireGuard**: Für Admin/SFTP/SSH Zugänge einrichten (optional).
@@ -285,7 +316,7 @@ systemctl reload nginx
 
 ---
 
-## 7. Tests
+## 8. Tests
 
 - `curl -k https://ddns.meinedomain.de/api/health`
 - Login als Admin (`admin@schmitz-intralogistik.de` / `admin123`, Passwort direkt ändern).
@@ -295,7 +326,7 @@ systemctl reload nginx
 
 ---
 
-## 8. Betrieb & Wartung
+## 9. Betrieb & Wartung
 
 - `systemctl status tick-guard-backend` und `journalctl -u tick-guard-backend`.
 - `journalctl -u nginx` / `journalctl -u fail2ban`.
@@ -305,7 +336,7 @@ systemctl reload nginx
 
 ---
 
-## 9. Fehlerbehebung (Kurz)
+## 10. Fehlerbehebung (Kurz)
 
 | Problem                               | Prüfen                                               |
 |---------------------------------------|------------------------------------------------------|
