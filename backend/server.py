@@ -9,6 +9,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+os.environ.setdefault("PASSLIB_DISABLED_HASHES", "bcrypt")
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
