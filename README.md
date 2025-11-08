@@ -144,6 +144,8 @@ curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_
    BACKEND_SCHEME=http RUN_CERTBOT=true CERTBOT_EMAIL=admin@mein.host.tld bash
 ```
 
+> Hinweis: Standardmäßig nutzt das Frontend die relative `/api`-Route über Nginx. Nur wenn du den Backend-Port direkt exponieren willst, übergib zusätzlich `PUBLIC_BACKEND_URL=http://192.168.178.151:8000`.
+
 Die Skripte legen alle benötigten Pakete, Konfigurationen und systemd-Dienste automatisch an. Details und manuelle Alternativen sind in `INSTALLATION_PROXMOX_CT.md` beschrieben.
 
 ---

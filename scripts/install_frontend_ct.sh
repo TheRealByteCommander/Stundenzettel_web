@@ -85,10 +85,19 @@ log "Frontend-Abhängigkeiten installieren…"
 npm install --legacy-peer-deps
 
 ENV_FILE="$FRONTEND_DIR/.env.production"
-log ".env.production schreiben ($ENV_FILE)…"
-cat >"$ENV_FILE" <<EOF
-REACT_APP_BACKEND_URL=$BACKEND_SCHEME://$BACKEND_HOST:$BACKEND_PORT
+if [[ -n "${PUBLIC_BACKEND_URL:-}" ]]; then
+  log ".env.production schreiben ($ENV_FILE)…"
+  cat >"$ENV_FILE" <<EOF
+REACT_APP_BACKEND_URL=$PUBLIC_BACKEND_URL
 EOF
+else
+  if [[ -f "$ENV_FILE" ]]; then
+    log ".env.production entfernen – verwende relative /api-Routen."
+    rm -f "$ENV_FILE"
+  else
+    log "Keine REACT_APP_BACKEND_URL gesetzt – verwende relative /api-Routen."
+  fi
+fi
 
 log "Frontend build ausführen…"
 if ! npm run build; then

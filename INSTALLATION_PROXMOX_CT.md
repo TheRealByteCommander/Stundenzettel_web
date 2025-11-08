@@ -62,6 +62,8 @@ curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_
    RUN_CERTBOT=true CERTBOT_EMAIL=admin@mein.host.tld bash
 ```
 
+> Standardmäßig nutzt das Frontend relative `/api`-Routen über den Nginx-Proxy. Falls der Backend-Port direkt erreichbar sein soll, optional `PUBLIC_BACKEND_URL=http://192.168.178.151:8000` mitgeben.
+
 Die folgenden Abschnitte beschreiben die manuellen Schritte im Detail und dienen als Referenz, falls einzelne Komponenten individuell angepasst werden sollen.
 
 ---
