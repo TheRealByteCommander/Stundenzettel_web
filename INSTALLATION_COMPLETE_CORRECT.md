@@ -84,7 +84,6 @@ curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_
 
 Für eine automatische Let’s-Encrypt-Integration `RUN_CERTBOT=true` sowie `CERTBOT_EMAIL=<adresse>` ergänzen (nur sinnvoll, wenn später ein Domainname hinterlegt ist). Die nachfolgenden Abschnitte beschreiben weiterhin sämtliche Arbeitsschritte, falls einzelne Komponenten manuell angepasst werden sollen.
 
-> Standardmäßig ruft das Frontend die API relativ über `/api` auf (geht über Nginx). Wenn du den Backend-Port direkt exponieren möchtest, kannst du optional `PUBLIC_BACKEND_URL=http://192.168.178.151:8000` mitgeben.
 
 ---
 

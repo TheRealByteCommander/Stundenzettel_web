@@ -87,9 +87,7 @@ npm install --legacy-peer-deps
 ENV_FILE="$FRONTEND_DIR/.env.production"
 if [[ -n "${PUBLIC_BACKEND_URL:-}" ]]; then
   log ".env.production schreiben ($ENV_FILE)…"
-  cat >"$ENV_FILE" <<EOF
-REACT_APP_BACKEND_URL=$PUBLIC_BACKEND_URL
-EOF
+  printf 'REACT_APP_BACKEND_URL=%s\n' "$PUBLIC_BACKEND_URL" > "$ENV_FILE"
 else
   if [[ -f "$ENV_FILE" ]]; then
     log ".env.production entfernen – verwende relative /api-Routen."
