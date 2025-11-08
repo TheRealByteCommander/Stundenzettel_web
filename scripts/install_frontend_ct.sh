@@ -82,7 +82,10 @@ fi
 
 log "Frontend-Abhängigkeiten installieren…"
 if [[ -f package-lock.json ]]; then
-  npm ci --legacy-peer-deps
+  if ! npm ci --legacy-peer-deps; then
+    warn "npm ci fehlgeschlagen – versuche npm install."
+    npm install --legacy-peer-deps
+  fi
 else
   npm install --legacy-peer-deps
 fi
