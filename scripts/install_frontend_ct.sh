@@ -11,6 +11,7 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   abort "Bitte als root bzw. mit sudo ausführen."
 fi
 
+export LC_ALL=C.UTF-8 LANG=C.UTF-8
 umask 022
 
 REPO_URL="${REPO_URL:-https://github.com/TheRealByteCommander/Stundenzettel_web.git}"
@@ -81,14 +82,7 @@ if [[ ! -f package.json ]]; then
 fi
 
 log "Frontend-Abhängigkeiten installieren…"
-if [[ -f package-lock.json ]]; then
-  if ! npm ci --legacy-peer-deps; then
-    warn "npm ci fehlgeschlagen – versuche npm install."
-    npm install --legacy-peer-deps
-  fi
-else
-  npm install --legacy-peer-deps
-fi
+npm install --legacy-peer-deps
 
 ENV_FILE="$FRONTEND_DIR/.env.production"
 log ".env.production schreiben ($ENV_FILE)…"
