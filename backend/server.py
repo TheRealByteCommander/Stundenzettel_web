@@ -1208,7 +1208,9 @@ async def login(request: Request, user_login: UserLogin):
     if not user:
         # ensure admin exists
         if user_login.email.lower() == "admin@app.byte-commander.de":
-            await create_admin_user()
+            created = await create_admin_user()
+            if created:
+                logger.info("Admin user auto-created during login attempt.")
             user = await db.users.find_one({"email": user_login.email})
     if not user or not verify_password(user_login.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -2610,22 +2612,22 @@ async def startup_tasks():
 
 async def create_admin_user():
     admin = await db.users.find_one({"email": "admin@app.byte-commander.de"})
-    if not admin:
-        # Generate 2FA secret for admin (2FA is mandatory)
-        two_fa_secret = pyotp.random_base32()
-        admin_user = User(
-            email="admin@app.byte-commander.de",
-            name="Administrator",
-            role="admin",
-            hashed_password=get_password_hash("admin123"),
-            two_fa_secret=two_fa_secret,
-            two_fa_enabled=False  # Will be enabled after first login with 2FA setup
-        )
-        admin_dict = admin_user.model_dump()
-        admin_dict["is_admin"] = True  # Backward compatibility
-        await db.users.insert_one(admin_dict)
-        print("Admin user created: admin@app.byte-commander.de / admin123")
-        print("NOTE: Admin must setup 2FA on first login (2FA is mandatory)")
+    if admin:
+        return False
+    two_fa_secret = pyotp.random_base32()
+    admin_user = User(
+        email="admin@app.byte-commander.de",
+        name="Administrator",
+        role="admin",
+        hashed_password=get_password_hash("admin123"),
+        two_fa_secret=two_fa_secret,
+        two_fa_enabled=False
+    )
+    admin_dict = admin_user.model_dump()
+    admin_dict["is_admin"] = True
+    await db.users.insert_one(admin_dict)
+    logger.info("Admin user created: admin@app.byte-commander.de / admin123 (2FA pending)")
+    return True
 
 # Security Headers Middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
