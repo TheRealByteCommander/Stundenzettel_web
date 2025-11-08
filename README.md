@@ -122,24 +122,26 @@ Für die Referenz-IPs `192.168.178.150` (Frontend), `192.168.178.151` (Backend) 
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
- | sudo DDNS_DOMAIN=my.ddns.example FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 bash
+ | sudo FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 \
+   DDNS_DOMAIN=192.168.178.150 CORS_ORIGINS=http://192.168.178.150 bash
 ```
 
-Optional lassen sich weitere Variablen wie `CORS_ORIGINS`, `SECRET_KEY`, `LOCAL_RECEIPTS_PATH` oder `REPO_BRANCH` mitgeben.
+Optional lassen sich weitere Variablen wie `SECRET_KEY`, `LOCAL_RECEIPTS_PATH` oder `REPO_BRANCH` mitgeben. `DDNS_DOMAIN` kann vorerst auf der Frontend-IP bleiben; DNS-basierter Zugriff kann später ergänzt werden.
 
 **Frontend-CT (Nginx + React Build)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 bash
+ | sudo FRONTEND_IP=192.168.178.150 PUBLIC_HOST=192.168.178.150 \
+   BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
 ```
 
-Sobald ein gültiges Zertifikat per Let’s Encrypt ausgestellt werden soll, den Aufruf ergänzen:
+Sobald ein gültiges Zertifikat per Let’s Encrypt ausgestellt werden soll (z. B. nach späterer DNS-Anbindung), den Aufruf ergänzen:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 \
-   RUN_CERTBOT=true CERTBOT_EMAIL=admin@my.ddns.example bash
+ | sudo PUBLIC_HOST=mein.host.tld BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 \
+   BACKEND_SCHEME=http RUN_CERTBOT=true CERTBOT_EMAIL=admin@mein.host.tld bash
 ```
 
 Die Skripte legen alle benötigten Pakete, Konfigurationen und systemd-Dienste automatisch an. Details und manuelle Alternativen sind in `INSTALLATION_PROXMOX_CT.md` beschrieben.

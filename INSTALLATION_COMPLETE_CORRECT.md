@@ -70,18 +70,19 @@ Wer die komplette Einrichtung ohne manuelle Zwischenschritte durchführen möcht
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
- | sudo DDNS_DOMAIN=my.ddns.example FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 \
-   OLLAMA_IP=192.168.178.155 bash
+ | sudo FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 \
+   DDNS_DOMAIN=192.168.178.150 CORS_ORIGINS=http://192.168.178.150 bash
 ```
 
 **Frontend-CT**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo DDNS_DOMAIN=my.ddns.example BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 bash
+ | sudo FRONTEND_IP=192.168.178.150 PUBLIC_HOST=192.168.178.150 \
+   BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
 ```
 
-Für eine automatische Let’s-Encrypt-Integration `RUN_CERTBOT=true` sowie `CERTBOT_EMAIL=<adresse>` ergänzen. Die nachfolgenden Abschnitte beschreiben weiterhin sämtliche Arbeitsschritte, falls einzelne Komponenten manuell angepasst werden sollen.
+Für eine automatische Let’s-Encrypt-Integration `RUN_CERTBOT=true` sowie `CERTBOT_EMAIL=<adresse>` ergänzen (nur sinnvoll, wenn später ein Domainname hinterlegt ist). Die nachfolgenden Abschnitte beschreiben weiterhin sämtliche Arbeitsschritte, falls einzelne Komponenten manuell angepasst werden sollen.
 
 ---
 
