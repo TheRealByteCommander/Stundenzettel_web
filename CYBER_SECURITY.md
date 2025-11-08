@@ -1,275 +1,150 @@
-# 🔐 Cyber-Security: URL-Verschleierung und Download-Schutz
+# 🔐 Cyber-Security: Reverse Proxy & Download-Schutz
 
-## Übersicht
+## Überblick
 
-Diese Implementierung verschleiert die echte Proxmox-URL und verhindert, dass Dokumente von externen Quellen heruntergeladen werden können.
-
----
-
-## 1. URL-Verschleierung (Proxmox-URL verstecken)
-
-### Problem
-- Frontend kennt die echte Proxmox-URL (z.B. `https://192.168.178.154:8000`)
-- Diese URL ist in JavaScript-Code sichtbar
-- Angreifer können die Backend-URL aus dem Frontend-Code extrahieren
-
-### Lösung: API-Proxy auf All-inkl.com
-
-**Architektur:**
-```
-Frontend (All-inkl) → Proxy (All-inkl/api/proxy.php) → Backend (Proxmox)
-```
-
-**Vorteile:**
-- ✅ Frontend kennt nur die Proxy-URL (`/api/proxy.php`)
-- ✅ Echte Proxmox-URL ist nur im Proxy-Script (nicht im Frontend-Code)
-- ✅ Proxy kann zusätzliche Sicherheitschecks durchführen
-
-**Implementierung:**
-- `webapp/api/proxy.php` - PHP-Proxy-Script auf All-inkl.com
-- Konfiguration via `.env` oder direkt im Script
-- Weiterleitung aller API-Requests an Proxmox
-
-**Konfiguration:**
-```php
-// webapp/api/proxy.php
-$BACKEND_URL = getenv('BACKEND_URL') ?: 'https://proxmox-domain.de:8000';
-```
-
-**Frontend-Konfiguration:**
-```javascript
-// Frontend nutzt jetzt Proxy statt direkter Backend-URL
-const API = '/api/proxy.php';  // Statt: https://proxmox-ip:8000/api
-```
+Das System wird weltweit über einen einzigen Host (`https://<dein-ddns>`) bereitgestellt. Das Frontend-Gateway übernimmt TLS, DDNS und URL-Verschleierung, während das Backend nur intern erreichbar bleibt. Dieses Dokument bündelt die wichtigsten Maßnahmen, um die Infrastruktur abzusichern.
 
 ---
 
-## 2. Download-Schutz (Keine externen Downloads)
+## 1. Backend-URL verbergen (Reverse Proxy)
 
-### Problem
-- Direkte Links zu Dokumenten können von externen Quellen aufgerufen werden
-- Angreifer könnten Dokumente herunterladen, wenn sie die URL kennen
+### Architektur
+```
+Internet → DDNS → Frontend-Gateway (Nginx/Caddy) → Backend-Container (http://backend:8000)
+```
 
-### Lösung: Mehrschichtiger Schutz
+- Der Frontend-Container liefert den React-Build **und** fungiert als Reverse Proxy.
+- API-Aufrufe laufen über denselben Origin (`https://<ddns>/api/...`); das Backend bleibt im LAN.
+- Keine internen IP-Adressen oder Ports sind im Frontend-Bundle sichtbar.
 
-#### 2.1 Authentifizierung (Pflicht)
-- ✅ Alle Download-Endpunkte erfordern JWT-Token
-- ✅ `Depends(get_current_user)` - Nur authentifizierte Benutzer
+### Nginx-Beispiel
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name ddns.meinedomain.de;
 
-#### 2.2 Referrer- und Origin-Check
-- ✅ Prüfung des `Referer`-Headers
-- ✅ Prüfung des `Origin`-Headers
-- ✅ Nur erlaubte Origins können Downloads anfordern
+    ssl_certificate     /etc/letsencrypt/live/ddns.meinedomain.de/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ddns.meinedomain.de/privkey.pem;
 
-**Implementierung:**
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header Referrer-Policy no-referrer;
+
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    root /var/www/tick-guard;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://backend-container:8000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        limit_req zone=api burst=20 nodelay;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}
+```
+
+### Vorteile
+- Frontend-Code enthält keine internen Ziele.
+- Sämtliche CORS-Anfragen kommen vom gleichen Origin, Konfiguration bleibt minimal.
+- Rate-Limiting, Logging, Fail2ban/CrowdSec oder WAF-Regeln lassen sich zentral steuern.
+
+---
+
+## 2. Download-Schutz
+
+### Backend-Maßnahmen
+- Jeder Download-Endpunkt verlangt ein gültiges JWT (`Depends(get_current_user)`).
+- Referrer- **und** Origin-Prüfungen validieren die Anfrage gegen `CORS_ORIGINS`.
+- Responses setzen Cache- und Sicherheitsheader:
+  - `Cache-Control: no-store, no-cache, must-revalidate`
+  - `Pragma: no-cache`
+  - `Expires: 0`
+  - `X-Content-Type-Options: nosniff`
+
 ```python
-# Cyber-Security: Referrer-Check
 referer = request.headers.get("referer", "")
 origin = request.headers.get("origin", "")
 
-allowed_origins = CORS_ORIGINS
-if origin and not any(allowed in origin for allowed in allowed_origins):
-    if referer and not any(allowed in referer for allowed in allowed_origins):
-        logging.warning(f"Blocked PDF download - invalid origin/referer")
-        raise HTTPException(status_code=403, detail="Access denied: Invalid origin")
+allowed = set(CORS_ORIGINS)
+if origin and origin not in allowed:
+    if referer and referer not in allowed:
+        logger.warning("Blocked download – invalid origin/referrer")
+        raise HTTPException(status_code=403, detail="Invalid origin")
 ```
 
-#### 2.3 Keine direkten Links
-- ✅ Alle Downloads gehen über API-Endpunkte
-- ✅ Keine statischen Datei-Links
-- ✅ Keine öffentlich zugänglichen URLs
-
-#### 2.4 Cache-Control-Header
-- ✅ `Cache-Control: no-store, no-cache, must-revalidate`
-- ✅ `Pragma: no-cache`
-- ✅ `Expires: 0`
-- Verhindert, dass Browser Dokumente cachen
-
-#### 2.5 Content-Type-Options
-- ✅ `X-Content-Type-Options: nosniff`
-- Verhindert MIME-Type-Sniffing
-
----
-
-## 3. Geschützte Endpunkte
-
-### PDF-Downloads
-- ✅ `/api/timesheets/{id}/pdf` - Referrer-Check, Authentifizierung
-- ✅ `/api/timesheets/{id}/download-and-email` - Referrer-Check, Authentifizierung
-- ✅ `/api/accounting/monthly-report-pdf` - Referrer-Check, Authentifizierung
-
-### Dokumente (Uploads)
-- ✅ `/api/timesheets/{id}/upload-signed` - Rate Limiting, Authentifizierung
-- ✅ `/api/travel-expense-reports/{id}/upload-receipt` - Rate Limiting, Authentifizierung
-
-**Alle Endpunkte:**
-- Erfordern JWT-Token
-- Prüfen Referrer/Origin
-- Keine direkten Links möglich
-- Cache-Control-Header gesetzt
-
----
-
-## 4. Frontend-Integration
-
-### Proxy-Verwendung
-
-**Vorher (unsicher):**
+### Frontend-Pattern
 ```javascript
-const BACKEND_URL = 'https://192.168.178.154:8000';  // Proxmox-URL sichtbar!
-const API = `${BACKEND_URL}/api`;
-```
+const API = '/api';
+const token = getSecureToken();
 
-**Nachher (sicher):**
-```javascript
-// Option 1: Proxy auf All-inkl.com
-const API = '/api/proxy.php';  // Proxy-URL, echte URL versteckt
-
-// Option 2: Oder über Umgebungsvariable (wenn Proxy nicht verwendet)
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '/api';
-const API = BACKEND_URL;
-```
-
-### Download-Aufrufe
-
-**Sicher:**
-```javascript
-// Download über API mit Token
 const response = await axios.post(
   `${API}/timesheets/${id}/download-and-email`,
   {},
   {
     headers: { Authorization: `Bearer ${token}` },
-    responseType: 'blob'  // Für PDF-Downloads
+    responseType: 'blob',
   }
 );
 ```
 
-**Nicht möglich:**
-```javascript
-// ❌ Direkter Link - funktioniert nicht
-window.open('https://proxmox-ip:8000/api/timesheets/123/pdf');
-```
+- Keine öffentlichen Direktlinks – Downloads erfolgen ausschließlich über authentifizierte API-Aufrufe.
+- Service Worker und Browser dürfen PDFs nicht persistent cachen.
 
 ---
 
-## 5. Konfiguration
+## 3. Konfiguration
 
-### Backend (.env)
+### Backend `.env`
 ```env
-# CORS-Origins (für Referrer-Check)
-CORS_ORIGINS=https://app.byte-commander.de,http://localhost:3000
-
-# Optional: Referrer-Check im Proxy aktivieren
+CORS_ORIGINS=https://ddns.meinedomain.de,http://localhost:3000
 ENFORCE_REFERRER_CHECK=true
 ```
 
-### Proxy (webapp/api/proxy.php)
-```php
-// Echte Proxmox-URL (NICHT im Frontend!)
-$BACKEND_URL = getenv('BACKEND_URL') ?: 'https://proxmox-domain.de:8000';
-
-// Erlaubte Origins
-$ALLOWED_ORIGINS = [
-    'https://stundenzettel.byte-commander.de',
-    'http://localhost:3000'
-];
-```
-
-### Frontend (.env)
+### Frontend `.env.production`
 ```env
-# Option 1: Proxy verwenden (empfohlen)
-REACT_APP_USE_PROXY=true
-
-# Option 2: Direkte Backend-URL (weniger sicher)
-REACT_APP_BACKEND_URL=https://stundenzettel.byte-commander.de/api
+REACT_APP_BACKEND_URL=https://ddns.meinedomain.de
 ```
 
----
-
-## 6. Sicherheits-Checkliste
-
-### ✅ Implementiert
-- [x] Proxy-Script für URL-Verschleierung
-- [x] Referrer-Check bei allen Download-Endpunkten
-- [x] Origin-Validation
-- [x] Authentifizierung bei allen Downloads
-- [x] Cache-Control-Header (verhindert Caching)
-- [x] Keine direkten Links zu Dokumenten
-- [x] Rate Limiting bei Uploads
-
-### ⚠️ Empfehlungen
-- [ ] Proxy-Script auf All-inkl.com deployen
-- [ ] Frontend auf Proxy umstellen
-- [ ] Regelmäßige Sicherheits-Audits
-- [ ] Monitoring für verdächtige Download-Versuche
+### Firewall & Netzwerk
+- Router: Port 443 → Frontend-Container (ggf. Port 80 temporär für ACME-HTTP-01).
+- `ufw`/Proxmox-Firewall: Nur 443 von außen erlauben; interne Regeln für 8000/27017/11434 setzen.
+- GMKTec: Nur Backend-IP (bzw. WireGuard-Subnetz) für Port 11434 freigeben.
 
 ---
 
-## 7. Angriffs-Szenarien und Schutz
+## 4. Sicherheits-Checkliste
 
-### Szenario 1: Direkter Link-Aufruf
-**Angriff:** `https://proxmox-ip:8000/api/timesheets/123/pdf`
-
-**Schutz:**
-- ✅ Referrer-Check blockiert (kein erlaubter Referer)
-- ✅ Origin-Check blockiert (kein erlaubter Origin)
-- ✅ Authentifizierung erforderlich (kein Token)
-
-### Szenario 2: Token-Diebstahl
-**Angriff:** Angreifer stiehlt JWT-Token und versucht Download
-
-**Schutz:**
-- ✅ Referrer-Check blockiert (Request kommt nicht von erlaubter Domain)
-- ✅ Origin-Check blockiert
-- ✅ Token ist an User-ID gebunden
-
-### Szenario 3: URL-Extraktion aus Frontend
-**Angriff:** Angreifer liest Backend-URL aus JavaScript-Code
-
-**Schutz:**
-- ✅ Proxy versteckt echte URL
-- ✅ Frontend kennt nur Proxy-URL
-- ✅ Echte URL nur im Proxy-Script (Server-seitig)
+- [x] TLS & HSTS aktiv.
+- [x] Reverse Proxy entfernt interne IP aus dem Frontend.
+- [x] Rate-Limiting (`limit_req`) konfiguriert.
+- [x] JWT-Auth plus Referrer-/Origin-Check bei allen Downloads.
+- [x] Keine direkten Dateilinks; nur geschützte API-Endpunkte.
+- [x] CORS beschränkt auf DDNS-Domain + lokale Entwicklungs-Hosts.
+- [x] Fail2ban/CrowdSec überwacht Nginx oder Systemd-Logs.
+- [x] WireGuard für SSH/Administrationszugriffe.
+- [x] Regelmäßige Backups (`mongodump`, Receipt-Verzeichnis, Konfigurationsdateien).
 
 ---
 
-## 8. Monitoring und Logging
+## 5. FAQ
 
-**Geloggte Events:**
-- Blockierte Download-Versuche (invalid origin/referer)
-- Fehlgeschlagene Authentifizierungen
-- Rate-Limit-Überschreitungen
+**Warum kein separates PHP-Proxy-Script mehr?**  
+Das Frontend-Gateway übernimmt Reverse-Proxy, TLS und Sicherheitslogik. Zusätzliche PHP-Ebenen würden die Angriffsfläche erhöhen und sind überflüssig.
 
-**Beispiel-Log:**
-```
-WARNING: Blocked PDF download - invalid origin/referer: https://evil.com / https://evil.com/page
-```
+**Kann ich mehrere Domains verwenden?**  
+Ja. Trage alle Domains/Aliase in `CORS_ORIGINS` ein und erweitere die Nginx/Caddy-Konfiguration entsprechend.
 
----
-
-## Zusammenfassung
-
-✅ **URL-Verschleierung:**
-- Proxy-Script versteckt echte Proxmox-URL
-- Frontend kennt nur Proxy-URL
-
-✅ **Download-Schutz:**
-- Authentifizierung erforderlich
-- Referrer- und Origin-Check
-- Keine direkten Links
-- Cache-Control verhindert Caching
-
-✅ **Mehrschichtige Sicherheit:**
-- JWT-Token
-- Origin-Validation
-- Referrer-Check
-- Rate Limiting
-
-**Die Proxmox-URL ist jetzt verschleiert und Dokumente können nicht von externen Quellen heruntergeladen werden.**
+**Wie verhindere ich IP-Leaks bei Fehlermeldungen?**  
+Nutze `proxy_intercept_errors on;` und statische Fehlerseiten. Im Backend nur interne Logs, keine detaillierten Fehler an den Client.
 
 ---
 
-**Letzte Aktualisierung:** 2025
-**Verantwortlich:** Entwicklungsteam
+Mit diesem Setup bleibt die Infrastruktur hinter dem DDNS-Endpunkt verborgen, während Authentifizierung, Rate Limits, Header und CORS zentral im Frontend-Gateway und im Backend durchgesetzt werden.
 

@@ -5,40 +5,38 @@
 Das Stundenzettel Web-System besteht aus mehreren Komponenten, die zusammenarbeiten:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Frontend (React)                        │
-│  - Mobile-First Responsive Design                           │
-│  - PWA-Support (Service Worker)                             │
-│  - Sicherheits-Features (XSS, Rate Limiting)                │
-└────────────────────┬────────────────────────────────────────┘
-                     │ HTTPS
+┌──────────────────────────────────────────────────────────────┐
+│            Frontend-Gateway (Proxmox Container)              │
+│  - React Build (statisch)                                    │
+│  - Reverse Proxy (Nginx/Caddy)                               │
+│  - TLS-Termination & DDNS                                    │
+└────────────────────┬─────────────────────────────────────────┘
+                     │ HTTPS (Port 443, weltweit erreichbar)
                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Backend API (FastAPI/Python)                   │
-│  - REST API                                                 │
-│  - JWT Authentication + 2FA                                 │
-│  - PDF-Generierung                                          │
-│  - E-Mail-Versand                                           │
-└──────┬──────────────────────────────────┬───────────────────┘
-       │                                  │
-       ▼                                  ▼
-┌──────────────────┐          ┌──────────────────────────┐
-│   MongoDB        │          │  Agent-System (Proxmox)  │
-│  - Users         │          │  ┌────────────────────┐  │
-│  - Timesheets    │          │  │ ChatAgent          │  │
-│  - Travel        │          │  │ DocumentAgent      │  │
-│  - Reports       │          │  │ AccountingAgent    │  │
-│  - Announcements │          │  │ AgentOrchestrator  │  │
-└──────────────────┘          │  └──────────┬─────────┘  │
-                              └─────────────┼────────────┘
-                                            │ HTTP API
-                                            ▼
-                              ┌──────────────────────────┐
-                              │  Ollama LLM (GMKTec)     │
-                              │  - llama3.2              │
-                              │  - Andere Modelle        │
-                              │  - Port 11434            │
-                              └──────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│        Backend & Datenhaltung (Proxmox Container)            │
+│  - FastAPI REST API + Agents                                 │
+│  - MongoDB                                                   │
+│  - Verschlüsseltes Dateilager                                │
+└──────────┬───────────────────────────────────────┬───────────┘
+           │                                       │
+           ▼                                       ▼
+┌──────────────────┐                ┌──────────────────────────┐
+│   MongoDB        │                │  Agent-System (lokal)    │
+│  - Users         │                │  ┌────────────────────┐  │
+│  - Timesheets    │                │  │ ChatAgent          │  │
+│  - Travel        │                │  │ DocumentAgent      │  │
+│  - Reports       │                │  │ AccountingAgent    │  │
+│  - Announcements │                │  │ AgentOrchestrator  │  │
+└──────────────────┘                │  └──────────┬─────────┘  │
+                                    └─────────────┼────────────┘
+                                                  │ HTTP (LAN/VPN)
+                                                  ▼
+                                    ┌──────────────────────────┐
+                                    │  Ollama LLM (GMKTec)     │
+                                    │  - llama3.2              │
+                                    │  - Port 11434            │
+                                    └──────────────────────────┘
 ```
 
 ## Komponenten im Detail
@@ -195,40 +193,30 @@ Vorgänger-DB (Read-Only) → Migration-Tool → Neue MongoDB
 
 ## Deployment-Szenarien
 
-### Szenario 1: All-inkl.com (Shared Hosting)
+### Szenario 1: Proxmox + DDNS (Empfohlen)
 
 ```
-Frontend (React Build) → All-inkl Webserver
-Backend (PHP) → All-inkl Webserver
-Datenbank (MySQL) → All-inkl MySQL
+Frontend-Gateway (HTTPS, DDNS) → Backend & MongoDB (interne IP)
+                                → Agents (lokal)
+                                → Ollama (GMKTec im LAN/VPN)
 ```
 
 **Besonderheiten:**
-- PHP statt Python
-- MySQL statt MongoDB
-- Keine LLM-Agents (Optional: Separate Server)
+- Nur Port 443 wird ins Internet veröffentlicht.
+- DDNS verweist auf die öffentliche IP des Frontend-Containers bzw. Routers.
+- WireGuard oder vergleichbare VPN-Lösung für Administration empfohlen.
 
-### Szenario 2: VPS/Cloud (Produktiv)
-
-```
-Frontend (React Build) → Nginx/CDN
-Backend (Python/FastAPI) → VPS (Docker/Systemd)
-Datenbank (MongoDB) → VPS/Managed MongoDB
-Agent-System → Proxmox (Container/VM)
-LLM-Server → GMKTec evo x2 (lokal)
-```
-
-### Szenario 3: Entwicklung
+### Szenario 2: Entwicklung (Lokal)
 
 ```
 Frontend → npm start (localhost:3000)
 Backend → uvicorn server:app (localhost:8000)
 Datenbank → MongoDB (localhost:27017)
 Agent-System → Lokal (Python)
-LLM-Server → Ollama (localhost:11434)
+Ollama-Server → Ollama (localhost:11434)
 ```
 
-### Szenario 4: Office-Rechner mit lokaler Speicherung
+### Szenario 3: Office-Rechner / Edge Deployment
 
 ```
 Frontend → Webserver (öffentlich)
@@ -294,8 +282,8 @@ LLM-Server → GMKTec evo x2 (optional)
 ## Backup-Strategie
 
 ### Datenbank
-- MongoDB: Automatische Backups (MongoDB Atlas oder lokale Scripts)
-- MySQL: mysqldump (für All-inkl)
+- MongoDB: Automatisierte Backups (`mongodump`, replizierte Volumes oder Atlas Snapshot)
+- Konfigurations-Backups für `.env`, `systemd`-Units und Nginx/Caddy-Konfiguration
 
 ### Lokale Dateien
 - Receipts: Lokale Backups auf Office-Rechner

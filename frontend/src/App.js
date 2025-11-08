@@ -17,7 +17,25 @@ import { Alert, AlertDescription } from './components/ui/alert';
 import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000');
+const resolveBackendUrl = () => {
+  const envUrl = process.env.REACT_APP_BACKEND_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  if (typeof window === 'undefined') {
+    return 'http://localhost:8000';
+  }
+  const { protocol, hostname, port } = window.location;
+  const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+  if (isLocalHost && port && port !== '8000') {
+    return `${protocol}//${hostname}:8000`;
+  }
+  const isStandardPort = port === '' || port === '80' || port === '443';
+  const portSuffix = isStandardPort ? '' : `:${port}`;
+  return `${protocol}//${hostname}${portSuffix}`;
+};
+
+const BACKEND_URL = resolveBackendUrl();
 const API = `${BACKEND_URL}/api`;
 
 // Axios interceptor for automatic token refresh and error handling

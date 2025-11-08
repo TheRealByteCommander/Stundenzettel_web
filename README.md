@@ -96,76 +96,27 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 
 **⚠️ WICHTIG: Architektur-Verständnis**
 
-Diese Anwendung besteht aus mehreren Komponenten, die auf verschiedenen Servern laufen:
+Diese Anwendung ist für einen vollständig lokalen Betrieb auf Proxmox ausgelegt:
 
-- ✅ **Frontend:** All-inkl.com Webserver (nur statische Dateien aus React Build)
-- ✅ **Backend:** Proxmox Server (Python/FastAPI) - **NICHT auf All-inkl!**
-- ✅ **MongoDB:** Proxmox Server (oder remote)
-- ✅ **Agents:** Proxmox Server (laufen mit Backend zusammen, kein separater Service)
-- ✅ **Ollama (LLM):** GMKTec evo x2 (Home-Netzwerk)
+- ✅ **Frontend:** Eigener Proxmox-Container (z. B. Nginx + React Build)
+- ✅ **Backend & MongoDB:** Zweiter Proxmox-Container (FastAPI, Agents, Datenbank, Dateispeicher)
+- ✅ **Ollama (LLM):** GMKTec evo x2 im lokalen Netzwerk
+- ✅ **Zugriff von außen:** DDNS + WireGuard VPN oder Reverse-Proxy auf dem Frontend-Container
 
 ### 📚 Installationsanleitungen
 
-- **⭐ KORREKTE Installationsanleitung:** Siehe **[INSTALLATION_COMPLETE_CORRECT.md](INSTALLATION_COMPLETE_CORRECT.md)** - Vollständige, korrekte Anleitung mit klarer Beschreibung wo was installiert wird
-- **Architektur-Details:** Siehe **[ARCHITEKTUR_ALL_INKL_PROXMOX.md](ARCHITEKTUR_ALL_INKL_PROXMOX.md)** - Ihre spezifische Architektur
-- **LLM-Integration:** Siehe **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** - Ollama Setup auf GMKTec
-- **Legacy PHP-Version:** Siehe **[INSTALLATION_ALL_INKL.md](INSTALLATION_ALL_INKL.md)** - Nur für PHP-Version (Legacy)
-- **Für Windows:** Siehe **[WINDOWS_INSTALLATION.md](WINDOWS_INSTALLATION.md)** - Windows-spezifische Anleitung
-- **Für andere Server:** Siehe **[INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md)** - Allgemeine Installationsanleitung
-- **Schnellstart:** Siehe **[QUICK_START.md](QUICK_START.md)**
-- **Frontend Dependency-Fixes:** Siehe **[frontend/INSTALLATION_FIX.md](frontend/INSTALLATION_FIX.md)**
-- **Office-Rechner Routing:** Siehe **[OFFICE_RECHNER_ROUTING.md](OFFICE_RECHNER_ROUTING.md)** - Lösungen für dynamische IPs
-
-## ⚠️ Installation auf All-Inkl.com Webserver - NUR Frontend!
-
-### ⚠️ WICHTIG: Diese Anleitung ist für die Legacy PHP-Version (nicht empfohlen)
-
-**Für die aktuelle Architektur (Python/FastAPI + Agents + LLM):**
-- ✅ **Frontend:** All-inkl.com (nur statische Dateien aus React Build)
-- ✅ **Backend:** Proxmox Server (Python/FastAPI) - **NICHT auf All-inkl!**
-- ✅ **MongoDB:** Proxmox Server (oder remote) - **NICHT MySQL auf All-inkl!**
-- ✅ **Agents:** Proxmox Server (laufen mit Backend zusammen)
-- ✅ **Ollama:** GMKTec evo x2 (Home-Netzwerk)
-
-**Siehe `INSTALLATION_COMPLETE_CORRECT.md` für die vollständige, korrekte Installationsanleitung!**
+- **⭐ Primäre Anleitung:** **[INSTALLATION_COMPLETE_CORRECT.md](INSTALLATION_COMPLETE_CORRECT.md)** – Schritt-für-Schritt-Setup für zwei Proxmox-Container + GMKTec
+- **Architektur-Details:** **[ARCHITEKTUR_ALL_INKL_PROXMOX.md](ARCHITEKTUR_ALL_INKL_PROXMOX.md)** – aktualisierte Übersicht der lokalen Container-Architektur
+- **LLM-Integration:** **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** – Ollama-Setup auf dem GMKTec
+- **Legacy PHP-Version:** **[INSTALLATION_ALL_INKL.md](INSTALLATION_ALL_INKL.md)** – nur für die nicht mehr empfohlene PHP-Variante
+- **Windows-spezifisch:** **[WINDOWS_INSTALLATION.md](WINDOWS_INSTALLATION.md)**
+- **Allgemeine Installation/Quickstart:** **[INSTALLATION_COMPLETE.md](INSTALLATION_COMPLETE.md)**, **[QUICK_START.md](QUICK_START.md)**
+- **Frontend Dependency-Fixes:** **[frontend/INSTALLATION_FIX.md](frontend/INSTALLATION_FIX.md)**
+- **Netzwerk-Routing/Tunnel:** **[OFFICE_RECHNER_ROUTING.md](OFFICE_RECHNER_ROUTING.md)**
 
 ---
 
-### ❌ MySQL auf All-inkl.com ist NICHT notwendig für die aktuelle Architektur!
-
-**MySQL wird nur verwendet für:**
-1. **Migration:** Import aus alter MySQL-Datenbank (einmalig, via Migration-Tool)
-2. **Legacy PHP-Version:** Falls Sie die PHP-Version aus `webapp/` verwenden (nicht empfohlen, nicht aktuell)
-
-**Die aktuelle Python/FastAPI-Version nutzt NUR MongoDB:**
-- MongoDB läuft auf Proxmox (oder remote/Cloud)
-- Keine MySQL-Datenbank nötig für die aktuelle Architektur
-- Keine Datenbank auf All-inkl.com nötig
-
----
-
-### ✅ Frontend auf All-inkl.com installieren (Kurzanleitung)
-
-**NUR für Frontend (statische Dateien):**
-
-1. **Frontend lokal bauen:**
-```bash
-cd frontend/
-npm install
-# .env Datei erstellen:
-echo "REACT_APP_BACKEND_URL=https://proxmox-domain.de:8000" > .env
-npm run build
-```
-
-2. **Frontend-Dateien hochladen:**
-   - Inhalt von `frontend/build/` auf All-inkl hochladen
-   - `.htaccess` für React Router hochladen
-
-3. **Fertig!** Backend läuft auf Proxmox, nicht auf All-inkl.
-
----
-
-### ❌ Legacy PHP-Version (nur falls Sie wirklich PHP verwenden wollen)
+### ❌ Legacy PHP-Version (nur falls zwingend erforderlich)
 
 **⚠️ Hinweis:** Die PHP-Version ist Legacy und wird nicht mehr aktiv entwickelt. Sie unterstützt NICHT:
 - Agent-System
@@ -176,11 +127,11 @@ npm run build
 
 **Falls Sie die PHP-Version trotzdem verwenden wollen:**
 
-1. MySQL-Datenbank auf All-inkl erstellen (siehe `INSTALLATION_ALL_INKL.md`)
-2. `webapp/` Ordner auf All-inkl hochladen
+1. MySQL-Datenbank bereitstellen (siehe `INSTALLATION_ALL_INKL.md`)
+2. `webapp/`-Ordner deployen
 3. PHP-Konfiguration anpassen
 
-**Empfehlung:** Verwenden Sie die aktuelle Python/FastAPI-Version auf Proxmox!
+**Empfehlung:** Verwenden Sie die aktuelle Proxmox-basierte Python/FastAPI-Version!
 
 ---
 

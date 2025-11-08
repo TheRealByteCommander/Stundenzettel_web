@@ -1,455 +1,291 @@
-# 📘 Komplette Installationsanleitung - Korrekt
+# 📘 Komplette Installationsanleitung – Lokale Proxmox-Architektur
 
-## ⚠️ WICHTIG: Architektur-Verständnis
+## ⚠️ Architektur im Überblick
 
-**Diese Anwendung besteht aus mehreren Komponenten, die auf verschiedenen Servern laufen:**
+Die empfohlene Produktionsarchitektur nutzt zwei Proxmox-Container im lokalen Netzwerk plus den GMKTec evo x2 für die LLM-Verarbeitung:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     All-inkl.com Webserver                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Frontend (React Build) - NUR statische Dateien    │   │
-│  │  - HTML, CSS, JavaScript                            │   │
-│  │  - Keine Backend-Logik!                            │   │
-│  └───────────────────────┬─────────────────────────────┘   │
-│                          │ HTTPS                            │
-│                          │ API-Calls                        │
-└──────────────────────────┼──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Proxmox Server                           │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Backend API (Python/FastAPI)                      │   │
-│  │  - Läuft auf Port 8000 (öffentlich erreichbar)     │   │
-│  │  - REST API für Frontend                           │   │
-│  └──────┬───────────────────────────────────────┬──────┘   │
-│         │                                       │           │
-│         ▼                                       ▼           │
-│  ┌───────────────────┐          ┌──────────────────────┐ │
-│  │  MongoDB          │          │  Agents (Python)     │ │
-│  │  - Datenbank      │          │  - Läuft lokal       │ │
-│  │  - Auf Proxmox    │          │  - Kein separater    │ │
-│  │    oder remote    │          │    Container nötig!  │ │
-│  └───────────────────┘          └──────────┬───────────┘ │
-│                                             │              │
-│                                             │ HTTP API     │
-│                                             │ (lokales     │
-└─────────────────────────────────────────────┼──────────────┘
-                                              │
-                                              ▼
-                              ┌──────────────────────────┐
-                              │  GMKTec evo x2           │
-                              │  (Home-Netzwerk)         │
-                              │  ┌────────────────────┐  │
-                              │  │ Ollama LLM Server  │  │
-                              │  │ Port 11434         │  │
-                              │  └────────────────────┘  │
-                              └──────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│            Proxmox Host (lokales Rechenzentrum/VPN)           │
+│                                                               │
+│  ┌──────────────┐                          ┌────────────────┐ │
+│  │ Container 1  │                          │  Container 2   │ │
+│  │ Frontend     │  <─── interne HTTP ───>  │ Backend & DB   │ │
+│  │ - Nginx/SPA  │                          │ - FastAPI      │ │
+│  │ - TLS/Proxy  │                          │ - Agents       │ │
+│  └─────┬────────┘                          │ - MongoDB      │ │
+│        │ HTTPS (DDNS/WireGuard)            │ - Storage      │ │
+│        ▼                                   └────────┬───────┘ │
+│  Externe Clients                                   │          │
+└─────────────────────────────────────────────────────┼──────────┘
+                                                      │
+                                                      │ HTTP (LAN/VPN)
+                                                      ▼
+                                   ┌────────────────────────────────┐
+                                   │  GMKTec evo x2 (Ollama Server) │
+                                   │  - Port 11434                  │
+                                   │  - Llama-Modelle               │
+                                   └────────────────────────────────┘
 ```
 
-## 📍 Wo wird was installiert?
+- **Container 1 – Frontend-Gateway:** Liefert den React-Build (Nginx oder Caddy) und terminiert HTTPS für den externen Zugriff über DDNS/WireGuard.
+- **Container 2 – Backend-Stack:** Enthält FastAPI, Agents, MongoDB sowie das verschlüsselte Dateilager für Belege.
+- **GMKTec evo x2:** Betreibt Ollama und stellt die LLM-Funktionen über das lokale Netzwerk bereit (empfohlen via WireGuard oder dediziertem LAN).
 
-### 1. Frontend (React) → **All-inkl.com Webserver**
-
-**Was wird installiert:**
-- Nur die **statischen Dateien** aus dem React Build (`frontend/build/`)
-- HTML, CSS, JavaScript-Dateien
-- Keine Backend-Logik
-- Keine Python/Node.js-Laufzeit nötig
-
-**Installation:**
-1. Frontend lokal bauen: `npm run build`
-2. Inhalt von `frontend/build/` auf All-inkl hochladen
-3. `.htaccess` Datei für React Router hochladen
-
-**Konfiguration:**
-- `.env` Datei vor Build: `REACT_APP_BACKEND_URL=https://proxmox-domain.de:8000`
-- Oder: `REACT_APP_BACKEND_URL=https://proxmox-ip:8000`
+Alle Komponenten bleiben innerhalb des lokalen Netzwerks, lediglich Port `443` des Frontend-Containers wird nach außen veröffentlicht (bzw. via VPN erreichbar gemacht).
 
 ---
 
-### 2. Backend (Python/FastAPI) → **Proxmox Server** ⚠️ NICHT auf All-inkl!
+## 📍 Aufgabenverteilung
 
-**Was wird installiert:**
-- Python 3.11+ Laufzeit
-- FastAPI-Anwendung (`backend/server.py`)
-- Alle Python-Dependencies (`requirements.txt`)
-- MongoDB (lokal oder remote)
+| Komponente              | Ort                 | Dienst(e)                           | Ports extern |
+|------------------------|---------------------|-------------------------------------|--------------|
+| Frontend-Gateway       | Proxmox Container 1 | Nginx/Caddy, React Build, TLS       | 443 (HTTPS)  |
+| Backend & Datenhaltung | Proxmox Container 2 | FastAPI, Agents, MongoDB, Storage   | keine        |
+| LLM                    | GMKTec evo x2       | Ollama                              | keine        |
+| VPN/DDNS               | je nach Setup       | WireGuard (empfohlen)               | optional     |
 
-**Installation auf Proxmox:**
+---
 
-**Option A: Direkt auf Proxmox VM/Container**
+## 🛠️ Vorbereitung
+
+1. **DNS/VPN planen**
+   - DDNS-Domain auf die öffentliche IP des Frontend-Containers oder des vorgeschalteten Routers legen.
+   - WireGuard-Tunnel für administrative Zugriffe einrichten (Port 51820 o. Ä.).
+2. **Proxmox-Container anlegen**
+   - Zwei LXC- oder KVM-Container mit Ubuntu 22.04+ (oder vergleichbar).
+   - Frontend-Container: 1 vCPU, 1–2 GB RAM, 10 GB SSD.
+   - Backend-Container: 2–4 vCPU, 4–8 GB RAM, 40 GB SSD (abhängig von Datenvolumen).
+3. **GMKTec vorbereiten**
+   - Statische IP oder DHCP-Reservierung vergeben (z. B. `192.168.100.10`).
+   - WireGuard/VLAN festlegen, falls GMKTec nicht im gleichen Netzsegment steht.
+
+---
+
+## 🚀 Schritt-für-Schritt Installation
+
+### 1. Container 2 – Backend & MongoDB
 
 ```bash
-# 1. VM oder LXC Container erstellen (Ubuntu 22.04+)
-# 2. Python installieren
+# Basis-Pakete
 sudo apt update
-sudo apt install python3.11 python3-pip python3-venv
+sudo apt install -y python3.11 python3.11-venv python3-pip git build-essential
 
-# 3. Projekt klonen
-cd /opt
-git clone <repository-url> stundenzettel_web
+# Projekt ablegen
+sudo mkdir -p /opt/tick-guard && sudo chown $USER:$USER /opt/tick-guard
+cd /opt/tick-guard
+git clone <REPO_URL> stundenzettel_web
 cd stundenzettel_web/backend
 
-# 4. Virtual Environment erstellen
+# Python-Umgebung
 python3 -m venv venv
 source venv/bin/activate
-
-# 5. Dependencies installieren
+pip install --upgrade pip
 pip install -r requirements.txt
-
-# 6. .env Datei erstellen
-nano .env
 ```
 
-**.env Konfiguration (auf Proxmox):**
-```env
-# MongoDB (lokal auf Proxmox oder remote)
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=stundenzettel
-
-# Lokaler Speicher für PDFs (auf Proxmox!)
-LOCAL_RECEIPTS_PATH=/var/stundenzettel/receipts
-
-# Ollama auf GMKTec (lokales Netzwerk)
-OLLAMA_BASE_URL=http://192.168.1.100:11434
-OLLAMA_MODEL=llama3.2
-OLLAMA_TIMEOUT=300
-
-# JWT & Verschlüsselung
-SECRET_KEY=<generiere-starkes-secret-min-32-zeichen>
-ENCRYPTION_KEY=<generiere-encryption-key>
-
-# CORS (Frontend-URL auf All-inkl)
-CORS_ORIGINS=https://ihre-domain.de
-```
-
-**Option B: Docker auf Proxmox**
+#### MongoDB installieren
 
 ```bash
-# Docker installieren
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Docker Compose installieren
-sudo apt install docker-compose-plugin
-
-# docker-compose.yml erstellen
+sudo apt install -y mongodb
+# oder Docker:
+# docker run -d --name mongodb -p 127.0.0.1:27017:27017 -v /var/lib/mongodb:/data/db mongo:7
 ```
 
-**Systemd Service (für Option A):**
+#### Dateispeicher
+
+```bash
+sudo mkdir -p /var/tick-guard/receipts
+sudo chown $USER:$USER /var/tick-guard/receipts
+```
+
+#### `.env` im Backend
+
+```env
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=stundenzettel
+LOCAL_RECEIPTS_PATH=/var/tick-guard/receipts
+SECRET_KEY=<openssl rand -hex 32>
+ENCRYPTION_KEY=<openssl rand -hex 32>
+OLLAMA_BASE_URL=http://192.168.100.10:11434
+OLLAMA_MODEL=llama3.2
+OLLAMA_TIMEOUT=300
+OLLAMA_MAX_RETRIES=3
+CORS_ORIGINS=https://ddns-beispiel.meinedomain.de,https://frontend.local
+```
+
+> Hinweis: `CORS_ORIGINS` sollte die externe DDNS-Adresse und interne Admin-Hosts enthalten (Komma-separiert).
+
+#### Systemd-Service
 
 ```ini
-# /etc/systemd/system/stundenzettel-backend.service
+# /etc/systemd/system/tick-guard-backend.service
 [Unit]
-Description=Stundenzettel Backend API
-After=network.target mongod.service
+Description=Tick Guard Backend
+After=network-online.target mongod.service
 
 [Service]
-Type=simple
-User=stundenzettel
-WorkingDirectory=/opt/stundenzettel_web/backend
-Environment="PATH=/opt/stundenzettel_web/backend/venv/bin"
-EnvironmentFile=/opt/stundenzettel_web/backend/.env
-ExecStart=/opt/stundenzettel_web/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000
-Restart=always
+User=tickguard
+Group=tickguard
+WorkingDirectory=/opt/tick-guard/stundenzettel_web/backend
+Environment="PATH=/opt/tick-guard/stundenzettel_web/backend/venv/bin"
+EnvironmentFile=/opt/tick-guard/stundenzettel_web/backend/.env
+ExecStart=/opt/tick-guard/stundenzettel_web/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-**Service starten:**
 ```bash
-sudo systemctl enable stundenzettel-backend
-sudo systemctl start stundenzettel-backend
+sudo useradd --system --home /opt/tick-guard --shell /usr/sbin/nologin tickguard
+sudo chown -R tickguard:tickguard /opt/tick-guard
+sudo systemctl daemon-reload
+sudo systemctl enable --now tick-guard-backend
+curl http://localhost:8000/health   # Funktionstest
 ```
 
----
-
-### 3. MongoDB → **Proxmox Server** (oder remote)
-
-**Option A: MongoDB lokal auf Proxmox**
+### 2. Container 1 – Frontend & Reverse Proxy
 
 ```bash
-# MongoDB installieren
-sudo apt install -y mongodb
-
-# Oder Docker:
-docker run -d --name mongodb \
-  -p 27017:27017 \
-  -v /var/lib/mongodb:/data/db \
-  mongo:latest
+sudo apt update
+sudo apt install -y nginx nodejs npm git
 ```
 
-**Option B: MongoDB Atlas (remote, Cloud)**
-
-```env
-MONGO_URL=mongodb+srv://user:pass@cluster.mongodb.net/stundenzettel?retryWrites=true&w=majority
-```
-
----
-
-### 4. Agents → **Proxmox Server** (läuft mit Backend zusammen!)
-
-**⚠️ WICHTIG: Agents sind TEIL des Backends, kein separater Service!**
-
-Die Agents (`backend/agents.py`) werden **direkt vom Backend aufgerufen**. Sie laufen **nicht** als separater Container oder Service.
-
-**Wie es funktioniert:**
-- Backend ruft `AgentOrchestrator` auf
-- Agents laufen im gleichen Python-Prozess wie Backend
-- Agents kommunizieren über HTTP mit Ollama auf GMKTec
-
-**Keine separate Installation nötig!** Die Agents sind bereits im Backend-Code enthalten.
-
----
-
-### 5. Ollama (LLM) → **GMKTec evo x2** (Home-Netzwerk)
-
-**Was wird installiert:**
-- Ollama Server
-- LLM-Modelle (z.B. llama3.2)
-
-**Installation auf GMKTec:**
+#### Frontend bauen
 
 ```bash
-# 1. Ollama installieren
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# 2. Ollama starten (als Service)
-sudo systemctl enable ollama
-sudo systemctl start ollama
-
-# 3. Modell herunterladen
-ollama pull llama3.2
-
-# 4. Netzwerk-Zugriff konfigurieren
-# Ollama hört standardmäßig auf 0.0.0.0:11434 (alle Interfaces)
-# Falls Firewall aktiv: Port 11434 öffnen
-sudo ufw allow from 192.168.1.0/24 to any port 11434
+cd /opt/tick-guard
+git clone <REPO_URL> stundenzettel_web-frontend
+cd stundenzettel_web-frontend/frontend
+npm install
+echo "REACT_APP_BACKEND_URL=https://ddns-beispiel.meinedomain.de" > .env.production
+npm run build
 ```
 
-**Statische IP für GMKTec (empfohlen):**
-- Router: DHCP-Reservierung für GMKTec MAC-Adresse
-- Oder: Statische IP auf GMKTec selbst konfigurieren
+#### Build bereitstellen
 
-**Test:**
 ```bash
-# Von Proxmox aus testen
-curl http://192.168.1.100:11434/api/tags
+sudo rm -rf /var/www/tick-guard
+sudo mkdir -p /var/www/tick-guard
+sudo cp -r build/* /var/www/tick-guard/
+sudo chown -R www-data:www-data /var/www/tick-guard
 ```
 
----
-
-## 📋 Komplette Installations-Checkliste
-
-### Phase 1: Proxmox vorbereiten
-
-- [ ] Proxmox VM oder LXC Container erstellen (Ubuntu 22.04+)
-- [ ] Python 3.11+ installieren
-- [ ] MongoDB installieren (lokal oder remote konfigurieren)
-- [ ] Verzeichnis für PDFs erstellen: `/var/stundenzettel/receipts`
-- [ ] Firewall konfigurieren: Port 8000 für Backend öffnen
-
-### Phase 2: Backend auf Proxmox installieren
-
-- [ ] Projekt klonen: `git clone <repo> /opt/stundenzettel_web`
-- [ ] Virtual Environment erstellen
-- [ ] Dependencies installieren: `pip install -r requirements.txt`
-- [ ] `.env` Datei erstellen mit:
-  - MongoDB URL
-  - LOCAL_RECEIPTS_PATH
-  - OLLAMA_BASE_URL (GMKTec IP)
-  - SECRET_KEY, ENCRYPTION_KEY
-  - CORS_ORIGINS
-- [ ] Systemd Service erstellen
-- [ ] Backend starten: `sudo systemctl start stundenzettel-backend`
-- [ ] Backend testen: `curl http://localhost:8000/health`
-
-### Phase 3: GMKTec (Ollama) konfigurieren
-
-- [ ] Ollama installieren
-- [ ] Ollama als Service starten
-- [ ] Modell herunterladen: `ollama pull llama3.2`
-- [ ] Statische IP konfigurieren (empfohlen)
-- [ ] Firewall: Port 11434 für Proxmox erlauben
-- [ ] Test: Von Proxmox aus Ollama erreichen
-
-### Phase 4: Frontend auf All-inkl installieren
-
-- [ ] Frontend lokal bauen: `npm run build`
-- [ ] `.env` vor Build: `REACT_APP_BACKEND_URL=https://proxmox-domain:8000`
-- [ ] Inhalt von `frontend/build/` auf All-inkl hochladen
-- [ ] `.htaccess` hochladen (für React Router)
-- [ ] SSL/HTTPS auf All-inkl aktivieren
-
-### Phase 5: Netzwerk & Sicherheit
-
-- [ ] Nginx Reverse Proxy auf Proxmox (für HTTPS)
-- [ ] SSL-Zertifikat (Let's Encrypt) für Proxmox
-- [ ] Firewall-Regeln:
-  - Proxmox: Port 8000 für All-inkl erlauben
-  - GMKTec: Port 11434 für Proxmox erlauben
-- [ ] CORS in Backend konfiguriert
-
-### Phase 6: Test & Validierung
-
-- [ ] Frontend lädt: `https://ihre-domain.de`
-- [ ] Backend erreichbar: `https://proxmox-domain:8000/health`
-- [ ] Login funktioniert
-- [ ] Stundenzettel erstellen funktioniert
-- [ ] PDF-Generierung funktioniert
-- [ ] Reisekosten-App funktioniert
-- [ ] Agents können Ollama erreichen (Test-Reisekosten-Prüfung)
-
----
-
-## 🔧 Konfiguration im Detail
-
-### Backend .env (auf Proxmox)
-
-```env
-# MongoDB
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=stundenzettel
-
-# Lokaler Speicher (auf Proxmox!)
-LOCAL_RECEIPTS_PATH=/var/stundenzettel/receipts
-
-# Ollama (GMKTec im Home-Netzwerk)
-OLLAMA_BASE_URL=http://192.168.1.100:11434
-OLLAMA_MODEL=llama3.2
-OLLAMA_TIMEOUT=300
-OLLAMA_MAX_RETRIES=3
-
-# JWT & Security
-SECRET_KEY=<generiere-mit-openssl-rand-hex-32>
-ENCRYPTION_KEY=<generiere-mit-openssl-rand-hex-32>
-
-# CORS (Frontend-URL auf All-inkl)
-CORS_ORIGINS=https://ihre-domain.de,https://www.ihre-domain.de
-```
-
-### Frontend .env (vor Build)
-
-```env
-REACT_APP_BACKEND_URL=https://proxmox-domain.de:8000
-```
-
-### Nginx Reverse Proxy (auf Proxmox)
+#### Nginx-Konfiguration
 
 ```nginx
+# /etc/nginx/sites-available/tick-guard
+server {
+    listen 80;
+    server_name ddns-beispiel.meinedomain.de;
+    return 301 https://$host$request_uri;
+}
+
 server {
     listen 443 ssl http2;
-    server_name proxmox-domain.de;
+    server_name ddns-beispiel.meinedomain.de;
 
-    ssl_certificate /etc/letsencrypt/live/proxmox-domain.de/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/proxmox-domain.de/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/ddns-beispiel.meinedomain.de/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ddns-beispiel.meinedomain.de/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+
+    # PWA/Static Assets
+    root /var/www/tick-guard;
+    index index.html;
 
     location / {
-        proxy_pass http://localhost:8000;
+        try_files $uri /index.html;
+    }
+
+    # API-Proxy ins interne Backend (Container 2)
+    location /api/ {
+        proxy_pass http://backend-container.lan:8000/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
----
+```bash
+sudo ln -s /etc/nginx/sites-available/tick-guard /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
-## ❌ Häufige Fehler vermeiden
+#### Zertifikate via Let’s Encrypt
 
-### ❌ FALSCH: Backend auf All-inkl installieren
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d ddns-beispiel.meinedomain.de
+```
 
-**Warum falsch:**
-- All-inkl unterstützt kein Python/FastAPI
-- Keine MongoDB möglich
-- Keine lokale Dateispeicherung
-- Agents können nicht laufen
-
-### ❌ FALSCH: Agents als separaten Container laufen lassen
-
-**Warum falsch:**
-- Agents sind Teil des Backends
-- Werden direkt vom Backend aufgerufen
-- Kein separater Service nötig
-
-### ✅ RICHTIG: Backend auf Proxmox
-
-**Warum richtig:**
-- Volle Kontrolle über Python-Umgebung
-- MongoDB lokal möglich
-- Lokale Dateispeicherung
-- Agents laufen im Backend-Prozess
+> Wenn ausschließlich WireGuard genutzt wird und kein öffentlicher Port verfügbar ist, stattdessen interne Zertifizierungsstelle oder selbstsignierte Zertifikate verwenden.
 
 ---
 
-## 📊 Datenfluss
+### 3. GMKTec evo x2 – Ollama
 
-### Stundenzettel erstellen:
-```
-User (Browser) 
-  → Frontend (All-inkl) 
-  → Backend API (Proxmox:8000) 
-  → MongoDB (Proxmox)
-  → PDF-Generierung (Proxmox)
-  → E-Mail-Versand (Proxmox)
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+sudo systemctl enable --now ollama
+ollama pull llama3.2
 ```
 
-### Reisekosten prüfen:
-```
-User (Browser)
-  → Frontend (All-inkl)
-  → Backend API (Proxmox:8000)
-  → Agents (laufen im Backend-Prozess auf Proxmox)
-  → Ollama API (GMKTec:11434) über lokales Netzwerk
-  → Ergebnisse zurück
-  → MongoDB Update (Proxmox)
+Firewall anpassen:
+
+```bash
+sudo ufw allow from 192.168.100.0/24 to any port 11434 proto tcp
 ```
 
-### PDF-Upload:
-```
-User (Browser)
-  → Frontend (All-inkl)
-  → Backend API (Proxmox:8000)
-  → Speicherung in /var/stundenzettel/receipts (Proxmox)
-  → Verschlüsselung (Proxmox)
-  → MongoDB Metadaten (Proxmox)
+Test vom Backend-Container:
+
+```bash
+curl http://192.168.100.10:11434/api/tags
 ```
 
 ---
 
-## 🎯 Zusammenfassung: Was wo installiert wird
+## ✅ Checkliste
 
-| Komponente | Server | Technologie | Port | Öffentlich erreichbar? |
-|------------|--------|-------------|------|----------------------|
-| **Frontend** | All-inkl.com | React Build (statisch) | 443 (HTTPS) | ✅ Ja |
-| **Backend API** | Proxmox | Python/FastAPI | 8000 | ✅ Ja (über HTTPS) |
-| **MongoDB** | Proxmox | MongoDB | 27017 | ❌ Nein (nur lokal) |
-| **Agents** | Proxmox | Python (im Backend) | - | ❌ Nein (lokal) |
-| **Ollama** | GMKTec evo x2 | Ollama Server | 11434 | ❌ Nein (lokal) |
-| **Local Storage** | Proxmox | Dateisystem | - | ❌ Nein (lokal) |
-
-**Wichtig:**
-- ✅ Frontend: All-inkl (nur statische Dateien)
-- ✅ Backend: Proxmox (Python/FastAPI)
-- ✅ Agents: Proxmox (laufen mit Backend zusammen)
-- ✅ Ollama: GMKTec (Home-Netzwerk)
-- ✅ MongoDB: Proxmox (oder remote)
-
-**NICHT auf All-inkl:**
-- ❌ Backend (Python wird nicht unterstützt)
-- ❌ MongoDB
-- ❌ Agents
-- ❌ Lokale Dateispeicherung
+- [ ] Beide Container laufen, führen automatische Updates durch (`unattended-upgrades`).
+- [ ] Backend-Service aktiv (`systemctl status tick-guard-backend`).
+- [ ] MongoDB gesichert (Zugriff nur `127.0.0.1`, regelmäßige Dumps).
+- [ ] Frontend über DDNS erreichbar (`https://ddns-beispiel.meinedomain.de`).
+- [ ] WireGuard-Clients verbinden erfolgreich und erreichen Backend/Frontend intern.
+- [ ] Ollama antwortet innerhalb von <1 s auf `/api/tags`.
+- [ ] Push-Benachrichtigungen und E-Mail-Versand getestet.
+- [ ] Backup-Strategie eingerichtet (`mongodump`, Receipts-Verzeichnis, Systemd-Services).
 
 ---
 
-## 📚 Weitere Dokumentation
+## 🔐 Sicherheit & Härtung
 
-- **Architektur-Details:** Siehe `ARCHITEKTUR_ALL_INKL_PROXMOX.md`
-- **LLM-Integration:** Siehe `backend/LLM_INTEGRATION.md`
-- **Agent-System:** Siehe `backend/AGENTS_README.md`
+- **Ports:** Nur `443/tcp` (HTTPS) von außen. SSH ausschließlich via WireGuard/VPN oder per Port-Knocking.
+- **Firewall:** `ufw default deny incoming`, explizite Allow-Regeln für WireGuard und HTTPS.
+- **Reverse Proxy:** Aktivierte HTTP-Security-Header, Rate-Limiting (`limit_req`), optional WAF (CrowdSec, Naxsi).
+- **Secrets:** `.env`-Dateien nur root-lesbar; idealerweise im Secret-Manager (Vault, SOPS) hinterlegt.
+- **CORS:** Nur DDNS-Domain + interne Admin-Hosts erlauben.
+- **Logging:** Systemd-Journal forwarden, Fail2ban aktivieren, Audit-Logs regelmäßig archivieren.
+
+---
+
+## 🧪 Validierung
+
+1. Login mit Standard-Admin (`admin@schmitz-intralogistik.de` / `admin123`) und Passwortwechsel erzwingen.
+2. Timesheet erstellen, PDF herunterladen, Signatur-Upload testen.
+3. Reisekosten-Report erzeugen und vom Agenten prüfen lassen (Ollama-Aufruf).
+4. Push-Benachrichtigungen (VAPID), SMTP-Versand und 2FA aktivieren.
+
+---
+
+## 📚 Weiterführende Ressourcen
+
+- `ARCHITEKTUR_ALL_INKL_PROXMOX.md` – aktualisierte Architekturübersicht (jetzt ohne All-inkl).
+- `backend/LLM_INTEGRATION.md` – Deep-Dive in Agenten & Ollama.
+- `OFFICE_RECHNER_ROUTING.md` – Tipps zu Routing, VPN und dynamischen IPs.
+- `DSGVO_COMPLIANCE.md` – Datenschutz, Verschlüsselung & Aufbewahrung.
+
+Mit dieser Anleitung betreibst du Tick Guard vollständig lokal, ohne externe Hosting-Anbieter. Der Frontend-Container fungiert als sicherer Gateway, während der Backend-Container alle sensiblen Daten im LAN verarbeitet. Die GMKTec-eigene LLM-Infrastruktur bleibt strikt im internen Netzwerk oder im WireGuard-VPN eingeschlossen.
 

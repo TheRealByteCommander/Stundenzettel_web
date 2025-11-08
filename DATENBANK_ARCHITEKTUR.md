@@ -1,6 +1,6 @@
 # 🗄️ Datenbank-Architektur - Klarstellung
 
-## ⚠️ WICHTIG: MySQL auf All-inkl.com ist NICHT notwendig für die aktuelle Architektur!
+## ⚠️ WICHTIG: MySQL ist für die aktuelle Architektur NICHT erforderlich!
 
 ### ✅ Aktuelle Architektur (Python/FastAPI)
 
@@ -15,8 +15,8 @@
 - Agent-System nutzt MongoDB für Memory-System
 
 **Wo läuft MongoDB?**
-- Auf **Proxmox Server** (lokal) ODER
-- Remote/Cloud (z.B. MongoDB Atlas)
+- Im **Backend-Container** auf Proxmox (Standardfall)
+- Alternativ als Managed Instanz (z. B. MongoDB Atlas)
 
 **Konfiguration:**
 ```env
@@ -72,14 +72,7 @@ python migration_tool.py \
   - Reisekosten-App mit Agents
   - Urlaubsplaner mit Feiertags-Integration
 
-**MySQL-Konfiguration (nur für Legacy PHP):**
-- MySQL-Datenbank auf All-inkl.com
-- `webapp/api/config/database.php` konfigurieren
-- Legacy PHP-Version nutzt MySQL statt MongoDB
-
-**Empfehlung:**
-- ❌ **NICHT verwenden** - PHP-Version ist Legacy
-- ✅ Verwenden Sie die aktuelle Python/FastAPI-Version auf Proxmox
+**Empfehlung:** ❌ Nicht verwenden – PHP-Version ist Legacy und nicht feature-par.
 
 ---
 
@@ -89,13 +82,13 @@ python migration_tool.py \
 |----------|-----------|-----|-------------|
 | **Aktuelle Architektur** | MongoDB | Proxmox (oder remote) | ✅ Immer |
 | **Migration** | MySQL (Source) | Alte DB (read-only) | ⚠️ Einmalig |
-| **Legacy PHP** | MySQL | All-inkl.com | ❌ Nicht empfohlen |
+| **Legacy PHP** | MySQL | Externes Shared Hosting (z. B. All-inkl) | ❌ Nicht empfohlen |
 
 ---
 
 ## ❌ Häufige Fehler vermeiden
 
-### ❌ FALSCH: MySQL auf All-inkl für aktuelle Architektur
+### ❌ FALSCH: MySQL in der aktuellen (Python/FastAPI) Architektur
 
 **Problem:**
 - Aktuelle Python/FastAPI-Version nutzt MongoDB
@@ -107,24 +100,22 @@ python migration_tool.py \
 - Oder MongoDB Atlas (Cloud) verwenden
 - `.env` Datei: `MONGO_URL=mongodb://...`
 
-### ❌ FALSCH: Backend auf All-inkl installieren
+### ❌ FALSCH: Backend auf Shared Hosting installieren
 
 **Problem:**
 - All-inkl unterstützt kein Python/FastAPI
 - MongoDB nicht verfügbar
 - Agents können nicht laufen
 
-**Lösung:**
-- Backend auf Proxmox installieren
-- Frontend auf All-inkl (nur statische Dateien)
+**Lösung:** Backend im Proxmox-Container betreiben, Frontend-Gateway ebenfalls lokal (mit DDNS/Reverse Proxy).
 
 ### ✅ RICHTIG: Architektur
 
 ```
-Frontend (All-inkl) → Backend (Proxmox) → MongoDB (Proxmox)
+Internet → DDNS → Frontend-Gateway (Proxmox) → Backend & MongoDB (Proxmox)
 ```
 
-**Keine MySQL-Datenbank auf All-inkl nötig!**
+**Keine zusätzliche MySQL-Datenbank erforderlich!**
 
 ---
 
