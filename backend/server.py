@@ -1203,7 +1203,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 
 @limiter.limit("5/minute")  # Max 5 Login-Versuche pro Minute
 @api_router.post("/auth/login")
-async def login(user_login: UserLogin):
+async def login(request: Request, user_login: UserLogin):
     user = await db.users.find_one({"email": user_login.email})
     if not user or not verify_password(user_login.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -1263,7 +1263,7 @@ async def login(user_login: UserLogin):
 
 @limiter.limit("3/hour")  # Max 3 Registrierungen pro Stunde
 @api_router.post("/auth/register")
-async def register(user_create: UserCreate, current_user: User = Depends(get_admin_user)):
+async def register(request: Request, user_create: UserCreate, current_user: User = Depends(get_admin_user)):
     # Check if user exists
     existing_user = await db.users.find_one({"email": user_create.email})
     if existing_user:
@@ -2360,6 +2360,7 @@ async def send_timesheet_email(timesheet_id: str, current_user: User = Depends(g
 @limiter.limit("10/hour")  # Max 10 Uploads pro Stunde
 @api_router.post("/timesheets/{timesheet_id}/upload-signed")
 async def upload_signed_timesheet(
+    request: Request,
     timesheet_id: str,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
@@ -3141,6 +3142,7 @@ async def submit_expense_report(
 @limiter.limit("20/hour")  # Max 20 Belege-Uploads pro Stunde
 @api_router.post("/travel-expense-reports/{report_id}/upload-receipt")
 async def upload_receipt(
+    request: Request,
     report_id: str,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
@@ -3424,6 +3426,7 @@ async def upload_receipt(
 @limiter.limit("20/hour")  # Max 20 Nachweis-Uploads pro Stunde
 @api_router.post("/travel-expense-reports/{report_id}/receipts/{receipt_id}/upload-exchange-proof")
 async def upload_exchange_proof(
+    request: Request,
     report_id: str,
     receipt_id: str,
     file: UploadFile = File(...),
