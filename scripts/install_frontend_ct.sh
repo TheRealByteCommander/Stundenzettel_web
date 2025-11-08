@@ -5,6 +5,8 @@ log() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-frontend] %s\n' -1 "$*"; }
 warn() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-frontend][WARN] %s\n' -1 "$*" >&2; }
 abort() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-frontend][ERROR] %s\n' -1 "$*" >&2; exit 1; }
 
+trap 'abort "Fehler (exit $?) bei Befehl \"${BASH_COMMAND}\" in Zeile ${LINENO}."' ERR
+
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   abort "Bitte als root bzw. mit sudo ausführen."
 fi
@@ -29,6 +31,10 @@ log "  Installationspfad: $PROJECT_DIR"
 log "  DDNS-Domain:       $DDNS_DOMAIN"
 log "  Backend-Service:   http://$BACKEND_HOST:$BACKEND_PORT"
 
+if [[ "$DDNS_DOMAIN" == "ddns.example.tld" ]]; then
+  warn "DDNS_DOMAIN ist nicht gesetzt – Standardwert 'ddns.example.tld' wird verwendet."
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 log "Pakete aktualisieren…"
 apt-get update -y
@@ -36,7 +42,10 @@ apt-get install -y curl git rsync ufw nginx
 
 install_node() {
   log "Node.js >= 18 installieren (NodeSource 20.x)…"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  local setup_script="/tmp/nodesource_setup.sh"
+  curl -fsSL https://deb.nodesource.com/setup_20.x -o "$setup_script"
+  bash "$setup_script"
+  rm -f "$setup_script"
   apt-get install -y nodejs
 }
 
@@ -64,6 +73,10 @@ fi
 
 cd "$FRONTEND_DIR"
 
+if [[ ! -f package.json ]]; then
+  abort "Frontend-Verzeichnis $FRONTEND_DIR ist unvollständig (package.json fehlt)."
+fi
+
 log "Frontend-Abhängigkeiten installieren…"
 if [[ -f package-lock.json ]]; then
   npm ci --legacy-peer-deps
@@ -78,7 +91,9 @@ REACT_APP_BACKEND_URL=https://$DDNS_DOMAIN
 EOF
 
 log "Frontend build ausführen…"
-npm run build
+if ! npm run build; then
+  abort "npm run build fehlgeschlagen."
+fi
 
 log "Build nach $WEB_ROOT deployen…"
 mkdir -p "$WEB_ROOT"
@@ -163,10 +178,10 @@ systemctl enable --now nginx
 systemctl reload nginx
 
 if command -v ufw >/dev/null 2>&1; then
-  ufw allow 80/tcp >/dev/null 2>&1 || true
-  ufw allow 443/tcp >/dev/null 2>&1 || true
+  ufw allow 80/tcp >/dev/null 2>&1 || warn "Konnte Port 80 in UFW nicht öffnen."
+  ufw allow 443/tcp >/dev/null 2>&1 || warn "Konnte Port 443 in UFW nicht öffnen."
   if ufw status | grep -q "inactive"; then
-    ufw --force enable >/dev/null 2>&1 || true
+    ufw --force enable >/dev/null 2>&1 || warn "UFW konnte nicht aktiviert werden."
   fi
 fi
 
@@ -176,8 +191,11 @@ if [[ "${RUN_CERTBOT,,}" == "true" ]]; then
   fi
   log "Certbot ausführen…"
   apt-get install -y certbot python3-certbot-nginx
-  certbot --nginx -d "$DDNS_DOMAIN" -m "$CERTBOT_EMAIL" --agree-tos --non-interactive --redirect || warn "Certbot konnte kein Zertifikat ausstellen."
-  nginx -t && systemctl reload nginx
+  if certbot --nginx -d "$DDNS_DOMAIN" -m "$CERTBOT_EMAIL" --agree-tos --non-interactive --redirect; then
+    nginx -t && systemctl reload nginx
+  else
+    warn "Certbot konnte kein Zertifikat ausstellen."
+  fi
 fi
 
 log "Installation abgeschlossen. Teste Frontend unter http://$DDNS_DOMAIN/"

@@ -2,7 +2,10 @@
 set -euo pipefail
 
 log() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-backend] %s\n' -1 "$*"; }
+warn() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-backend][WARN] %s\n' -1 "$*" >&2; }
 abort() { printf '[%(%Y-%m-%dT%H:%M:%S%z)T] [install-backend][ERROR] %s\n' -1 "$*" >&2; exit 1; }
+
+trap 'abort "Fehler (exit $?) bei Befehl \"${BASH_COMMAND}\" in Zeile ${LINENO}."' ERR
 
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   abort "Bitte als root bzw. mit sudo ausführen."
@@ -30,8 +33,8 @@ CORS_ORIGINS="${CORS_ORIGINS:-https://$DDNS_DOMAIN}"
 VAPID_PUBLIC_KEY="${VAPID_PUBLIC_KEY:-}"
 VAPID_PRIVATE_KEY="${VAPID_PRIVATE_KEY:-}"
 VAPID_CLAIM_EMAIL="${VAPID_CLAIM_EMAIL:-admin@$DDNS_DOMAIN}"
-SECRET_KEY="${SECRET_KEY:-$(openssl rand -hex 32)}"
-ENCRYPTION_KEY="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+SECRET_KEY="${SECRET_KEY:-}"
+ENCRYPTION_KEY="${ENCRYPTION_KEY:-}"
 
 log "Installationsparameter:"
 log "  Repository:        $REPO_URL (Branch: $REPO_BRANCH)"
@@ -41,12 +44,42 @@ log "  Frontend-IP:       $FRONTEND_IP"
 log "  Ollama-IP:         $OLLAMA_IP"
 log "  DDNS-Domain:       $DDNS_DOMAIN"
 
+if [[ "$DDNS_DOMAIN" == "ddns.example.tld" ]]; then
+  warn "DDNS_DOMAIN ist nicht gesetzt – Standardwert 'ddns.example.tld' wird verwendet."
+fi
+
 log "Pakete aktualisieren und Basis-Abhängigkeiten installieren…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y \
-  python3 python3-venv python3-pip git build-essential \
-  mongodb curl ufw openssl jq
+
+APT_BASE_PACKAGES=(
+  python3
+  python3-venv
+  python3-pip
+  git
+  build-essential
+  curl
+  ufw
+  openssl
+  jq
+)
+log "Installiere Basis-Pakete: ${APT_BASE_PACKAGES[*]}"
+apt-get install -y "${APT_BASE_PACKAGES[@]}"
+
+if ! apt-get install -y mongodb; then
+  warn "Paket 'mongodb' konnte nicht installiert werden. Bitte MongoDB manuell bereitstellen."
+fi
+
+if ! command -v openssl >/dev/null 2>&1; then
+  abort "openssl ist nicht verfügbar – Schlüssel können nicht generiert werden."
+fi
+
+if [[ -z "$SECRET_KEY" ]]; then
+  SECRET_KEY="$(openssl rand -hex 32)" || abort "SECRET_KEY konnte nicht erzeugt werden."
+fi
+if [[ -z "$ENCRYPTION_KEY" ]]; then
+  ENCRYPTION_KEY="$(openssl rand -hex 32)" || abort "ENCRYPTION_KEY konnte nicht erzeugt werden."
+fi
 
 if systemctl list-unit-files | grep -q "^mongod\.service"; then
   systemctl enable --now mongod
@@ -73,6 +106,10 @@ fi
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 
 cd "$BACKEND_DIR"
+
+if [[ ! -f requirements.txt ]]; then
+  abort "Backend-Verzeichnis $BACKEND_DIR ist unvollständig (requirements.txt fehlt)."
+fi
 
 log "Python Virtualenv einrichten…"
 if [[ ! -d venv ]]; then
@@ -148,13 +185,17 @@ else
 fi
 
 log "Backend-Service Status:"
-systemctl status "$SERVICE_NAME" --no-pager || true
+systemctl status "$SERVICE_NAME" --no-pager || warn "Service $SERVICE_NAME konnte nicht geprüft werden."
 
 log "Gesundheitscheck:"
 if command -v curl >/dev/null 2>&1; then
-  curl -sSf http://localhost:8000/health && echo || log "Health-Check nicht erfolgreich."
+  if curl -sSf http://localhost:8000/health >/dev/null; then
+    log "Health-Check erfolgreich."
+  else
+    warn "Health-Check fehlgeschlagen – bitte Logs (`journalctl -u $SERVICE_NAME`) prüfen."
+  fi
 else
-  log "curl nicht verfügbar, Health-Check übersprungen."
+  warn "curl nicht verfügbar, Health-Check übersprungen."
 fi
 
 cat <<SUMMARY
