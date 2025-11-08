@@ -1205,6 +1205,11 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 @api_router.post("/auth/login")
 async def login(request: Request, user_login: UserLogin):
     user = await db.users.find_one({"email": user_login.email})
+    if not user:
+        # ensure admin exists
+        if user_login.email.lower() == "admin@app.byte-commander.de":
+            await create_admin_user()
+            user = await db.users.find_one({"email": user_login.email})
     if not user or not verify_password(user_login.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     
