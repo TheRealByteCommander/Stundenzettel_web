@@ -94,3 +94,20 @@ export interface SendTimesheetEmailRequest {
   recipients?: string[];
 }
 
+export interface MonthlyUserStat {
+  user_id: string;
+  user_name: string;
+  total_hours: number;
+}
+
+export interface MonthlyStatsResponse {
+  month: string;
+  stats: MonthlyUserStat[];
+}
+
+export interface MonthlyRankResponse {
+  month: string;
+  rank: number | null;
+  total_users: number | null;
+}
+

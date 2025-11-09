@@ -2,7 +2,7 @@
 
 > **Rebuild-Status (Nov 2025)**  
 > - Auth & App-Shell: ✓ vollständig umgesetzt  
-> - Timesheets: Liste, Detail und Erstellung ✓ – Upload/Reporting noch offen  
+> - Timesheets: Liste, Detail, Erstellung & Monatsstatistik ✓ – Admin-Notizen & erweiterte Reports folgen  
 > - Übrige Module (Reisekosten, Urlaub, Admin, Push) folgen in kommenden Iterationen
 
 Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden React-Anwendung sowie die angebundenen API-Endpunkte und Kern-Datenmodelle. Grundlage sind `frontend/src/App.js` und die FastAPI-Definitionen in `backend/server.py`. Diese Inventur dient als Referenz für den schrittweisen Neuaufbau.

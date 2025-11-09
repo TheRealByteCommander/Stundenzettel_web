@@ -1,6 +1,8 @@
 import { apiClient } from "./client";
 import type {
   CreateTimesheetRequest,
+  MonthlyRankResponse,
+  MonthlyStatsResponse,
   SendTimesheetEmailRequest,
   UpdateTimesheetRequest,
   WeeklyTimesheet,
@@ -69,5 +71,25 @@ export const uploadSignedTimesheet = async (id: string, file: File) => {
       "Content-Type": "multipart/form-data",
     },
   });
+};
+
+export const fetchMonthlyStats = async (month: string) => {
+  const { data } = await apiClient.get<MonthlyStatsResponse>(
+    "/stats/monthly",
+    {
+      params: { month },
+    }
+  );
+  return data;
+};
+
+export const fetchMonthlyRank = async (month: string) => {
+  const { data } = await apiClient.get<MonthlyRankResponse>(
+    "/stats/monthly/rank",
+    {
+      params: { month },
+    }
+  );
+  return data;
 };
 

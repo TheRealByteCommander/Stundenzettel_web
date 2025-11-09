@@ -43,8 +43,8 @@
 - [x] Liste & Detailansicht inkl. Statuswechsel (Send/Approve/Reject) und Mailversand.
 - [x] Anlage neuer Stundenzettel mit grundlegender Formularlogik.
 - [x] Upload unterschriebener PDFs inkl. Rückmeldung im Detail.
+- [x] Monatsstatistik (Top-Liste & persönliche Platzierung im Dashboard).
 - [ ] Verifikationshinweise & Admin-spezifische Aktionen (z. B. QA-Notizen).
-- [ ] Statistiken/Reporting (Monatsübersichten, Ranking).
 
 ## Arbeitspakete (Iteration 4 – Reisekosten**
 1. **Reisekostenmodul**  
