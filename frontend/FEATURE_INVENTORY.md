@@ -39,6 +39,7 @@ Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden Reac
 - Upload unterschriebener Stundenzettel (`/timesheets/{id}/upload-signed`).
 - Admin-Workflows:
   - Genehmigen/Ablehnen (`/timesheets/{id}/approve`, `/timesheets/{id}/reject`).
+  - Übersicht für Buchhaltung (`/accounting/timesheets-list`) inkl. manueller Prüfung.
   - Löschen (Admin) (`/timesheets/{id}` DELETE).
 - Statistiken & Ranglisten:
   - Monatsstunden je Nutzer (`/stats/monthly`).

@@ -60,6 +60,7 @@ Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 - Liste, Detailansicht & Erstellung von Wochen-Stundenzetteln  
 - Statuswechsel (Entwurf → gesendet → genehmigt), Mailversand  
 - Upload unterschriebener PDF-Stundenzettel mit Feedback  
-- Monatsstatistik inkl. persönlicher Platzierung auf dem Dashboard
+- Monatsstatistik inkl. persönlicher Platzierung auf dem Dashboard  
+- Admin-/Buchhaltungsansicht zur manuellen Prüfung und Genehmigung
 
 Weitere Module (Timesheet-Reporting, Reisekosten, Admin, …) werden gemäß Roadmap sukzessive migriert.

@@ -58,6 +58,14 @@ export const ProtectedLayout = () => {
             >
               Stundenzettel
             </button>
+            {(user.role === "admin" || user.role === "accounting") && (
+              <button
+                className="text-brand-gray hover:text-brand-primary"
+                onClick={() => navigate("/app/timesheets/admin/review")}
+              >
+                Prüfung
+              </button>
+            )}
           </nav>
           <div className="flex items-center gap-4">
             <div className="text-right text-sm text-gray-600">

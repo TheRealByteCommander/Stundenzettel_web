@@ -8,6 +8,7 @@ import { DashboardPage } from "../modules/dashboard/pages/DashboardPage";
 import { TimesheetListPage } from "../modules/timesheets/pages/TimesheetListPage";
 import { TimesheetDetailPage } from "../modules/timesheets/pages/TimesheetDetailPage";
 import { TimesheetCreatePage } from "../modules/timesheets/pages/TimesheetCreatePage";
+import { TimesheetAdminPage } from "../modules/timesheets/pages/TimesheetAdminPage";
 import { ProtectedLayout } from "./layouts/ProtectedLayout";
 
 const router = createBrowserRouter([
@@ -37,6 +38,10 @@ const router = createBrowserRouter([
           {
             path: "new",
             element: <TimesheetCreatePage />,
+          },
+          {
+            path: "admin/review",
+            element: <TimesheetAdminPage />,
           },
           {
             path: ":id",

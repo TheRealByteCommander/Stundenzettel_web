@@ -93,3 +93,23 @@ export const fetchMonthlyRank = async (month: string) => {
   return data;
 };
 
+export interface AccountingTimesheetParams {
+  month?: string;
+  userId?: string;
+}
+
+export const fetchAccountingTimesheets = async (
+  params: AccountingTimesheetParams
+) => {
+  const { data } = await apiClient.get<WeeklyTimesheet[]>(
+    "/accounting/timesheets-list",
+    {
+      params: {
+        month: params.month,
+        user_id: params.userId,
+      },
+    }
+  );
+  return data;
+};
+
