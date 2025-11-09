@@ -681,7 +681,8 @@ A: Nein, genehmigter Urlaub kann **nicht mehr geändert** werden. Kontaktieren S
 
 ### Administrator
 
-**E-Mail:** admin@app.byte-commander.de
+**E-Mail:** admin@schmitz-intralogistik.de  
+*(Legacy: admin@app.byte-commander.de)*
 
 ---
 

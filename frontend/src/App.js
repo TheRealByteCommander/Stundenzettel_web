@@ -17,26 +17,45 @@ import { Alert, AlertDescription } from './components/ui/alert';
 import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
 
-const resolveBackendUrl = () => {
+const resolveApiConfig = () => {
   const envUrl = process.env.REACT_APP_BACKEND_URL?.trim();
   if (envUrl) {
-    return envUrl.replace(/\/+$/, '');
+    let useEnv = true;
+    try {
+      const { hostname } = new URL(envUrl);
+      const blockedHosts = ['preview.emergentagent.com'];
+      if (blockedHosts.some((blocked) => hostname === blocked || hostname.endsWith(`.${blocked}`))) {
+        useEnv = false;
+      }
+    } catch (error) {
+      useEnv = false;
+    }
+
+    if (useEnv) {
+      const normalized = envUrl.replace(/\/+$/, '');
+      return {
+        backendBaseUrl: normalized,
+        apiBaseUrl: `${normalized}/api`,
+      };
+    }
   }
+
   if (typeof window === 'undefined') {
-    return 'http://localhost:8000';
+    return {
+      backendBaseUrl: 'http://localhost:8000',
+      apiBaseUrl: 'http://localhost:8000/api',
+    };
   }
-  const { protocol, hostname, port } = window.location;
-  const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
-  if (isLocalHost && port && port !== '8000') {
-    return `${protocol}//${hostname}:8000`;
-  }
-  const isStandardPort = port === '' || port === '80' || port === '443';
-  const portSuffix = isStandardPort ? '' : `:${port}`;
-  return `${protocol}//${hostname}${portSuffix}`;
+
+  return {
+    backendBaseUrl: window.location.origin,
+    apiBaseUrl: '/api',
+  };
 };
 
-const BACKEND_URL = resolveBackendUrl();
-const API = `${BACKEND_URL}/api`;
+const { backendBaseUrl: BACKEND_URL, apiBaseUrl: API } = resolveApiConfig();
+const DEFAULT_ADMIN_EMAIL = process.env.REACT_APP_DEFAULT_ADMIN_EMAIL?.trim() || 'admin@schmitz-intralogistik.de';
+const DEFAULT_ADMIN_PASSWORD = process.env.REACT_APP_DEFAULT_ADMIN_PASSWORD?.trim() || 'admin123';
 
 // Axios interceptor for automatic token refresh and error handling
 axios.interceptors.request.use(
@@ -1511,7 +1530,7 @@ function App() {
             </form>
             <div className="mt-4 text-center text-sm" style={{ color: colors.gray }}>
               <p>Standard Admin:</p>
-              <p>admin@app.byte-commander.de / admin123</p>
+              <p>{`${DEFAULT_ADMIN_EMAIL} / ${DEFAULT_ADMIN_PASSWORD}`}</p>
             </div>
           </CardContent>
         </Card>

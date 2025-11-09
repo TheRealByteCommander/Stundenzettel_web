@@ -38,6 +38,16 @@ from pywebpush import webpush, WebPushException
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+DEFAULT_ADMIN_EMAIL = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@schmitz-intralogistik.de").strip().lower()
+DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
+DEFAULT_ADMIN_NAME = os.getenv("DEFAULT_ADMIN_NAME", "Administrator").strip() or "Administrator"
+LEGACY_ADMIN_EMAILS = {
+    email.strip().lower()
+    for email in os.getenv("LEGACY_ADMIN_EMAILS", "admin@app.byte-commander.de").split(",")
+    if email.strip()
+}
+LEGACY_ADMIN_EMAILS.add(DEFAULT_ADMIN_EMAIL)
+
 # MongoDB connection
 mongo_url = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
@@ -1208,14 +1218,24 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 @limiter.limit("5/minute")  # Max 5 Login-Versuche pro Minute
 @api_router.post("/auth/login")
 async def login(request: Request, user_login: UserLogin):
-    user = await db.users.find_one({"email": user_login.email})
+    requested_email = user_login.email.strip()
+    user = await db.users.find_one({"email": requested_email})
     if not user:
-        # ensure admin exists
-        if user_login.email.lower() == "admin@app.byte-commander.de":
-            created = await create_admin_user()
+        normalized_email = requested_email.lower()
+        if normalized_email != requested_email:
+            user = await db.users.find_one({"email": normalized_email})
+        else:
+            normalized_email = requested_email.lower()
+    else:
+        normalized_email = requested_email.lower()
+
+    if not user:
+        admin_candidates = LEGACY_ADMIN_EMAILS | {DEFAULT_ADMIN_EMAIL}
+        if normalized_email in admin_candidates:
+            created = await create_admin_user(email=normalized_email)
             if created:
                 logger.info("Admin user auto-created during login attempt.")
-            user = await db.users.find_one({"email": user_login.email})
+            user = await db.users.find_one({"email": normalized_email})
     if not user or not verify_password(user_login.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     
@@ -2614,23 +2634,24 @@ async def startup_tasks():
     logger.info("DSGVO Compliance: Retention manager initialized")
     logger.info("EU-AI-Act Compliance: AI transparency logging enabled")
 
-async def create_admin_user():
-    admin = await db.users.find_one({"email": "admin@app.byte-commander.de"})
+async def create_admin_user(email: Optional[str] = None):
+    target_email = (email or DEFAULT_ADMIN_EMAIL).strip().lower()
+    admin = await db.users.find_one({"email": target_email})
     if admin:
         return False
     two_fa_secret = pyotp.random_base32()
     admin_user = User(
-        email="admin@app.byte-commander.de",
-        name="Administrator",
+        email=target_email,
+        name=DEFAULT_ADMIN_NAME,
         role="admin",
-        hashed_password=get_password_hash("admin123"),
+        hashed_password=get_password_hash(DEFAULT_ADMIN_PASSWORD),
         two_fa_secret=two_fa_secret,
         two_fa_enabled=False
     )
     admin_dict = admin_user.model_dump()
     admin_dict["is_admin"] = True
     await db.users.insert_one(admin_dict)
-    logger.info("Admin user created: admin@app.byte-commander.de / admin123 (2FA pending)")
+    logger.info(f"Admin user created: {target_email} / {DEFAULT_ADMIN_PASSWORD} (2FA pending)")
     return True
 
 # Security Headers Middleware
