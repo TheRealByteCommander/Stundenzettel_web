@@ -42,7 +42,8 @@
 ### Iteration 3 – Timesheets ⏳ (laufend)
 - [x] Liste & Detailansicht inkl. Statuswechsel (Send/Approve/Reject) und Mailversand.
 - [x] Anlage neuer Stundenzettel mit grundlegender Formularlogik.
-- [ ] Upload unterschriebener PDFs, Verifikationshinweise & Admin-spezifische Aktionen.
+- [x] Upload unterschriebener PDFs inkl. Rückmeldung im Detail.
+- [ ] Verifikationshinweise & Admin-spezifische Aktionen (z. B. QA-Notizen).
 - [ ] Statistiken/Reporting (Monatsübersichten, Ranking).
 
 ## Arbeitspakete (Iteration 4 – Reisekosten**

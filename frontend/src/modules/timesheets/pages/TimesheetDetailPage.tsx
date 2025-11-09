@@ -1,12 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
 import {
   useApproveTimesheetMutation,
   useRejectTimesheetMutation,
   useSendTimesheetEmailMutation,
   useTimesheetQuery,
+  useUploadSignedTimesheetMutation,
 } from "../hooks/useTimesheets";
 
 const statusLabels: Record<string, string> = {
@@ -18,10 +20,18 @@ const statusLabels: Record<string, string> = {
 export const TimesheetDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data, isLoading, error } = useTimesheetQuery(id);
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useTimesheetQuery(id);
   const approveMutation = useApproveTimesheetMutation(id ?? "");
   const rejectMutation = useRejectTimesheetMutation(id ?? "");
   const sendMutation = useSendTimesheetEmailMutation(id ?? "");
+  const uploadMutation = useUploadSignedTimesheetMutation(id ?? "");
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const totalHours = useMemo(() => {
     if (!data) return 0;
@@ -66,6 +76,33 @@ export const TimesheetDetailPage = () => {
     );
   }
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !id) {
+      return;
+    }
+    setUploadMessage(null);
+    setUploadError(null);
+
+    uploadMutation.mutate(file, {
+      onSuccess: async () => {
+        setUploadMessage("Unterschriebener Stundenzettel wurde hochgeladen.");
+        await refetch();
+      },
+      onError: (err) => {
+        const detail =
+          (err.response?.data as { detail?: string } | undefined)?.detail ??
+          err.message;
+        setUploadError(
+          detail ??
+            "Upload fehlgeschlagen. Bitte versuchen Sie es erneut."
+        );
+      },
+    });
+
+    event.target.value = "";
+  };
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
       <Button variant="outline" onClick={() => navigate(-1)}>
@@ -83,6 +120,23 @@ export const TimesheetDetailPage = () => {
               Status: {statusLabels[data.status] ?? data.status} • Gesamtstunden:{" "}
               {totalHours.toFixed(2).replace(".", ",")}
             </p>
+            {data.signed_pdf_path && (
+              <p className="mt-1 text-sm text-gray-500">
+                Unterschriebenes Dokument: {data.signed_pdf_path}
+                {data.signed_pdf_verified !== undefined && (
+                  <>
+                    {" "}
+                    • Verifiziert:{" "}
+                    {data.signed_pdf_verified ? "Ja" : "Nein"}
+                  </>
+                )}
+                {data.signed_pdf_verification_notes && (
+                  <span className="block text-xs text-gray-500">
+                    Hinweis: {data.signed_pdf_verification_notes}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -107,6 +161,33 @@ export const TimesheetDetailPage = () => {
               Ablehnen
             </Button>
           </div>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <h2 className="text-lg font-semibold text-brand-gray">
+            Unterschriebenen Stundenzettel hochladen
+          </h2>
+          <p className="text-sm text-gray-600">
+            Akzeptiert werden PDF-Dateien mit der unterschriebenen Version dieses
+            Stundenzettels.
+          </p>
+          <div className="flex items-center gap-4">
+            <Input
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileUpload}
+              disabled={uploadMutation.isPending}
+            />
+            {uploadMutation.isPending && (
+              <span className="text-sm text-gray-500">
+                Upload läuft…
+              </span>
+            )}
+          </div>
+          {uploadMessage && <Alert variant="success">{uploadMessage}</Alert>}
+          {uploadError && (
+            <Alert variant="destructive">{uploadError}</Alert>
+          )}
         </div>
 
         <div className="mt-6 overflow-hidden rounded-lg border border-gray-200">

@@ -60,3 +60,14 @@ export const rejectTimesheet = async (id: string) => {
   await apiClient.post(`/timesheets/${id}/reject`);
 };
 
+export const uploadSignedTimesheet = async (id: string, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  await apiClient.post(`/timesheets/${id}/upload-signed`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
+

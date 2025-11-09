@@ -13,6 +13,7 @@ import {
   rejectTimesheet,
   sendTimesheetEmail,
   updateTimesheet,
+  uploadSignedTimesheet,
 } from "../../../services/api/timesheets";
 import type {
   CreateTimesheetRequest,
@@ -94,6 +95,17 @@ export const useRejectTimesheetMutation = (id: string) => {
   const client = useQueryClient();
   return useMutation<void, AxiosError>({
     mutationFn: () => rejectTimesheet(id),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: timesheetsQueryKey });
+      client.invalidateQueries({ queryKey: [...timesheetsQueryKey, id] });
+    },
+  });
+};
+
+export const useUploadSignedTimesheetMutation = (id: string) => {
+  const client = useQueryClient();
+  return useMutation<void, AxiosError, File>({
+    mutationFn: (file) => uploadSignedTimesheet(id, file),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: timesheetsQueryKey });
       client.invalidateQueries({ queryKey: [...timesheetsQueryKey, id] });

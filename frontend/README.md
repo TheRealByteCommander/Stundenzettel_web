@@ -55,4 +55,10 @@ Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 - Geschütztes Layout inkl. Logout  
 - React Query / Axios Client + Interceptoren  
 
-Weitere Module (Timesheets, Reisekosten, Admin, …) werden gemäß Roadmap sukzessive migriert.
+✅ Iteration 3 (Teilumfang) – Timesheets:
+
+- Liste, Detailansicht & Erstellung von Wochen-Stundenzetteln  
+- Statuswechsel (Entwurf → gesendet → genehmigt), Mailversand  
+- Upload unterschriebener PDF-Stundenzettel mit Feedback
+
+Weitere Module (Timesheet-Reporting, Reisekosten, Admin, …) werden gemäß Roadmap sukzessive migriert.
