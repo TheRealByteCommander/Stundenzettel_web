@@ -17,14 +17,32 @@ import { Alert, AlertDescription } from './components/ui/alert';
 import { sanitizeHTML, sanitizeInput, validateEmail, validatePassword, validateFilename, escapeHTML, setSecureToken, getSecureToken, clearSecureToken, checkRateLimit } from './utils/security';
 import './App.css';
 
+const BLOCKED_BACKEND_HOSTS = ['preview.emergentagent.com'];
+const LAN_BACKEND_HOST_MAP = {
+  '192.168.178.150': 'http://192.168.178.151:8000',
+  '192.168.178.151': 'http://192.168.178.151:8000',
+};
+
+const isBlockedBackendHost = (hostname) => {
+  if (!hostname) return false;
+  return BLOCKED_BACKEND_HOSTS.some((blocked) => {
+    const normalizedBlocked = blocked.toLowerCase();
+    const normalizedHost = hostname.toLowerCase();
+    return (
+      normalizedHost === normalizedBlocked ||
+      normalizedHost.endsWith(`.${normalizedBlocked}`) ||
+      normalizedHost.includes(normalizedBlocked)
+    );
+  });
+};
+
 const resolveApiConfig = () => {
   const envUrl = process.env.REACT_APP_BACKEND_URL?.trim();
   if (envUrl) {
     let useEnv = true;
     try {
       const { hostname } = new URL(envUrl);
-      const blockedHosts = ['preview.emergentagent.com'];
-      if (blockedHosts.some((blocked) => hostname === blocked || hostname.endsWith(`.${blocked}`))) {
+      if (isBlockedBackendHost(hostname)) {
         useEnv = false;
       }
     } catch (error) {
@@ -42,14 +60,25 @@ const resolveApiConfig = () => {
 
   if (typeof window === 'undefined') {
     return {
-      backendBaseUrl: 'http://localhost:8000',
-      apiBaseUrl: 'http://localhost:8000/api',
+      backendBaseUrl: 'http://192.168.178.151:8000',
+      apiBaseUrl: 'http://192.168.178.151:8000/api',
     };
   }
 
+  const { origin, hostname } = window.location;
+  const mappedBackend = LAN_BACKEND_HOST_MAP[hostname];
+  if (mappedBackend) {
+    const normalized = mappedBackend.replace(/\/+$/, '');
+    return {
+      backendBaseUrl: normalized,
+      apiBaseUrl: `${normalized}/api`,
+    };
+  }
+
+  const normalizedOrigin = origin.replace(/\/+$/, '');
   return {
-    backendBaseUrl: window.location.origin,
-    apiBaseUrl: '/api',
+    backendBaseUrl: normalizedOrigin,
+    apiBaseUrl: `${normalizedOrigin}/api`,
   };
 };
 

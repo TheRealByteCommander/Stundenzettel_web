@@ -47,6 +47,11 @@ LEGACY_ADMIN_EMAILS = {
     if email.strip()
 }
 LEGACY_ADMIN_EMAILS.add(DEFAULT_ADMIN_EMAIL)
+TEST_ANNOUNCEMENT_TITLE = os.getenv("TEST_ANNOUNCEMENT_TITLE", "Testsystem-Ankündigung")
+TEST_ANNOUNCEMENT_CONTENT = os.getenv(
+    "TEST_ANNOUNCEMENT_CONTENT",
+    "<p>Dies ist eine automatische Test-Ankündigung, um die Frontend-Anzeige zu verifizieren.</p>"
+)
 
 # MongoDB connection
 mongo_url = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
@@ -80,7 +85,7 @@ audit_logger = AuditLogger()
 retention_manager = RetentionManager(db)
 
 # Ollama configuration
-OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://192.168.178.155:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
 
 # JWT and Password settings
@@ -2631,8 +2636,26 @@ async def get_smtp_config(current_user: User = Depends(get_admin_user)):
 async def startup_tasks():
     """Startup tasks: create admin user and setup compliance"""
     await create_admin_user()
+    await ensure_test_announcement()
     logger.info("DSGVO Compliance: Retention manager initialized")
     logger.info("EU-AI-Act Compliance: AI transparency logging enabled")
+
+async def ensure_test_announcement():
+    existing = await db.announcements.find_one({"title": TEST_ANNOUNCEMENT_TITLE})
+    if existing:
+        return False
+    announcement = Announcement(
+        title=TEST_ANNOUNCEMENT_TITLE,
+        content=TEST_ANNOUNCEMENT_CONTENT,
+        active=True,
+        created_by="system"
+    )
+    announcement_dict = announcement.model_dump()
+    announcement_dict["created_at"] = datetime.utcnow()
+    announcement_dict["updated_at"] = datetime.utcnow()
+    await db.announcements.insert_one(announcement_dict)
+    logger.info("Test announcement created for verification.")
+    return True
 
 async def create_admin_user(email: Optional[str] = None):
     target_email = (email or DEFAULT_ADMIN_EMAIL).strip().lower()
@@ -2703,7 +2726,10 @@ app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS-Konfiguration aus Umgebungsvariablen
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://app.byte-commander.de,http://localhost:3000,http://localhost:8000").split(",")
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "https://app.byte-commander.de,http://localhost:3000,http://localhost:8000,http://192.168.178.150,http://192.168.178.151"
+).split(",")
 CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS if origin.strip()]
 
 app.add_middleware(
