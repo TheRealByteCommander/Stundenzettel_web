@@ -1,70 +1,58 @@
-# Getting Started with Create React App
+# Tick Guard Frontend (Rebuild)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Neuer React/Vite/TypeScript-Client für Tick Guard. Die bisherigen shadcn/CRA-Bestände sind unter `frontend_legacy/` archiviert und dienen nur noch als Referenz während der Migration.
 
-## Available Scripts
+## Technologie-Stack
 
-In the project directory, you can run:
+- [Vite](https://vitejs.dev/) + React 19 + TypeScript
+- TailwindCSS 3 & eigene UI-Komponenten (Button, Card, etc.)
+- Zustand (Session-State) & TanStack Query (Server-State)
+- React Router v7
+- Axios-basierter API-Client mit JWT/2FA-Unterstützung
 
-### `npm start`
+Architektur- und Migrationsdetails: siehe  
+- `ARCHITECTURE_PLAN.md`  
+- `REBUILD_PLAN.md`  
+- `FEATURE_INVENTORY.md`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Setup
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```bash
+# Install dependencies
+npm install
 
-### `npm test`
+# Lokaler Dev-Server
+npm run dev
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+# Typprüfung + Build
+npm run build
 
-### `npm run build`
+# Linting
+npm run lint
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Vite benötigt Node ≥ 20.19 oder ≥ 22.12 (Hinweis wird aktuell auf Node 20.15 noch angezeigt).
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Konfiguration
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Die folgenden Variablen werden per `.env` (nicht versioniert) erwartet:
 
-### `npm run eject`
+```
+VITE_API_BASE_URL=http://192.168.178.151:8000/api
+VITE_DEFAULT_ADMIN_EMAIL=admin@schmitz-intralogistik.de
+VITE_DEFAULT_ADMIN_PASSWORD=admin123
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Implementierungsstand
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+✅ Iteration 2 – Auth & App-Shell:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- Login mit E-Mail/Passwort + Validierung  
+- 2FA-Flow (Verify & Initial Setup inkl. QR)  
+- Session-Persistenz via Zustand  
+- Geschütztes Layout inkl. Logout  
+- React Query / Axios Client + Interceptoren  
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Weitere Module (Timesheets, Reisekosten, Admin, …) werden gemäß Roadmap sukzessive migriert.
