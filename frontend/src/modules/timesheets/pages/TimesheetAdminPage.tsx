@@ -9,6 +9,7 @@ import {
   useAccountingApproveMutation,
   useAccountingRejectMutation,
   useAccountingTimesheetsQuery,
+  useAccountingUpdateVerificationMutation,
 } from "../hooks/useAccountingTimesheets";
 
 const getCurrentMonth = () => {
@@ -20,6 +21,10 @@ export const TimesheetAdminPage = () => {
   const { data: user } = useCurrentUserQuery();
   const isAccounting = user?.role === "admin" || user?.role === "accounting";
   const [month, setMonth] = useState(getCurrentMonth);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [verifiedDraft, setVerifiedDraft] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const params = useMemo(
     () => ({
@@ -31,6 +36,40 @@ export const TimesheetAdminPage = () => {
   const { data, isLoading, error } = useAccountingTimesheetsQuery(params);
   const approveMutation = useAccountingApproveMutation();
   const rejectMutation = useAccountingRejectMutation();
+  const updateVerificationMutation = useAccountingUpdateVerificationMutation();
+
+  const startEdit = (timesheetId: string, note: string | null | undefined, verified: boolean | null | undefined) => {
+    setEditingId(timesheetId);
+    setNoteDraft(note ?? "");
+    setVerifiedDraft(Boolean(verified));
+    setFormError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setNoteDraft("");
+    setVerifiedDraft(false);
+    setFormError(null);
+  };
+
+  const handleSaveNotes = () => {
+    if (!editingId) return;
+    updateVerificationMutation.mutate(
+      {
+        id: editingId,
+        params,
+        notes: noteDraft,
+        verified: verifiedDraft,
+      },
+      {
+        onSuccess: cancelEdit,
+        onError: (err) => {
+          const detail = (err.response?.data as { detail?: string } | undefined)?.detail ?? err.message;
+          setFormError(detail ?? "Speichern fehlgeschlagen.");
+        },
+      }
+    );
+  };
 
   if (!isAccounting) {
     return (
@@ -140,6 +179,19 @@ export const TimesheetAdminPage = () => {
                             Details
                           </Link>
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            startEdit(
+                              timesheet.id,
+                              timesheet.signed_pdf_verification_notes,
+                              timesheet.signed_pdf_verified
+                            )
+                          }
+                        >
+                          Prüfbemerkung
+                        </Button>
                         {(timesheet.status === "sent" ||
                           timesheet.status === "draft") && (
                           <Button
@@ -177,6 +229,45 @@ export const TimesheetAdminPage = () => {
               )}
             </tbody>
           </table>
+          {editingId && (
+            <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <h2 className="text-sm font-semibold text-brand-gray">
+                Prüfbemerkung bearbeiten
+              </h2>
+              <div className="mt-3 flex flex-col gap-3">
+                <label className="text-sm text-gray-600" htmlFor="verification-notes">
+                  Notiz
+                </label>
+                <textarea
+                  id="verification-notes"
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  className="min-h-[120px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                />
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={verifiedDraft}
+                    onChange={(event) => setVerifiedDraft(event.target.checked)}
+                  />
+                  Unterschrift verifiziert (manuell)
+                </label>
+                {formError && <Alert variant="destructive">{formError}</Alert>}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveNotes}
+                    disabled={updateVerificationMutation.isPending}
+                  >
+                    {updateVerificationMutation.isPending ? "Speichere..." : "Speichern"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={cancelEdit}>
+                    Abbrechen
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

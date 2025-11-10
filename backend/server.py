@@ -296,6 +296,8 @@ class TimeEntry(BaseModel):
 class TimesheetUpdate(BaseModel):
     week_start: Optional[str] = None
     entries: Optional[List[TimeEntry]] = None
+    signed_pdf_verification_notes: Optional[str] = None
+    signed_pdf_verified: Optional[bool] = None
 
 class WeeklyTimesheet(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -2129,6 +2131,14 @@ async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate,
             db
         )
         update_data["entries"] = [entry.model_dump() for entry in entries_with_vacation]
+    
+    if timesheet_update.signed_pdf_verification_notes is not None or timesheet_update.signed_pdf_verified is not None:
+        if not current_user.can_view_all_data():
+            raise HTTPException(status_code=403, detail="Nur Buchhaltung oder Admin können Prüfbemerkungen bearbeiten")
+        if timesheet_update.signed_pdf_verification_notes is not None:
+            update_data["signed_pdf_verification_notes"] = timesheet_update.signed_pdf_verification_notes
+        if timesheet_update.signed_pdf_verified is not None:
+            update_data["signed_pdf_verified"] = timesheet_update.signed_pdf_verified
     
     if update_data:
         await db.timesheets.update_one({"id": timesheet_id}, {"$set": update_data})

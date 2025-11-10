@@ -4,6 +4,7 @@ import {
   approveTimesheet,
   fetchAccountingTimesheets,
   rejectTimesheet,
+  updateTimesheet,
   type AccountingTimesheetParams,
 } from "../../../services/api/timesheets";
 import type { WeeklyTimesheet } from "../../../services/api/types";
@@ -38,6 +39,30 @@ export const useAccountingRejectMutation = () => {
   const client = useQueryClient();
   return useMutation<void, AxiosError, { id: string; params: AccountingTimesheetParams }>({
     mutationFn: ({ id }) => rejectTimesheet(id),
+    onSuccess: (_, variables) => {
+      client.invalidateQueries({ queryKey: accountingTimesheetsKey(variables.params) });
+      client.invalidateQueries({ queryKey: ["timesheets"] });
+    },
+  });
+};
+
+export const useAccountingUpdateVerificationMutation = () => {
+  const client = useQueryClient();
+  return useMutation<
+    WeeklyTimesheet,
+    AxiosError,
+    {
+      id: string;
+      params: AccountingTimesheetParams;
+      notes: string;
+      verified: boolean;
+    }
+  >({
+    mutationFn: ({ id, notes, verified }) =>
+      updateTimesheet(id, {
+        signed_pdf_verification_notes: notes,
+        signed_pdf_verified: verified,
+      }),
     onSuccess: (_, variables) => {
       client.invalidateQueries({ queryKey: accountingTimesheetsKey(variables.params) });
       client.invalidateQueries({ queryKey: ["timesheets"] });

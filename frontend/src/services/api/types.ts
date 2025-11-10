@@ -88,6 +88,8 @@ export interface CreateTimesheetRequest {
 export interface UpdateTimesheetRequest {
   week_start?: string;
   entries?: TimeEntry[];
+  signed_pdf_verification_notes?: string | null;
+  signed_pdf_verified?: boolean | null;
 }
 
 export interface SendTimesheetEmailRequest {
