@@ -422,6 +422,22 @@ Genehmigte Urlaubstage werden **automatisch** in Ihre Stundenzettel eingetragen:
 
 **Wichtig:** Ankündigungen werden auf der **App-Auswahlseite** angezeigt.
 
+### Fahrzeuge verwalten
+
+1. Gehen Sie zu **"Administration"** → **"Fahrzeuge"**
+2. Tragen Sie ein:
+   - **Bezeichnung** (z. B. „Transporter 1“)
+   - **Kennzeichen**
+   - Optional: Ordnen Sie das Fahrzeug einer Person zu
+   - Alternativ markieren Sie das Fahrzeug als **Poolfahrzeug**
+3. Klicken Sie auf **"Fahrzeug speichern"**
+4. Bestehende Fahrzeuge können über **"Bearbeiten"** angepasst oder über **"Löschen"** entfernt werden
+
+**Hinweise:**
+- Poolfahrzeuge stehen allen Mitarbeitenden zur Verfügung (keine Zuordnung)
+- Persönliche Fahrzeuge werden einer Person zugeordnet (z. B. Dienstwagen)
+- Änderungen sind sofort aktiv und wirken sich auf kommende Reisekostenabrechnungen aus
+
 ### SMTP-Konfiguration
 
 1. Gehen Sie zu **"Einstellungen"** → **"SMTP-Konfiguration"**

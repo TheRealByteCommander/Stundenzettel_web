@@ -209,3 +209,35 @@ export interface TravelExpenseReportChatMessage {
   role?: string | null;
 }
 
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  is_admin?: boolean;
+}
+
+export interface Vehicle {
+  id: string;
+  name: string;
+  license_plate: string;
+  is_pool: boolean;
+  assigned_user_id?: string | null;
+  assigned_user_name?: string | null;
+  created_at?: string;
+}
+
+export interface VehicleCreateRequest {
+  name: string;
+  license_plate: string;
+  is_pool: boolean;
+  assigned_user_id?: string | null;
+}
+
+export interface VehicleUpdateRequest {
+  name?: string;
+  license_plate?: string;
+  is_pool?: boolean;
+  assigned_user_id?: string | null;
+}
+

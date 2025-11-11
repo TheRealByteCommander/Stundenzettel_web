@@ -58,6 +58,7 @@
 ## Arbeitspakete (Iteration 5 – Administration & Settings)
 1. **Benutzerverwaltung**  
    - CRUD, Rollen, Wochenstunden.
+   - **Neu**: Fahrzeugverwaltung (Pool/Persönlich, Zuordnung zu Mitarbeitenden).
 
 2. **SMTP/Push/Einstellungen**  
    - Formulare & Validierung, Push-Registrierung.

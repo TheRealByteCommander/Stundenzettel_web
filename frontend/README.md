@@ -69,5 +69,6 @@ Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 - Initialisierung monatlicher Reisekostenberichte (Auto-Befüllung aus genehmigten Wochen)  
 - Detailansicht inkl. Statuswechsel Draft → In Review (Backend-Validierung eingebunden)  
 - API-Clients/Hooks für Reports, Belege & Chat vorbereitet
+- Admin-Erweiterung: Fahrzeugverwaltung (Pool- vs. Mitarbeiterfahrzeuge, Kennzeichenpflege)
 
 Weitere Module (Timesheet-Reporting, vollständige Reisekosten-Workflows, Admin, …) werden gemäß Roadmap sukzessive migriert.

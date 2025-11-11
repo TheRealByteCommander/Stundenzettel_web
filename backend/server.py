@@ -386,6 +386,27 @@ class TravelExpenseReport(BaseModel):
 class TravelExpenseReportUpdate(BaseModel):
     entries: Optional[List[TravelExpenseReportEntry]] = None
 
+class Vehicle(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    license_plate: str
+    is_pool: bool = False
+    assigned_user_id: Optional[str] = None
+    assigned_user_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class VehicleCreate(BaseModel):
+    name: str
+    license_plate: str
+    is_pool: bool = False
+    assigned_user_id: Optional[str] = None
+
+class VehicleUpdate(BaseModel):
+    name: Optional[str] = None
+    license_plate: Optional[str] = None
+    is_pool: Optional[bool] = None
+    assigned_user_id: Optional[str] = None
+
 class VacationRequest(BaseModel):
     """Urlaubsantrag"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1406,6 +1427,113 @@ async def delete_user(user_id: str, current_user: User = Depends(get_admin_user)
     await db.timesheets.delete_many({"user_id": user_id})
     
     return {"message": "User and associated timesheets deleted successfully"}
+
+@api_router.get("/vehicles", response_model=List[Vehicle])
+async def get_vehicles(current_user: User = Depends(get_admin_user)):
+    vehicles = await db.vehicles.find().sort("name", 1).to_list(1000)
+    sanitized: List[Vehicle] = []
+    for vehicle in vehicles:
+        vehicle.pop("_id", None)
+        sanitized.append(Vehicle(**vehicle))
+    return sanitized
+
+@api_router.post("/vehicles", response_model=Vehicle)
+async def create_vehicle(vehicle_create: VehicleCreate, current_user: User = Depends(get_admin_user)):
+    name = vehicle_create.name.strip()
+    license_plate = vehicle_create.license_plate.strip()
+    if not name or not license_plate:
+        raise HTTPException(status_code=400, detail="Name and licence plate are required")
+    
+    assigned_user_id: Optional[str] = None
+    assigned_user_name: Optional[str] = None
+    
+    if vehicle_create.is_pool:
+        # Pool vehicles must not have an assigned user
+        if vehicle_create.assigned_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Poolfahrzeuge dürfen keinem bestimmten Mitarbeiter zugewiesen sein."
+            )
+    else:
+        if not vehicle_create.assigned_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Für ein persönliches Fahrzeug muss ein Mitarbeiter ausgewählt werden."
+            )
+        user = await db.users.find_one({"id": vehicle_create.assigned_user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Mitarbeiter nicht gefunden")
+        assigned_user_id = user["id"]
+        assigned_user_name = user["name"]
+    
+    vehicle = Vehicle(
+        name=name,
+        license_plate=license_plate,
+        is_pool=vehicle_create.is_pool,
+        assigned_user_id=assigned_user_id,
+        assigned_user_name=assigned_user_name
+    )
+    await db.vehicles.insert_one(vehicle.model_dump())
+    return vehicle
+
+@api_router.put("/vehicles/{vehicle_id}", response_model=Vehicle)
+async def update_vehicle(vehicle_id: str, vehicle_update: VehicleUpdate, current_user: User = Depends(get_admin_user)):
+    existing = await db.vehicles.find_one({"id": vehicle_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Fahrzeug nicht gefunden")
+    
+    name = vehicle_update.name.strip() if vehicle_update.name is not None else existing.get("name", "")
+    license_plate = (
+        vehicle_update.license_plate.strip()
+        if vehicle_update.license_plate is not None
+        else existing.get("license_plate", "")
+    )
+    if not name or not license_plate:
+        raise HTTPException(status_code=400, detail="Name und Kennzeichen dürfen nicht leer sein.")
+    
+    is_pool = vehicle_update.is_pool if vehicle_update.is_pool is not None else existing.get("is_pool", False)
+    assigned_user_id: Optional[str]
+    assigned_user_name: Optional[str]
+    
+    if is_pool:
+        assigned_user_id = None
+        assigned_user_name = None
+    else:
+        # Determine user to assign: update value if provided, otherwise keep existing
+        user_id_candidate = vehicle_update.assigned_user_id
+        if user_id_candidate is None:
+            user_id_candidate = existing.get("assigned_user_id")
+        if not user_id_candidate:
+            raise HTTPException(
+                status_code=400,
+                detail="Für ein persönliches Fahrzeug muss ein Mitarbeiter ausgewählt werden."
+            )
+        user = await db.users.find_one({"id": user_id_candidate})
+        if not user:
+            raise HTTPException(status_code=404, detail="Mitarbeiter nicht gefunden")
+        assigned_user_id = user["id"]
+        assigned_user_name = user["name"]
+    
+    update_data = {
+        "name": name,
+        "license_plate": license_plate,
+        "is_pool": is_pool,
+        "assigned_user_id": assigned_user_id,
+        "assigned_user_name": assigned_user_name,
+        "updated_at": datetime.utcnow()
+    }
+    
+    await db.vehicles.update_one({"id": vehicle_id}, {"$set": update_data})
+    updated_vehicle = await db.vehicles.find_one({"id": vehicle_id})
+    updated_vehicle.pop("_id", None)
+    return Vehicle(**updated_vehicle)
+
+@api_router.delete("/vehicles/{vehicle_id}")
+async def delete_vehicle(vehicle_id: str, current_user: User = Depends(get_admin_user)):
+    result = await db.vehicles.delete_one({"id": vehicle_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Fahrzeug nicht gefunden")
+    return {"message": "Fahrzeug wurde gelöscht"}
 
 @api_router.post("/auth/change-password")
 async def change_password(password_change: PasswordChange, current_user: User = Depends(get_current_user)):
