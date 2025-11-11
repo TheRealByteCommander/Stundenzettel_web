@@ -101,6 +101,7 @@ Fahrzeug: Firmenwagen (Poolfahrzeug)
 - Wählen Sie beim Anlegen des Stundenzettels zuerst das **Wochenfahrzeug** aus der Liste Ihrer zugeordneten Fahrzeuge sowie aller Poolfahrzeuge.
 - Bei Bedarf können Sie in jedem Tageintrag ein **abweichendes Fahrzeug** auswählen (z.B. bei spontanen Fahrzeugwechseln).
 - Wenn Sie kein Fahrzeug auswählen, bleibt das Feld leer und es wird angenommen, dass kein Firmenfahrzeug genutzt wurde.
+- Die Auswahl dient ausschließlich der internen Weiterverarbeitung – das Fahrzeug erscheint nicht auf dem exportierten Stundenzettel.
 
 ### Abwesenheitstage eintragen
 
