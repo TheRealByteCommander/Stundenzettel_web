@@ -2098,7 +2098,7 @@ async def get_timesheets(current_user: User = Depends(get_current_user)):
         sanitized.append(WeeklyTimesheet(**t))
     return sanitized
 
-@api_router.put("/timesheets/{timesheet_id}")
+@api_router.put("/timesheets/{timesheet_id}", response_model=WeeklyTimesheet)
 async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate, current_user: User = Depends(get_current_user)):
     # Find timesheet
     timesheet = await db.timesheets.find_one({"id": timesheet_id})
@@ -2143,7 +2143,12 @@ async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate,
     if update_data:
         await db.timesheets.update_one({"id": timesheet_id}, {"$set": update_data})
     
-    return {"message": "Timesheet updated successfully"}
+    updated_timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not updated_timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found after update")
+    
+    updated_timesheet.pop("_id", None)
+    return WeeklyTimesheet(**updated_timesheet)
 
 @api_router.delete("/timesheets/{timesheet_id}")
 async def delete_timesheet(timesheet_id: str, current_user: User = Depends(get_current_user)):

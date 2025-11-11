@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
@@ -9,7 +9,9 @@ import {
   useSendTimesheetEmailMutation,
   useTimesheetQuery,
   useUploadSignedTimesheetMutation,
+  useUpdateTimesheetMutation,
 } from "../hooks/useTimesheets";
+import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
 
 const statusLabels: Record<string, string> = {
   draft: "Entwurf",
@@ -30,8 +32,20 @@ export const TimesheetDetailPage = () => {
   const rejectMutation = useRejectTimesheetMutation(id ?? "");
   const sendMutation = useSendTimesheetEmailMutation(id ?? "");
   const uploadMutation = useUploadSignedTimesheetMutation(id ?? "");
+  const updateMutation = useUpdateTimesheetMutation(id ?? "");
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [verificationMessage, setVerificationMessage] = useState<
+    string | null
+  >(null);
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null
+  );
+  const [verificationNotes, setVerificationNotes] = useState("");
+  const [verificationChecked, setVerificationChecked] = useState(false);
+  const { data: currentUser } = useCurrentUserQuery();
+  const isAccounting =
+    currentUser?.role === "admin" || currentUser?.role === "accounting";
 
   const totalHours = useMemo(() => {
     if (!data) return 0;
@@ -42,6 +56,14 @@ export const TimesheetDetailPage = () => {
         (end.getTime() - start.getTime()) / 1000 / 60 - entry.break_minutes;
       return acc + Math.max(diff, 0) / 60;
     }, 0);
+  }, [data]);
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+    setVerificationNotes(data.signed_pdf_verification_notes ?? "");
+    setVerificationChecked(Boolean(data.signed_pdf_verified));
   }, [data]);
 
   if (!id) {
@@ -101,6 +123,44 @@ export const TimesheetDetailPage = () => {
     });
 
     event.target.value = "";
+  };
+
+  const handleSaveVerification = () => {
+    if (!id) {
+      return;
+    }
+    setVerificationMessage(null);
+    setVerificationError(null);
+    updateMutation.mutate(
+      {
+        signed_pdf_verification_notes: verificationNotes,
+        signed_pdf_verified: verificationChecked,
+      },
+      {
+        onSuccess: async () => {
+          setVerificationMessage("Prüfinformationen wurden gespeichert.");
+          await refetch();
+        },
+        onError: (err) => {
+          const detail =
+            (err.response?.data as { detail?: string } | undefined)?.detail ??
+            err.message;
+          setVerificationError(
+            detail ?? "Speichern der Prüfinformationen fehlgeschlagen."
+          );
+        },
+      }
+    );
+  };
+
+  const handleResetVerification = () => {
+    if (!data) {
+      return;
+    }
+    setVerificationNotes(data.signed_pdf_verification_notes ?? "");
+    setVerificationChecked(Boolean(data.signed_pdf_verified));
+    setVerificationMessage(null);
+    setVerificationError(null);
   };
 
   return (
@@ -189,6 +249,59 @@ export const TimesheetDetailPage = () => {
             <Alert variant="destructive">{uploadError}</Alert>
           )}
         </div>
+
+        {isAccounting && (
+          <div className="mt-6 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <h2 className="text-lg font-semibold text-brand-gray">
+              Prüfbemerkungen & Verifikation
+            </h2>
+            <p className="text-sm text-gray-600">
+              Notieren Sie Hinweise für QA und markieren Sie das Dokument bei
+              manueller Prüfung als verifiziert.
+            </p>
+            <div className="space-y-2">
+              <label
+                className="text-sm font-medium text-brand-gray"
+                htmlFor="verification-notes"
+              >
+                Prüfbemerkung
+              </label>
+              <textarea
+                id="verification-notes"
+                value={verificationNotes}
+                onChange={(event) => setVerificationNotes(event.target.value)}
+                className="min-h-[120px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={verificationChecked}
+                onChange={(event) =>
+                  setVerificationChecked(event.target.checked)
+                }
+              />
+              Unterschrift manuell verifiziert
+            </label>
+            {verificationMessage && (
+              <Alert variant="success">{verificationMessage}</Alert>
+            )}
+            {verificationError && (
+              <Alert variant="destructive">{verificationError}</Alert>
+            )}
+            <div className="flex gap-2">
+              <Button
+                onClick={handleSaveVerification}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? "Speichere..." : "Speichern"}
+              </Button>
+              <Button variant="outline" onClick={handleResetVerification}>
+                Zurücksetzen
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 overflow-hidden rounded-lg border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200 text-sm">

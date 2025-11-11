@@ -58,6 +58,12 @@ export const ProtectedLayout = () => {
             >
               Stundenzettel
             </button>
+            <button
+              className="text-brand-gray hover:text-brand-primary"
+              onClick={() => navigate("/app/expenses")}
+            >
+              Reisekosten
+            </button>
             {(user.role === "admin" || user.role === "accounting") && (
               <button
                 className="text-brand-gray hover:text-brand-primary"

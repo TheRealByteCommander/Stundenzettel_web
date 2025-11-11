@@ -113,3 +113,99 @@ export interface MonthlyRankResponse {
   total_users: number | null;
 }
 
+export type TravelExpenseStatus = "draft" | "sent" | "approved";
+
+export interface TravelExpense {
+  id: string;
+  user_id: string;
+  user_name: string;
+  date: string;
+  description: string;
+  kilometers: number;
+  expenses: number;
+  customer_project: string;
+  status: TravelExpenseStatus;
+  created_at?: string;
+}
+
+export interface TravelExpenseCreate {
+  date: string;
+  description: string;
+  kilometers: number;
+  expenses: number;
+  customer_project?: string;
+}
+
+export interface TravelExpenseUpdate {
+  date?: string;
+  description?: string;
+  kilometers?: number;
+  expenses?: number;
+  customer_project?: string;
+}
+
+export type TravelExpenseReportStatus =
+  | "draft"
+  | "in_review"
+  | "approved"
+  | "rejected"
+  | "submitted";
+
+export interface TravelExpenseReceipt {
+  id: string;
+  filename: string;
+  local_path: string;
+  uploaded_at: string;
+  file_size: number;
+  exchange_proof_path?: string | null;
+  exchange_proof_filename?: string | null;
+  needs_exchange_proof?: boolean;
+  currency?: string | null;
+}
+
+export interface TravelExpenseReportEntry {
+  date: string;
+  location: string;
+  customer_project: string;
+  travel_time_minutes: number;
+  days_count: number;
+  working_hours: number;
+}
+
+export interface TravelExpenseReport {
+  id: string;
+  user_id: string;
+  user_name: string;
+  month: string;
+  entries: TravelExpenseReportEntry[];
+  receipts: TravelExpenseReceipt[];
+  status: TravelExpenseReportStatus;
+  review_notes?: string | null;
+  accounting_data?: Record<string, unknown> | null;
+  document_analyses?: Array<Record<string, unknown>>;
+  chat_messages?: TravelExpenseReportChatMessage[];
+  created_at?: string;
+  updated_at?: string;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+}
+
+export interface TravelExpenseReportUpdate {
+  entries?: TravelExpenseReportEntry[];
+  review_notes?: string | null;
+  status?: TravelExpenseReportStatus;
+}
+
+export interface ExpenseReportMonthOption {
+  value: string;
+  label: string;
+}
+
+export interface TravelExpenseReportChatMessage {
+  id: string;
+  sender: string;
+  message: string;
+  created_at: string;
+  role?: string | null;
+}
+

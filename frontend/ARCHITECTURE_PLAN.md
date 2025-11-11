@@ -74,14 +74,34 @@ frontend/
 | `/2fa/setup` | Pflichtsetup nach erstem Login | öffentlich (mit Temp-Token) |
 | `/app` | Dashboard (Announcements, Statistiken) | user+ |
 | `/app/timesheets` | Wochenübersicht, CRUD | user+ |
-| `/app/timesheets/:id` | Detail/Upload | user/admin |
 | `/app/expenses` | Reisekosten monatlich | user |
-| `/app/expenses/:id` | Detail inkl. Chat | user |
 | `/app/vacation` | Urlaubsübersicht | user |
 | `/app/accounting` | Accounting-Stats & Report-Download | accounting/admin |
 | `/app/admin/users` | Benutzerverwaltung | admin |
 | `/app/admin/announcements` | Ankündigungen verwalten | admin |
 | `/app/admin/settings` | SMTP, Push | admin |
+
+#### 3.2.1 Timesheet-Routing (Nested)
+```
+/app/timesheets
+├─ (index)                 → `TimesheetListPage` (eigene Stundenzettel)
+├─ /new                    → `TimesheetCreatePage`
+├─ /:id                    → `TimesheetDetailPage`
+└─ /admin/review           → `TimesheetAdminPage` (Buchhaltung/Admin)
+```
+- `TimesheetDetailPage` blendet Upload-Abschnitt für Mitarbeitende ein und zusätzlich Prüfbemerkungen für Rollen `admin`/`accounting`.
+- Admin-Review erhält Query-Filter (`month`, später `userId`) und verlinkt in die Detailseite.
+- Routing-Struktur dient als Referenz für spätere Unterrouten (z. B. `/admin/review/:id` falls Review-Workspace notwendig wird).
+
+#### 3.2.2 Reisekosten-Routing (Ausblick)
+```
+/app/expenses
+├─ (index)                 → Monatsübersicht & Report-Liste (React Query, Filter Select)
+├─ /reports/:id            → Detailansicht mit Chat / Dokumentenprüfung
+└─ /receipts/upload        → Dialog / Drawer für neuen Beleg (FormData Upload)
+```
+- Erstes Ziel Iteration 4: Index-Seite mit Liste genehmigter Stundenzettel + Upload-Schritt kombinieren.
+- Detailroute kann später gestaffelt eingeführt werden; Placeholder-Komponenten werden im Modul angelegt.
 
 > React Router bietet Loader/Action APIs; wir kombinieren es mit React Query (Queries/Mutations) für Datenfetching.
 
@@ -144,10 +164,10 @@ frontend/
 - Password Change → separater Page/Section (`/app/settings/security`?).
 
 ### 7.2 Timesheets
-- Unterteilung: Liste (`TimesheetListPage`), Detail (`TimesheetDetailPage`), Editor (`TimesheetCreatePage`).
-- Bestehender Stand: Liste/Detail/Create implementiert; Upload & Reporting folgen.
-- Upload: `UploadSignedTimesheetSection` (geplant).
-- Tabs oder Filter für Admin-Ansicht (z. B. “Meine”, “Alle (Admin)”).
+- Unterteilung: Liste (`TimesheetListPage`), Detail (`TimesheetDetailPage`), Editor (`TimesheetCreatePage`), Admin-Review (`TimesheetAdminPage`).
+- Aktueller Stand: CRUD + Upload + Prüfbemerkungen vollständig; nächster Ausbauschritt Reporting/Exporte.
+- Upload: eigener Abschnitt im Detail, Admin-Bereich ergänzt Verifikationsnotizen (persistiert via `PUT /timesheets/{id}`).
+- Admin-Ansicht nutzt Query-Parameter (`month`, später `userId`) und Routelinks zu Details.
 
 ### 7.3 Expenses
 - Monatliche Auswahl (Select) → Query.

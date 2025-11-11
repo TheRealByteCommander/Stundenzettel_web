@@ -9,6 +9,8 @@ import { TimesheetListPage } from "../modules/timesheets/pages/TimesheetListPage
 import { TimesheetDetailPage } from "../modules/timesheets/pages/TimesheetDetailPage";
 import { TimesheetCreatePage } from "../modules/timesheets/pages/TimesheetCreatePage";
 import { TimesheetAdminPage } from "../modules/timesheets/pages/TimesheetAdminPage";
+import { ExpensesOverviewPage } from "../modules/expenses/pages/ExpensesOverviewPage";
+import { ExpenseReportDetailPage } from "../modules/expenses/pages/ExpenseReportDetailPage";
 import { ProtectedLayout } from "./layouts/ProtectedLayout";
 
 const router = createBrowserRouter([
@@ -46,6 +48,19 @@ const router = createBrowserRouter([
           {
             path: ":id",
             element: <TimesheetDetailPage />,
+          },
+        ],
+      },
+      {
+        path: "expenses",
+        children: [
+          {
+            index: true,
+            element: <ExpensesOverviewPage />,
+          },
+          {
+            path: "reports/:id",
+            element: <ExpenseReportDetailPage />,
           },
         ],
       },
