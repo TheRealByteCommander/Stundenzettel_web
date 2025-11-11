@@ -185,20 +185,17 @@ Die Reisekosten-App ermöglicht es Ihnen, Reisekostenabrechnungen zu erstellen u
 
 **Wichtig:** Nur Tage mit **genehmigten, unterschriebenen und verifizierten Stundenzetteln** werden berücksichtigt.
 
-### Reisekosten eintragen
+### Reiseeinträge prüfen
 
-Für jeden Tag können Sie Reisekosten eintragen:
+Alle relevanten Reisetage werden automatisch aus Ihren genehmigten Stundenzetteln übernommen. Sie müssen **keine manuellen Eingaben** vornehmen.
 
-**Felder:**
-- **Datum**: Automatisch vorausgefüllt
-- **Ort**: Automatisch aus Stundenzettel übernommen
-- **Kunde/Projekt**: Automatisch aus Stundenzettel übernommen
-- **Arbeitsstunden**: Automatisch aus Stundenzettel übernommen
-- **Fahrkosten**: z.B. "45.50" (in Euro)
-- **Übernachtung**: z.B. "120.00" (in Euro)
-- **Verpflegung**: Automatisch berechnet (Spesensätze)
-- **Sonstige Kosten**: z.B. "15.00" (in Euro)
-- **Notizen**: Zusätzliche Informationen
+Die Liste zeigt für jeden Tag:
+
+- **Datum**, **Ort** und **Kunde/Projekt**
+- **Fahrzeit (Minuten)** und bereits erfasste **Arbeitsstunden**
+- Hinweis, wenn für einen Tag noch keine Arbeitsstunden hinterlegt sind (z.B. nur Anreise)
+
+> **Hinweis:** Fehlt ein genehmigter Stundenzettel, erscheint der Tag nicht in der Liste. Reichen Sie den entsprechenden Stundenzettel nach oder wenden Sie sich an die Buchhaltung.
 
 ### Belege hochladen
 
@@ -246,28 +243,17 @@ Für jeden Tag können Sie Reisekosten eintragen:
 - Belege werden in strukturierten Ordnern gespeichert: `User_Monat_ReportID/`
 - **Keine manuellen Eingaben nötig** - alles wird automatisch extrahiert!
 - **Fremdwährungs-Nachweis ist erforderlich** für alle Belege in Fremdwährung (GoBD)
-
-### Abrechnung abschließen
-
-1. Überprüfen Sie alle Einträge und Belege
-2. Klicken Sie auf **"Abrechnung abschließen"**
-3. Das System prüft:
-   - ✅ Alle Tage haben **genehmigte, unterschriebene und verifizierte Stundenzettel**
-   - ✅ Alle Kosten haben **Belege** (empfohlen)
-   - ⚠️ Fehlende Stundenzettel werden angezeigt
-
-**Status-Anzeige:**
-- 🟢 **"Abgedeckte Tage"**: Alle Tage haben verifizierte Stundenzettel
-- 🔴 **"Fehlende Tage"**: Für diese Tage fehlen verifizierte Stundenzettel
-
-**Wichtig:** Sie können die Abrechnung nur abschließen, wenn **alle Tage verifizierte Stundenzettel** haben.
+- Sie können irrtümlich hochgeladene Belege im Status **"Entwurf"** jederzeit wieder entfernen
 
 ### Abrechnung einreichen
 
-1. Nach dem Abschließen klicken Sie auf **"Einreichen"**
-2. Die Abrechnung wird an die Buchhaltung gesendet
-3. Status ändert sich zu **"In Prüfung"**
-4. Die Buchhaltung prüft die Abrechnung mit KI-Agenten
+1. Überprüfen Sie alle Einträge und Belege
+2. Klicken Sie auf **"Bericht einreichen"**
+3. Das System prüft automatisch:
+   - ✅ Für alle Tage liegt ein freigegebener, unterschriebener und verifizierter Stundenzettel vor
+   - ✅ Alle Fremdwährungsbelege besitzen einen Nachweis
+   - ⚠️ Fehlende Unterlagen werden als Fehlermeldung angezeigt
+4. Nach erfolgreicher Prüfung wechselt der Status zu **"In Prüfung"**. Die Buchhaltung (und Agenten) übernehmen nun.
 
 ### Chat mit Agenten
 
@@ -277,6 +263,15 @@ Während der Prüfung können Sie mit den Agenten chatten:
 2. Scrollen Sie zum **Chat-Bereich**
 3. Stellen Sie Fragen oder beantworten Sie Rückfragen
 4. Die Agenten helfen bei der Zuordnung und Prüfung
+
+> **Tipp:** Antworten Sie zeitnah, damit Freigaben nicht verzögert werden. Jede Nachricht wird protokolliert.
+
+### Statusübersicht
+
+- **Entwurf (draft)**: Bericht kann bearbeitet, Belege hinzugefügt oder entfernt werden.
+- **Übermittelt (submitted)** / **In Prüfung (in_review)**: Bericht wurde eingereicht; Buchhaltung und Agenten prüfen.
+- **Freigegeben (approved)**: Reisekosten sind genehmigt.
+- **Zurückgewiesen (rejected)**: Bericht wurde mit Begründung abgelehnt. Sie können nachbessern und erneut einreichen.
 
 ### Abrechnung bearbeiten/löschen
 
@@ -483,9 +478,11 @@ Genehmigte Urlaubstage werden **automatisch** in Ihre Stundenzettel eingetragen:
    - **Zuordnung**: Kosten werden Kategorien zugeordnet
    - **Plausibilität**: Prüfung im Verhältnis zu Arbeitsstunden
 3. Die Agenten stellen bei Bedarf **Rückfragen** im Chat
-4. Nach der Prüfung können Sie:
-   - **Genehmigen**: Abrechnung wird genehmigt
-   - **Ablehnen**: Abrechnung wird abgelehnt (mit Grund)
+4. Prüfen Sie die Hinweise im Bereich **"Belege & Dokumente"** sowie die Chat-Nachrichten
+5. Nach der Prüfung können Sie:
+   - **Genehmigen**: Abrechnung wird freigegeben (Status **"Freigegeben"**)
+   - **Zurückweisen**: Abrechnung wird mit optionalem Grund zurückgewiesen (Status **"Zurückgewiesen"**)
+6. Bei Bedarf laden Sie eigene Chat-Nachrichten hoch (z.B. Rückfragen an den Mitarbeiter)
 
 ### Monatsberichte
 

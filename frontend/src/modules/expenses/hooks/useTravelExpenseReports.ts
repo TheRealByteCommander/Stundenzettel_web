@@ -9,8 +9,14 @@ import {
   fetchTravelExpenseReport,
   fetchTravelExpenseReports,
   initializeTravelExpenseReport,
+  approveTravelExpenseReport,
+  rejectTravelExpenseReport,
   submitTravelExpenseReport,
   updateTravelExpenseReport,
+  uploadExpenseReportReceipt,
+  uploadExpenseReportExchangeProof,
+  deleteExpenseReportReceipt,
+  sendTravelExpenseReportChatMessage,
   type TravelExpenseReportListParams,
 } from "../../../services/api/travel-expense-reports";
 import type {
@@ -77,6 +83,85 @@ export const useSubmitExpenseReportMutation = () => {
     mutationFn: submitTravelExpenseReport,
     onSuccess: (_, reportId) => {
       client.invalidateQueries({ queryKey: travelExpenseReportsKey() });
+      client.invalidateQueries({ queryKey: travelExpenseReportKey(reportId) });
+    },
+  });
+};
+
+export const useApproveExpenseReportMutation = () => {
+  const client = useQueryClient();
+  return useMutation<{ message: string }, AxiosError, string>({
+    mutationFn: approveTravelExpenseReport,
+    onSuccess: (_, reportId) => {
+      client.invalidateQueries({ queryKey: travelExpenseReportsKey() });
+      client.invalidateQueries({ queryKey: travelExpenseReportKey(reportId) });
+    },
+  });
+};
+
+export const useRejectExpenseReportMutation = () => {
+  const client = useQueryClient();
+  return useMutation<
+    { message: string },
+    AxiosError,
+    { id: string; reason?: string }
+  >({
+    mutationFn: ({ id, reason }) => rejectTravelExpenseReport(id, reason),
+    onSuccess: (_, variables) => {
+      client.invalidateQueries({ queryKey: travelExpenseReportsKey() });
+      client.invalidateQueries({
+        queryKey: travelExpenseReportKey(variables.id),
+      });
+    },
+  });
+};
+
+export const useUploadExpenseReportReceiptMutation = (reportId: string) => {
+  const client = useQueryClient();
+  return useMutation<
+    { message: string; receipt_id: string },
+    AxiosError,
+    File
+  >({
+    mutationFn: (file) => uploadExpenseReportReceipt(reportId, file),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: travelExpenseReportKey(reportId) });
+    },
+  });
+};
+
+export const useUploadExchangeProofMutation = (reportId: string) => {
+  const client = useQueryClient();
+  return useMutation<
+    { message: string; receipt_id: string },
+    AxiosError,
+    { receiptId: string; file: File }
+  >({
+    mutationFn: ({ receiptId, file }) =>
+      uploadExpenseReportExchangeProof(reportId, receiptId, file),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: travelExpenseReportKey(reportId) });
+    },
+  });
+};
+
+export const useDeleteExpenseReceiptMutation = (reportId: string) => {
+  const client = useQueryClient();
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (receiptId) =>
+      deleteExpenseReportReceipt(reportId, receiptId),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: travelExpenseReportKey(reportId) });
+    },
+  });
+};
+
+export const useSendExpenseReportChatMutation = (reportId: string) => {
+  const client = useQueryClient();
+  return useMutation<{ message: string }, AxiosError, string>({
+    mutationFn: (message) =>
+      sendTravelExpenseReportChatMessage(reportId, message),
+    onSuccess: () => {
       client.invalidateQueries({ queryKey: travelExpenseReportKey(reportId) });
     },
   });

@@ -14,6 +14,9 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - Dokumentation: Regelung in BENUTZERANLEITUNG.md und README.md klarstellt
 
 ### Hinzugefügt
+- **Frontend (Neuaufbau)**:
+  - Reisekosten-Übersicht mit Monatsinitialisierung und Draft-Detailansicht
+  - API-Clients & Hooks für Reisekostenberichte, Beleg-Uploads und Chat-Vorbereitung
 - **Fremdwährungs-Nachweis für Reisekosten-Belege**:
   - Automatische Erkennung von Fremdwährungen (nicht EUR)
   - Erforderlicher Nachweis über tatsächlichen Euro-Betrag (z.B. Kontoauszug)

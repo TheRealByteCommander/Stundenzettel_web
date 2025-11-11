@@ -39,17 +39,18 @@
 - [x] Persistenter Auth-Store + Axios-Interceptor.
 - [x] Geschützte App-Shell mit Navigation & Dashboard-Stub.
 
-### Iteration 3 – Timesheets ⏳ (laufend)
+### Iteration 3 – Timesheets ✅
 - [x] Liste & Detailansicht inkl. Statuswechsel (Send/Approve/Reject) und Mailversand.
 - [x] Anlage neuer Stundenzettel mit grundlegender Formularlogik.
 - [x] Upload unterschriebener PDFs inkl. Rückmeldung im Detail.
 - [x] Monatsstatistik (Top-Liste & persönliche Platzierung im Dashboard).
-- [ ] Verifikationshinweise & Admin-spezifische Aktionen (z. B. QA-Notizen).
+- [x] Verifikationshinweise & Admin-spezifische Aktionen (z. B. QA-Notizen).
 
 ## Arbeitspakete (Iteration 4 – Reisekosten**
 1. **Reisekostenmodul**  
    - Genehmigte Stundenzettel importieren, Belege hochladen, Fremdwährungsnachweis.
    - Chat mit Agenten, Statuswechsel.
+   - **Frontend-Stand**: Monatsinitialisierung & Detailansicht angebunden (Draft → In Review).
 
 2. **Dokumenten-/Beleganalyse-UI**  
    - Darstellung extrahierter Daten, Validierungs-Hinweise.
@@ -73,7 +74,7 @@
    - Deployment-Schritte, Migrationshinweise, Dokumentation.
 
 ## Nächste Schritte
-1. Timesheet-Iteration abschließen: Upload unterschriebener PDFs, Admin-Notizen & Reporting integrieren.
-2. Architekturplan um konkrete Modul-Routing-Aufteilung ergänzen (Timesheet-Unterseiten).
-3. Vorbereitung Iteration 4 – Reisekosten (API-Clients ableiten, UI-Konzept entwerfen).
+1. Reisekosten: Beleg-Uploads & Fremdwährungsnachweis im Frontend anbinden.
+2. Reisekosten: Chat-/Review-Workflow (Agentenmeldungen) visuell integrieren.
+3. Timesheet-Reporting vorbereiten (Exports, aggregierte Ansichten).
 

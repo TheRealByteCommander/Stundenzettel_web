@@ -117,6 +117,30 @@ export const deleteTravelExpenseReport = async (
   await apiClient.delete(`/travel-expense-reports/${id}`);
 };
 
+export const approveTravelExpenseReport = async (
+  id: string
+): Promise<{ message: string }> => {
+  const { data } = await apiClient.post<{ message: string }>(
+    `/travel-expense-reports/${id}/approve`
+  );
+  return data;
+};
+
+export const rejectTravelExpenseReport = async (
+  id: string,
+  reason?: string
+): Promise<{ message: string }> => {
+  const formData = new FormData();
+  if (reason) {
+    formData.append("reason", reason);
+  }
+  const { data } = await apiClient.post<{ message: string }>(
+    `/travel-expense-reports/${id}/reject`,
+    formData
+  );
+  return data;
+};
+
 export const fetchTravelExpenseReportChat = async (
   reportId: string
 ): Promise<TravelExpenseReportChatMessage[]> => {

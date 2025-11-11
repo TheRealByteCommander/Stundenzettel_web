@@ -63,4 +63,11 @@ Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 - Monatsstatistik inkl. persönlicher Platzierung auf dem Dashboard  
 - Admin-/Buchhaltungsansicht zur manuellen Prüfung und Genehmigung
 
-Weitere Module (Timesheet-Reporting, Reisekosten, Admin, …) werden gemäß Roadmap sukzessive migriert.
+⚙️ Iteration 4 (Vorbereitung) – Reisekosten:
+
+- Monatsübersicht (`/app/expenses`) mit Stundenzettel-Kopplung  
+- Initialisierung monatlicher Reisekostenberichte (Auto-Befüllung aus genehmigten Wochen)  
+- Detailansicht inkl. Statuswechsel Draft → In Review (Backend-Validierung eingebunden)  
+- API-Clients/Hooks für Reports, Belege & Chat vorbereitet
+
+Weitere Module (Timesheet-Reporting, vollständige Reisekosten-Workflows, Admin, …) werden gemäß Roadmap sukzessive migriert.
