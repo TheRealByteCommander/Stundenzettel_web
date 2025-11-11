@@ -81,6 +81,7 @@ Für jeden Arbeitstag können Sie mehrere Einträge erfassen:
   - **Wichtig**: Nur die **Anreise zum Arbeitsort** wird als Arbeitszeit gewertet
   - Die **tägliche Fahrt Hotel-Kunde** ist **KEINE Arbeitszeit** und sollte nicht als Fahrzeit erfasst werden
 - **Weiterberechnen**: Checkbox, um Fahrzeit zur Arbeitszeit hinzuzufügen (nur für Anreise zum Arbeitsort)
+- **Fahrzeug**: Auswahl des genutzten Fahrzeugs (Standard: Wochenfahrzeug, kann pro Tag überschrieben werden)
 
 **Beispiel:**
 ```
@@ -92,7 +93,14 @@ Aufgaben: Software-Entwicklung, Code-Review
 Kunde/Projekt: Projekt Alpha
 Ort: Büro
 Fahrzeit: 0 (nur Anreise zum Arbeitsort, nicht tägliche Fahrten Hotel-Kunde)
+Fahrzeug: Firmenwagen (Poolfahrzeug)
 ```
+
+### Fahrzeug auswählen
+
+- Wählen Sie beim Anlegen des Stundenzettels zuerst das **Wochenfahrzeug** aus der Liste Ihrer zugeordneten Fahrzeuge sowie aller Poolfahrzeuge.
+- Bei Bedarf können Sie in jedem Tageintrag ein **abweichendes Fahrzeug** auswählen (z.B. bei spontanen Fahrzeugwechseln).
+- Wenn Sie kein Fahrzeug auswählen, bleibt das Feld leer und es wird angenommen, dass kein Firmenfahrzeug genutzt wurde.
 
 ### Abwesenheitstage eintragen
 

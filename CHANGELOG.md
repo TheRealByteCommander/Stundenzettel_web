@@ -17,6 +17,9 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 - **Frontend (Neuaufbau)**:
   - Reisekosten-Übersicht mit Monatsinitialisierung und Draft-Detailansicht
   - API-Clients & Hooks für Reisekostenberichte, Beleg-Uploads und Chat-Vorbereitung
+- **Timesheets**
+  - Wochen- und tageweise Fahrzeugzuordnung bei der Stundenzettel-Erfassung
+  - Fahrzeuganzeige in Listen-, Detail- und Buchhaltungsansichten
 - **Administration**
   - Fahrzeugverwaltung (Pool-/Mitarbeiterfahrzeuge, Kennzeichenpflege, Zuordnung)
 - **Fremdwährungs-Nachweis für Reisekosten-Belege**:

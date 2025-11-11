@@ -45,6 +45,7 @@
 - [x] Upload unterschriebener PDFs inkl. Rückmeldung im Detail.
 - [x] Monatsstatistik (Top-Liste & persönliche Platzierung im Dashboard).
 - [x] Verifikationshinweise & Admin-spezifische Aktionen (z. B. QA-Notizen).
+- [x] Fahrzeugzuweisung auf Wochen- und Tagesbasis inkl. Übersicht in allen Ansichten.
 
 ## Arbeitspakete (Iteration 4 – Reisekosten**
 1. **Reisekostenmodul**  

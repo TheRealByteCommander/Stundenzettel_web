@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
@@ -5,6 +6,7 @@ import {
   useDeleteTimesheetMutation,
   useTimesheetsQuery,
 } from "../hooks/useTimesheets";
+import { useAvailableVehiclesQuery } from "../hooks/useAvailableVehicles";
 
 const statusLabels: Record<string, string> = {
   draft: "Entwurf",
@@ -26,6 +28,25 @@ const getIsoWeekNumber = (dateString: string) => {
 export const TimesheetListPage = () => {
   const { data, isLoading, error } = useTimesheetsQuery();
   const deleteMutation = useDeleteTimesheetMutation();
+  const { data: vehicles } = useAvailableVehiclesQuery();
+  const vehicleLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    vehicles?.forEach((vehicle) => {
+      map.set(
+        vehicle.id,
+        `${vehicle.name} (${vehicle.license_plate})${
+          vehicle.is_pool ? " • Pool" : ""
+        }`
+      );
+    });
+    return map;
+  }, [vehicles]);
+  const resolveVehicleLabel = (vehicleId?: string | null) => {
+    if (!vehicleId) {
+      return "—";
+    }
+    return vehicleLookup.get(vehicleId) ?? "Unbekanntes Fahrzeug";
+  };
 
   const handleDelete = (id: string) => {
     if (
@@ -70,13 +91,14 @@ export const TimesheetListPage = () => {
               <th className="px-4 py-3">Kalenderwoche</th>
               <th className="px-4 py-3">Zeitraum</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Fahrzeug</th>
               <th className="px-4 py-3">Aktionen</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                   Lade Stundenzettel…
                 </td>
               </tr>
@@ -93,6 +115,9 @@ export const TimesheetListPage = () => {
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {statusLabels[timesheet.status] ?? timesheet.status}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {resolveVehicleLabel(timesheet.week_vehicle_id)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
@@ -115,7 +140,7 @@ export const TimesheetListPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                   Noch keine Stundenzettel vorhanden.
                 </td>
               </tr>

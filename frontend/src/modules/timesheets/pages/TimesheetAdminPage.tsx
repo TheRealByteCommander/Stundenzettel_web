@@ -5,6 +5,7 @@ import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardTitle } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
+import { useVehiclesQuery } from "../../admin/hooks/useVehicles";
 import {
   useAccountingApproveMutation,
   useAccountingRejectMutation,
@@ -37,6 +38,25 @@ export const TimesheetAdminPage = () => {
   const approveMutation = useAccountingApproveMutation();
   const rejectMutation = useAccountingRejectMutation();
   const updateVerificationMutation = useAccountingUpdateVerificationMutation();
+  const { data: vehicles } = useVehiclesQuery();
+  const vehicleLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    vehicles?.forEach((vehicle) => {
+      map.set(
+        vehicle.id,
+        `${vehicle.name} (${vehicle.license_plate})${
+          vehicle.is_pool ? " • Pool" : ""
+        }`
+      );
+    });
+    return map;
+  }, [vehicles]);
+  const resolveVehicleLabel = (vehicleId?: string | null) => {
+    if (!vehicleId) {
+      return "—";
+    }
+    return vehicleLookup.get(vehicleId) ?? "Unbekanntes Fahrzeug";
+  };
 
   const startEdit = (timesheetId: string, note: string | null | undefined, verified: boolean | null | undefined) => {
     setEditingId(timesheetId);
@@ -137,6 +157,7 @@ export const TimesheetAdminPage = () => {
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Unterschrift</th>
                 <th className="px-4 py-3">Hinweise</th>
+                <th className="px-4 py-3">Fahrzeug</th>
                 <th className="px-4 py-3">Aktionen</th>
               </tr>
             </thead>
@@ -144,7 +165,7 @@ export const TimesheetAdminPage = () => {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-6 text-center text-gray-500"
                   >
                     Lade Stundenzettel…
@@ -171,6 +192,9 @@ export const TimesheetAdminPage = () => {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">
                       {timesheet.signed_pdf_verification_notes ?? "–"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {resolveVehicleLabel(timesheet.week_vehicle_id)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
@@ -219,10 +243,10 @@ export const TimesheetAdminPage = () => {
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-gray-500"
-                  >
+                <td
+                  colSpan={7}
+                  className="px-4 py-6 text-center text-gray-500"
+                >
                     Keine Stundenzettel für den ausgewählten Zeitraum gefunden.
                   </td>
                 </tr>

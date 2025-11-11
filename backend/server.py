@@ -292,9 +292,11 @@ class TimeEntry(BaseModel):
     absence_type: Optional[str] = None  # "urlaub", "krankheit", "feiertag", or None
     travel_time_minutes: int = 0  # Fahrzeit in Minuten
     include_travel_time: bool = False  # Checkbox "Weiterberechnen"
+    vehicle_id: Optional[str] = None  # Zugeordnetes Fahrzeug
 
 class TimesheetUpdate(BaseModel):
     week_start: Optional[str] = None
+    week_vehicle_id: Optional[str] = None
     entries: Optional[List[TimeEntry]] = None
     signed_pdf_verification_notes: Optional[str] = None
     signed_pdf_verified: Optional[bool] = None
@@ -306,6 +308,7 @@ class WeeklyTimesheet(BaseModel):
     week_start: str  # Monday date in YYYY-MM-DD format
     week_end: str    # Sunday date in YYYY-MM-DD format
     entries: List[TimeEntry]
+    week_vehicle_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "draft"  # draft, sent, approved
     signed_pdf_path: Optional[str] = None  # Pfad zum hochgeladenen unterschriebenen PDF
@@ -322,6 +325,7 @@ class SignedTimesheetUpload(BaseModel):
 
 class WeeklyTimesheetCreate(BaseModel):
     week_start: str
+    week_vehicle_id: Optional[str] = None
     entries: List[TimeEntry]
 
 class TravelExpense(BaseModel):
@@ -606,6 +610,18 @@ def get_vacation_dates_in_range(start_date: str, end_date: str, approved_request
     except Exception:
         pass
     return list(set(vacation_dates))  # Remove duplicates
+
+async def ensure_vehicle_access(vehicle_id: str, owner_user_id: str, db) -> Dict[str, Any]:
+    """Validiert, dass ein Fahrzeug existiert und vom Nutzer genutzt werden darf."""
+    vehicle = await db.vehicles.find_one({"id": vehicle_id})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Fahrzeug wurde nicht gefunden.")
+    if not vehicle.get("is_pool") and vehicle.get("assigned_user_id") != owner_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Das ausgewählte Fahrzeug ist diesem Mitarbeiter nicht zugeordnet."
+        )
+    return vehicle
 
 async def add_vacation_entries_to_timesheet(entries: List[TimeEntry], week_start: str, week_end: str, user_id: str, db) -> List[TimeEntry]:
     """Fügt automatisch genehmigte Urlaubstage als Einträge hinzu, falls noch nicht vorhanden.
@@ -1535,6 +1551,23 @@ async def delete_vehicle(vehicle_id: str, current_user: User = Depends(get_admin
         raise HTTPException(status_code=404, detail="Fahrzeug nicht gefunden")
     return {"message": "Fahrzeug wurde gelöscht"}
 
+@api_router.get("/vehicles/available", response_model=List[Vehicle])
+async def get_available_vehicles(current_user: User = Depends(get_current_user)):
+    """Gibt alle Poolfahrzeuge sowie persönliche Fahrzeuge des aktuellen Users zurück."""
+    vehicles = await db.vehicles.find(
+        {
+            "$or": [
+                {"is_pool": True},
+                {"assigned_user_id": current_user.id},
+            ]
+        }
+    ).sort("name", 1).to_list(100)
+    sanitized: List[Vehicle] = []
+    for vehicle in vehicles:
+        vehicle.pop("_id", None)
+        sanitized.append(Vehicle(**vehicle))
+    return sanitized
+
 @api_router.post("/auth/change-password")
 async def change_password(password_change: PasswordChange, current_user: User = Depends(get_current_user)):
     # Verify current password
@@ -2191,6 +2224,19 @@ async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user
     from datetime import datetime, timedelta
     week_start = datetime.strptime(timesheet_create.week_start, "%Y-%m-%d")
     week_end = week_start + timedelta(days=6)
+    vehicle_cache: Dict[str, Dict[str, Any]] = {}
+    selected_week_vehicle_id: Optional[str] = None
+    
+    if timesheet_create.week_vehicle_id:
+        vehicle = await ensure_vehicle_access(timesheet_create.week_vehicle_id, current_user.id, db)
+        vehicle_cache[timesheet_create.week_vehicle_id] = vehicle
+        selected_week_vehicle_id = timesheet_create.week_vehicle_id
+    
+    for entry in timesheet_create.entries:
+        if entry.vehicle_id:
+            if entry.vehicle_id not in vehicle_cache:
+                vehicle = await ensure_vehicle_access(entry.vehicle_id, current_user.id, db)
+                vehicle_cache[entry.vehicle_id] = vehicle
     
     # Automatisch genehmigte Urlaubstage hinzufügen
     entries_with_vacation = await add_vacation_entries_to_timesheet(
@@ -2201,12 +2247,23 @@ async def create_timesheet(timesheet_create: WeeklyTimesheetCreate, current_user
         db
     )
     
+    processed_entries: List[TimeEntry] = []
+    for entry in entries_with_vacation:
+        entry_vehicle_id = entry.vehicle_id or selected_week_vehicle_id
+        if entry_vehicle_id and entry_vehicle_id not in vehicle_cache:
+            vehicle = await ensure_vehicle_access(entry_vehicle_id, current_user.id, db)
+            vehicle_cache[entry_vehicle_id] = vehicle
+        entry_dict = entry.model_dump()
+        entry_dict["vehicle_id"] = entry_vehicle_id
+        processed_entries.append(TimeEntry(**entry_dict))
+    
     timesheet = WeeklyTimesheet(
         user_id=current_user.id,
         user_name=current_user.name,
         week_start=timesheet_create.week_start,
         week_end=week_end.strftime("%Y-%m-%d"),
-        entries=entries_with_vacation
+        week_vehicle_id=selected_week_vehicle_id,
+        entries=processed_entries
     )
     
     await db.timesheets.insert_one(timesheet.dict())
@@ -2247,10 +2304,34 @@ async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate,
         update_data["week_start"] = timesheet_update.week_start
         update_data["week_end"] = week_end.strftime("%Y-%m-%d")
     
+    vehicle_cache: Dict[str, Dict[str, Any]] = {}
+    week_vehicle_id = timesheet.get("week_vehicle_id")
+    if "week_vehicle_id" in timesheet_update.__fields_set__:
+        if timesheet_update.week_vehicle_id:
+            await ensure_vehicle_access(timesheet_update.week_vehicle_id, timesheet["user_id"], db)
+            week_vehicle_id = timesheet_update.week_vehicle_id
+            update_data["week_vehicle_id"] = week_vehicle_id
+        else:
+            week_vehicle_id = None
+            update_data["week_vehicle_id"] = None
+    elif week_vehicle_id:
+        # Ensure existing cached vehicle if needed later
+        vehicle_cache[week_vehicle_id] = await ensure_vehicle_access(week_vehicle_id, timesheet["user_id"], db)
+    
     if timesheet_update.entries is not None:
         # Automatisch genehmigte Urlaubstage hinzufügen
         week_start_str = update_data.get("week_start", timesheet.get("week_start"))
         week_end_str = update_data.get("week_end", timesheet.get("week_end"))
+        
+        # Validate provided vehicle assignments
+        if week_vehicle_id and week_vehicle_id not in vehicle_cache:
+            vehicle_cache[week_vehicle_id] = await ensure_vehicle_access(week_vehicle_id, timesheet["user_id"], db)
+        
+        for entry in timesheet_update.entries:
+            if entry.vehicle_id:
+                if entry.vehicle_id not in vehicle_cache:
+                    vehicle_cache[entry.vehicle_id] = await ensure_vehicle_access(entry.vehicle_id, timesheet["user_id"], db)
+        
         entries_with_vacation = await add_vacation_entries_to_timesheet(
             timesheet_update.entries,
             week_start_str,
@@ -2258,7 +2339,15 @@ async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate,
             timesheet["user_id"],
             db
         )
-        update_data["entries"] = [entry.model_dump() for entry in entries_with_vacation]
+        processed_entries: List[Dict[str, Any]] = []
+        for entry in entries_with_vacation:
+            entry_vehicle_id = entry.vehicle_id or week_vehicle_id
+            if entry_vehicle_id and entry_vehicle_id not in vehicle_cache:
+                vehicle_cache[entry_vehicle_id] = await ensure_vehicle_access(entry_vehicle_id, timesheet["user_id"], db)
+            entry_dict = entry.model_dump()
+            entry_dict["vehicle_id"] = entry_vehicle_id
+            processed_entries.append(entry_dict)
+        update_data["entries"] = processed_entries
     
     if timesheet_update.signed_pdf_verification_notes is not None or timesheet_update.signed_pdf_verified is not None:
         if not current_user.can_view_all_data():

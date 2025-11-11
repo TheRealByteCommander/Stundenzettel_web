@@ -62,6 +62,7 @@ Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 - Upload unterschriebener PDF-Stundenzettel mit Feedback  
 - Monatsstatistik inkl. persönlicher Platzierung auf dem Dashboard  
 - Admin-/Buchhaltungsansicht zur manuellen Prüfung und Genehmigung
+- Fahrzeugzuordnung pro Woche und optional pro Tag (inkl. Anzeige in allen Ansichten)
 
 ⚙️ Iteration 4 (Vorbereitung) – Reisekosten:
 

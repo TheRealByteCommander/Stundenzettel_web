@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -12,6 +13,8 @@ import {
   useUpdateTimesheetMutation,
 } from "../hooks/useTimesheets";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
+import { useAvailableVehiclesQuery } from "../hooks/useAvailableVehicles";
+import { fetchVehicles } from "../../../services/api/vehicles";
 
 const statusLabels: Record<string, string> = {
   draft: "Entwurf",
@@ -46,6 +49,43 @@ export const TimesheetDetailPage = () => {
   const { data: currentUser } = useCurrentUserQuery();
   const isAccounting =
     currentUser?.role === "admin" || currentUser?.role === "accounting";
+  const { data: availableVehicles } = useAvailableVehiclesQuery();
+  const { data: adminVehicles } = useQuery({
+    queryKey: ["all-vehicles-admin"],
+    queryFn: fetchVehicles,
+    enabled: isAccounting,
+  });
+  const vehicleLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    availableVehicles?.forEach((vehicle) => {
+      map.set(
+        vehicle.id,
+        `${vehicle.name} (${vehicle.license_plate})${
+          vehicle.is_pool ? " • Pool" : ""
+        }`
+      );
+    });
+    if (isAccounting && adminVehicles) {
+      adminVehicles.forEach((vehicle) => {
+        map.set(
+          vehicle.id,
+          `${vehicle.name} (${vehicle.license_plate})${
+            vehicle.is_pool ? " • Pool" : ""
+          }`
+        );
+      });
+    }
+    return map;
+  }, [availableVehicles, adminVehicles, isAccounting]);
+  const resolveVehicleLabel = useCallback(
+    (vehicleId?: string | null) => {
+      if (!vehicleId) {
+        return "—";
+      }
+      return vehicleLookup.get(vehicleId) ?? "Unbekanntes Fahrzeug";
+    },
+    [vehicleLookup]
+  );
 
   const totalHours = useMemo(() => {
     if (!data) return 0;
@@ -97,6 +137,8 @@ export const TimesheetDetailPage = () => {
       </div>
     );
   }
+
+  const weekVehicleLabel = resolveVehicleLabel(data.week_vehicle_id);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -179,6 +221,9 @@ export const TimesheetDetailPage = () => {
             <p className="text-sm text-gray-600">
               Status: {statusLabels[data.status] ?? data.status} • Gesamtstunden:{" "}
               {totalHours.toFixed(2).replace(".", ",")}
+            </p>
+            <p className="text-xs text-gray-500">
+              Fahrzeug (Woche): {weekVehicleLabel}
             </p>
             {data.signed_pdf_path && (
               <p className="mt-1 text-sm text-gray-500">
@@ -313,6 +358,7 @@ export const TimesheetDetailPage = () => {
                 <th className="px-4 py-3">Pause</th>
                 <th className="px-4 py-3">Aufgaben</th>
                 <th className="px-4 py-3">Projekt</th>
+                <th className="px-4 py-3">Fahrzeug</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -329,6 +375,9 @@ export const TimesheetDetailPage = () => {
                   <td className="px-4 py-3 text-gray-600">{entry.tasks}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {entry.customer_project || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {resolveVehicleLabel(entry.vehicle_id ?? data.week_vehicle_id)}
                   </td>
                 </tr>
               ))}

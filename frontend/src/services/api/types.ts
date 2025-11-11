@@ -60,6 +60,7 @@ export interface TimeEntry {
   absence_type?: string | null;
   travel_time_minutes: number;
   include_travel_time: boolean;
+  vehicle_id?: string | null;
 }
 
 export interface WeeklyTimesheet {
@@ -69,6 +70,7 @@ export interface WeeklyTimesheet {
   week_start: string;
   week_end: string;
   entries: TimeEntry[];
+  week_vehicle_id?: string | null;
   status: TimesheetStatus;
   signed_pdf_path?: string | null;
   signed_pdf_verified?: boolean;
@@ -82,6 +84,7 @@ export interface TimesheetListResponse {
 
 export interface CreateTimesheetRequest {
   week_start: string;
+  week_vehicle_id?: string | null;
   entries: TimeEntry[];
 }
 
@@ -90,6 +93,7 @@ export interface UpdateTimesheetRequest {
   entries?: TimeEntry[];
   signed_pdf_verification_notes?: string | null;
   signed_pdf_verified?: boolean | null;
+  week_vehicle_id?: string | null;
 }
 
 export interface SendTimesheetEmailRequest {

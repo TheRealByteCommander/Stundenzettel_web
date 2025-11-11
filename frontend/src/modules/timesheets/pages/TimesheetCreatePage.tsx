@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
@@ -9,6 +9,7 @@ import {
   useCreateTimesheetMutation,
   useTimesheetsQuery,
 } from "../hooks/useTimesheets";
+import { useAvailableVehiclesQuery } from "../hooks/useAvailableVehicles";
 import type { TimeEntry } from "../../../services/api/types";
 
 const defaultEntry: TimeEntry = {
@@ -22,17 +23,31 @@ const defaultEntry: TimeEntry = {
   absence_type: null,
   travel_time_minutes: 0,
   include_travel_time: false,
+  vehicle_id: null,
 };
 
 export const TimesheetCreatePage = () => {
   const navigate = useNavigate();
   const { refetch } = useTimesheetsQuery();
   const createMutation = useCreateTimesheetMutation();
+  const { data: vehicles, isLoading: vehiclesLoading, error: vehiclesError } =
+    useAvailableVehiclesQuery();
   const [weekStart, setWeekStart] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const [weekVehicleId, setWeekVehicleId] = useState<string>("");
   const [entries, setEntries] = useState<TimeEntry[]>([{ ...defaultEntry }]);
   const [error, setError] = useState<string | null>(null);
+  const vehicleOptions = useMemo(
+    () =>
+      vehicles?.map((vehicle) => ({
+        value: vehicle.id,
+        label: `${vehicle.name} (${vehicle.license_plate})${
+          vehicle.is_pool ? " • Pool" : ""
+        }`,
+      })) ?? [],
+    [vehicles]
+  );
 
   const handleEntryChange = (
     index: number,
@@ -47,6 +62,8 @@ export const TimesheetCreatePage = () => {
               [field]:
                 field === "break_minutes" || field === "travel_time_minutes"
                   ? Number(value)
+                  : field === "vehicle_id"
+                  ? value || null
                   : value,
             }
           : entry
@@ -55,7 +72,10 @@ export const TimesheetCreatePage = () => {
   };
 
   const handleAddEntry = () => {
-    setEntries((prev) => [...prev, { ...defaultEntry }]);
+    setEntries((prev) => [
+      ...prev,
+      { ...defaultEntry, vehicle_id: weekVehicleId || null },
+    ]);
   };
 
   const handleRemoveEntry = (index: number) => {
@@ -68,7 +88,11 @@ export const TimesheetCreatePage = () => {
     try {
       await createMutation.mutateAsync({
         week_start: weekStart,
-        entries,
+        week_vehicle_id: weekVehicleId || undefined,
+        entries: entries.map((entry) => ({
+          ...entry,
+          vehicle_id: entry.vehicle_id || null,
+        })),
       });
       await refetch();
       navigate("/app/timesheets");
@@ -94,6 +118,14 @@ export const TimesheetCreatePage = () => {
             Stundenzettel anlegen
           </CardTitle>
 
+          {vehiclesError && (
+            <Alert variant="destructive">
+              Fahrzeuge konnten nicht geladen werden:{" "}
+              {(vehiclesError.response?.data as { detail?: string } | undefined)
+                ?.detail ?? vehiclesError.message}
+            </Alert>
+          )}
+
           {error && <Alert variant="destructive">{error}</Alert>}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
@@ -105,6 +137,44 @@ export const TimesheetCreatePage = () => {
                 value={weekStart}
                 onChange={(event) => setWeekStart(event.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Fahrzeug für die Woche</Label>
+              <select
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                value={weekVehicleId}
+                onChange={(event) => {
+                  const newVehicleId = event.target.value;
+                  const previousVehicleId = weekVehicleId;
+                  setWeekVehicleId(newVehicleId);
+                  setEntries((prev) =>
+                    prev.map((entry) => {
+                      if (
+                        entry.vehicle_id === previousVehicleId ||
+                        entry.vehicle_id === null
+                      ) {
+                        return {
+                          ...entry,
+                          vehicle_id: newVehicleId || null,
+                        };
+                      }
+                      return entry;
+                    })
+                  );
+                }}
+                disabled={vehiclesLoading}
+              >
+                <option value="">— Kein Fahrzeug / später wählen —</option>
+                {vehicleOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">
+                Wählen Sie das standardmäßig genutzte Fahrzeug für diese Woche.
+                Die Auswahl kann für einzelne Tage überschrieben werden.
+              </p>
             </div>
 
             <div className="space-y-4">
@@ -123,6 +193,32 @@ export const TimesheetCreatePage = () => {
                   className="rounded-lg border border-gray-200 p-4 shadow-sm"
                 >
                   <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Fahrzeug</Label>
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                          value={entry.vehicle_id ?? ""}
+                          onChange={(event) =>
+                            handleEntryChange(
+                              index,
+                              "vehicle_id",
+                              event.target.value
+                            )
+                          }
+                          disabled={vehiclesLoading}
+                        >
+                          <option value="">
+                            {weekVehicleId
+                              ? "Wochenfahrzeug verwenden"
+                              : "Kein Fahrzeug"}
+                          </option>
+                          {vehicleOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     <div className="space-y-2">
                       <Label>Datum</Label>
                       <Input

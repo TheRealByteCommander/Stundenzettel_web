@@ -10,6 +10,11 @@ export const fetchVehicles = async (): Promise<Vehicle[]> => {
   return data;
 };
 
+export const fetchAvailableVehicles = async (): Promise<Vehicle[]> => {
+  const { data } = await apiClient.get<Vehicle[]>("/vehicles/available");
+  return data;
+};
+
 export const createVehicle = async (
   payload: VehicleCreateRequest
 ): Promise<Vehicle> => {
