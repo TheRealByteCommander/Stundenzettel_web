@@ -15,7 +15,7 @@ import {
   useInitialSetupMutation,
   useVerifyOtpMutation,
 } from "../hooks/useTwoFactor";
-import { authStore } from "../../../store/auth-store";
+import { authStore, useAuthStore } from "../../../store/auth-store";
 import { TwoFactorDialog } from "../components/TwoFactorDialog";
 import { TwoFactorSetupDialog } from "../components/TwoFactorSetupDialog";
 import type { LoginResponse } from "../../../services/api/types";
