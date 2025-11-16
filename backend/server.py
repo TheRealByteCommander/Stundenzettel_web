@@ -1284,15 +1284,15 @@ async def login(request: Request, user_login: UserLogin):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     
     # 2FA is mandatory - check if user has 2FA setup
-    if not user.get("two_fa_secret"):
-        # User needs to setup 2FA first
+    if not user.get("two_fa_secret") or not user.get("two_fa_enabled"):
+        # User needs to setup 2FA first (no secret OR secret exists but not enabled yet)
         # Generate a temporary token for 2FA setup (valid for 10 minutes)
         setup_token = create_access_token(
             data={"sub": user["email"], "scope": "2fa_setup"}, expires_delta=timedelta(minutes=10)
         )
         return {"requires_2fa_setup": True, "setup_token": setup_token}
     
-    # 2FA is mandatory - user must provide OTP
+    # 2FA is mandatory - user must provide OTP (only if 2FA is fully enabled)
     if not user_login.otp:
         # User needs to provide 2FA code
         temp_token = create_access_token(
