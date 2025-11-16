@@ -2,14 +2,11 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { Button } from "../../components/ui/button";
 import { useCurrentUserQuery } from "../../modules/auth/hooks/useCurrentUser";
-import { useAuthStore } from "../../store/auth-store";
+import { authStore } from "../../store/auth-store";
 
 export const ProtectedLayout = () => {
   const navigate = useNavigate();
   const hasRedirectedRef = useRef(false);
-  const { clearSession } = useAuthStore((state) => ({
-    clearSession: state.clearSession,
-  }));
   const { data: user, isLoading, isError } = useCurrentUserQuery();
 
   useEffect(() => {
@@ -19,10 +16,10 @@ export const ProtectedLayout = () => {
 
     if (isError || (!isLoading && !user)) {
       hasRedirectedRef.current = true;
-      clearSession();
+      authStore.getState().clearSession();
       navigate("/login", { replace: true });
     }
-  }, [clearSession, isError, isLoading, navigate, user]);
+  }, [isError, isLoading, navigate, user]);
 
   if (isLoading) {
     return (
@@ -37,7 +34,7 @@ export const ProtectedLayout = () => {
   }
 
   const handleLogout = () => {
-    clearSession();
+    authStore.getState().clearSession();
     navigate("/login", { replace: true });
   };
 
