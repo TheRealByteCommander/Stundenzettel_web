@@ -15,7 +15,7 @@ import {
   useInitialSetupMutation,
   useVerifyOtpMutation,
 } from "../hooks/useTwoFactor";
-import { useAuthStore } from "../../../store/auth-store";
+import { authStore } from "../../../store/auth-store";
 import { TwoFactorDialog } from "../components/TwoFactorDialog";
 import { TwoFactorSetupDialog } from "../components/TwoFactorSetupDialog";
 import type { LoginResponse } from "../../../services/api/types";
@@ -45,25 +45,10 @@ export const LoginPage = () => {
   const [showTwoFaDialog, setShowTwoFaDialog] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
 
-  const {
-    token,
-    setSession,
-    setTempToken,
-    setSetupToken,
-    tempToken,
-    setupToken,
-    qrUri,
-    clearSession,
-  } = useAuthStore((state) => ({
-    token: state.token,
-    setSession: state.setSession,
-    setTempToken: state.setTempToken,
-    setSetupToken: state.setSetupToken,
-    tempToken: state.tempToken,
-    setupToken: state.setupToken,
-    qrUri: state.qrUri,
-    clearSession: state.clearSession,
-  }));
+  const token = useAuthStore((state) => state.token);
+  const tempToken = useAuthStore((state) => state.tempToken);
+  const setupToken = useAuthStore((state) => state.setupToken);
+  const qrUri = useAuthStore((state) => state.qrUri);
 
   const loginMutation = useLoginMutation();
   const verifyMutation = useVerifyOtpMutation();
@@ -81,32 +66,32 @@ export const LoginPage = () => {
 
   useEffect(() => {
     if (token) {
-      navigate("/app");
+      navigate("/app", { replace: true });
     }
   }, [token, navigate]);
 
   const handleLoginSuccess = (response: LoginResponse) => {
     if ("access_token" in response) {
-      setSession(response.access_token, response.user);
+      authStore.getState().setSession(response.access_token, response.user);
       setErrorMessage(null);
       navigate("/app");
       return;
     }
 
     if ("requires_2fa" in response) {
-      setTempToken(response.temp_token);
+      authStore.getState().setTempToken(response.temp_token);
       setShowTwoFaDialog(true);
       return;
     }
 
     if ("requires_2fa_setup" in response) {
       const newSetupToken = response.setup_token;
-      setSetupToken({ setupToken: newSetupToken, qrUri: null });
+      authStore.getState().setSetupToken({ setupToken: newSetupToken, qrUri: null });
       setShowSetupDialog(true);
-      setTempToken(null);
+      authStore.getState().setTempToken(null);
       setupQrMutation.mutate(newSetupToken, {
         onSuccess: (data) => {
-          setSetupToken({ setupToken: newSetupToken, qrUri: data.otpauth_uri });
+          authStore.getState().setSetupToken({ setupToken: newSetupToken, qrUri: data.otpauth_uri });
         },
         onError: (error) => {
           const axiosError = error as AxiosError<{ detail?: string }>;
@@ -121,7 +106,7 @@ export const LoginPage = () => {
 
   const onSubmit = async (values: LoginSchema) => {
     setErrorMessage(null);
-    clearSession();
+    authStore.getState().clearSession();
     try {
       const response = await loginMutation.mutateAsync(values);
       handleLoginSuccess(response);
@@ -146,7 +131,7 @@ export const LoginPage = () => {
         otp: code,
         temp_token: tempToken,
       });
-      setSession(response.access_token, response.user);
+      authStore.getState().setSession(response.access_token, response.user);
       setShowTwoFaDialog(false);
       navigate("/app");
     } catch (error) {
@@ -172,7 +157,7 @@ export const LoginPage = () => {
         otp: code,
         temp_token: setupToken,
       });
-      setSession(response.access_token, response.user);
+      authStore.getState().setSession(response.access_token, response.user);
       setShowSetupDialog(false);
       navigate("/app");
     } catch (error) {
