@@ -2889,10 +2889,28 @@ async def ensure_test_announcement():
     logger.info("Test announcement created for verification.")
     return True
 
-async def create_admin_user(email: Optional[str] = None):
+async def create_admin_user(email: Optional[str] = None, reset_if_exists: bool = False):
     target_email = (email or DEFAULT_ADMIN_EMAIL).strip().lower()
     admin = await db.users.find_one({"email": target_email})
     if admin:
+        if reset_if_exists:
+            # Reset admin user: new secret, disable 2FA, reset password
+            two_fa_secret = pyotp.random_base32()
+            await db.users.update_one(
+                {"email": target_email},
+                {
+                    "$set": {
+                        "two_fa_secret": two_fa_secret,
+                        "two_fa_enabled": False,
+                        "hashed_password": get_password_hash(DEFAULT_ADMIN_PASSWORD),
+                        "name": DEFAULT_ADMIN_NAME,
+                        "role": "admin",
+                        "is_admin": True
+                    }
+                }
+            )
+            logger.info(f"Admin user reset: {target_email} / {DEFAULT_ADMIN_PASSWORD} (2FA pending)")
+            return True
         return False
     two_fa_secret = pyotp.random_base32()
     admin_user = User(
