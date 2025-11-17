@@ -76,12 +76,20 @@ export const ProtectedLayout = () => {
               </button>
             )}
             {user.role === "admin" && (
-              <button
-                className="text-brand-gray hover:text-brand-primary"
-                onClick={() => navigate("/app/admin/vehicles")}
-              >
-                Fahrzeuge
-              </button>
+              <>
+                <button
+                  className="text-brand-gray hover:text-brand-primary"
+                  onClick={() => navigate("/app/admin/users")}
+                >
+                  Benutzer
+                </button>
+                <button
+                  className="text-brand-gray hover:text-brand-primary"
+                  onClick={() => navigate("/app/admin/vehicles")}
+                >
+                  Fahrzeuge
+                </button>
+              </>
             )}
           </nav>
           <div className="flex items-center gap-4">

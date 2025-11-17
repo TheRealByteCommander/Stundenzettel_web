@@ -26,17 +26,46 @@ const defaultEntry: TimeEntry = {
   vehicle_id: null,
 };
 
+// Helper function to get Monday of a given date
+const getMonday = (date: Date): Date => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  return new Date(d.setDate(diff));
+};
+
+// Helper function to generate week entries (Monday to Sunday)
+const generateWeekEntries = (weekStartDate: string, weekVehicleId: string | null): TimeEntry[] => {
+  const start = new Date(weekStartDate);
+  const entries: TimeEntry[] = [];
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    entries.push({
+      ...defaultEntry,
+      date: date.toISOString().split("T")[0],
+      vehicle_id: weekVehicleId,
+    });
+  }
+  
+  return entries;
+};
+
 export const TimesheetCreatePage = () => {
   const navigate = useNavigate();
   const { refetch } = useTimesheetsQuery();
   const createMutation = useCreateTimesheetMutation();
   const { data: vehicles, isLoading: vehiclesLoading, error: vehiclesError } =
     useAvailableVehiclesQuery();
-  const [weekStart, setWeekStart] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  
+  // Initialize with Monday of current week
+  const initialMonday = getMonday(new Date()).toISOString().split("T")[0];
+  const [weekStart, setWeekStart] = useState(initialMonday);
   const [weekVehicleId, setWeekVehicleId] = useState<string>("");
-  const [entries, setEntries] = useState<TimeEntry[]>([{ ...defaultEntry }]);
+  const [entries, setEntries] = useState<TimeEntry[]>(() => 
+    generateWeekEntries(initialMonday, null)
+  );
   const [error, setError] = useState<string | null>(null);
   const vehicleOptions = useMemo(
     () =>
@@ -49,37 +78,29 @@ export const TimesheetCreatePage = () => {
     [vehicles]
   );
 
+  // Update entries when week start changes
+  const handleWeekStartChange = (newWeekStart: string) => {
+    setWeekStart(newWeekStart);
+    // Regenerate week entries for the new week
+    const newEntries = generateWeekEntries(newWeekStart, weekVehicleId || null);
+    setEntries(newEntries);
+  };
+
   const handleEntryChange = (
     index: number,
     field: keyof TimeEntry,
-    value: string
+    value: string | number | boolean | null
   ) => {
     setEntries((prev) =>
       prev.map((entry, idx) =>
         idx === index
           ? {
               ...entry,
-              [field]:
-                field === "break_minutes" || field === "travel_time_minutes"
-                  ? Number(value)
-                  : field === "vehicle_id"
-                  ? value || null
-                  : value,
+              [field]: value,
             }
           : entry
       )
     );
-  };
-
-  const handleAddEntry = () => {
-    setEntries((prev) => [
-      ...prev,
-      { ...defaultEntry, vehicle_id: weekVehicleId || null },
-    ]);
-  };
-
-  const handleRemoveEntry = (index: number) => {
-    setEntries((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -135,8 +156,16 @@ export const TimesheetCreatePage = () => {
                 id="week-start"
                 type="date"
                 value={weekStart}
-                onChange={(event) => setWeekStart(event.target.value)}
+                onChange={(event) => {
+                  const selectedDate = new Date(event.target.value);
+                  const monday = getMonday(selectedDate);
+                  const mondayStr = monday.toISOString().split("T")[0];
+                  handleWeekStartChange(mondayStr);
+                }}
               />
+              <p className="text-xs text-gray-500">
+                Die Woche wird automatisch auf den Montag der ausgewählten Woche gesetzt. Alle 7 Tage (Mo-So) werden automatisch erstellt.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Fahrzeug für die Woche</Label>
@@ -145,21 +174,13 @@ export const TimesheetCreatePage = () => {
                 value={weekVehicleId}
                 onChange={(event) => {
                   const newVehicleId = event.target.value;
-                  const previousVehicleId = weekVehicleId;
                   setWeekVehicleId(newVehicleId);
+                  // Update all entries that don't have a specific vehicle assigned
                   setEntries((prev) =>
-                    prev.map((entry) => {
-                      if (
-                        entry.vehicle_id === previousVehicleId ||
-                        entry.vehicle_id === null
-                      ) {
-                        return {
-                          ...entry,
-                          vehicle_id: newVehicleId || null,
-                        };
-                      }
-                      return entry;
-                    })
+                    prev.map((entry) => ({
+                      ...entry,
+                      vehicle_id: entry.vehicle_id || newVehicleId || null,
+                    }))
                   );
                 }}
                 disabled={vehiclesLoading}
@@ -180,12 +201,12 @@ export const TimesheetCreatePage = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-brand-gray">
-                  Einträge
+                  Wocheneinträge (Montag - Sonntag)
                 </h2>
-                <Button type="button" variant="outline" onClick={handleAddEntry}>
-                  Eintrag hinzufügen
-                </Button>
               </div>
+              <p className="text-sm text-gray-600">
+                Alle 7 Tage der Woche sind automatisch erstellt. Sie können jeden Tag individuell bearbeiten.
+              </p>
 
               {entries.map((entry, index) => (
                 <div
@@ -300,16 +321,6 @@ export const TimesheetCreatePage = () => {
                       />
                     </div>
                   </div>
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleRemoveEntry(index)}
-                      disabled={entries.length === 1}
-                    >
-                      Eintrag entfernen
-                    </Button>
-                  </div>
                 </div>
               ))}
             </div>
@@ -317,7 +328,7 @@ export const TimesheetCreatePage = () => {
             <div className="flex justify-end gap-3">
               <Button
                 type="submit"
-                disabled={createMutation.isPending || entries.length === 0}
+                disabled={createMutation.isPending || entries.length !== 7}
               >
                 {createMutation.isPending
                   ? "Speichere..."

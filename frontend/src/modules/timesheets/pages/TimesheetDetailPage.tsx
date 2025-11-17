@@ -12,6 +12,8 @@ import {
   useUpdateTimesheetMutation,
 } from "../hooks/useTimesheets";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
+import { useAvailableVehiclesQuery } from "../hooks/useAvailableVehicles";
+import type { TimeEntry } from "../../../services/api/types";
 
 const statusLabels: Record<string, string> = {
   draft: "Entwurf",
@@ -41,11 +43,17 @@ export const TimesheetDetailPage = () => {
   const [verificationError, setVerificationError] = useState<string | null>(
     null
   );
+  const [message, setMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [verificationNotes, setVerificationNotes] = useState("");
   const [verificationChecked, setVerificationChecked] = useState(false);
+  const [editingEntries, setEditingEntries] = useState<TimeEntry[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
   const { data: currentUser } = useCurrentUserQuery();
+  const { data: vehicles } = useAvailableVehiclesQuery();
   const isAccounting =
     currentUser?.role === "admin" || currentUser?.role === "accounting";
+  const canEdit = data?.status === "draft" && (currentUser?.id === data?.user_id || isAccounting);
 
   const totalHours = useMemo(() => {
     if (!data) return 0;
@@ -64,6 +72,7 @@ export const TimesheetDetailPage = () => {
     }
     setVerificationNotes(data.signed_pdf_verification_notes ?? "");
     setVerificationChecked(Boolean(data.signed_pdf_verified));
+    setEditingEntries([...data.entries]);
   }, [data]);
 
   if (!id) {
@@ -163,6 +172,84 @@ export const TimesheetDetailPage = () => {
     setVerificationError(null);
   };
 
+  const handleEntryChange = (
+    index: number,
+    field: keyof TimeEntry,
+    value: string | number | boolean | null
+  ) => {
+    setEditingEntries((prev) =>
+      prev.map((entry, idx) =>
+        idx === index
+          ? {
+              ...entry,
+              [field]: value,
+            }
+          : entry
+      )
+    );
+  };
+
+  const handleSaveEntries = () => {
+    if (!id || !data) return;
+    resetMessages();
+    updateMutation.mutate(
+      {
+        entries: editingEntries,
+      },
+      {
+        onSuccess: async () => {
+          setMessage("Stundenzettel wurde aktualisiert.");
+          setIsEditing(false);
+          await refetch();
+        },
+        onError: (err) => {
+          const detail =
+            (err.response?.data as { detail?: string } | undefined)?.detail ??
+            err.message;
+          setFormError(detail ?? "Stundenzettel konnte nicht aktualisiert werden.");
+        },
+      }
+    );
+  };
+
+  const handleCancelEdit = () => {
+    if (!data) return;
+    setEditingEntries([...data.entries]);
+    setIsEditing(false);
+    setFormError(null);
+  };
+
+  const handleSubmitTimesheet = () => {
+    if (!id) return;
+    resetMessages();
+    sendMutation.mutate(undefined, {
+      onSuccess: async () => {
+        setMessage("Stundenzettel wurde per E-Mail versendet. Sie erhalten eine Kopie als PDF.");
+        await refetch();
+      },
+      onError: (err) => {
+        const detail =
+          (err.response?.data as { detail?: string } | undefined)?.detail ??
+          err.message;
+        setFormError(detail ?? "E-Mail-Versand fehlgeschlagen.");
+      },
+    });
+  };
+
+  const resetMessages = () => {
+    setMessage(null);
+    setFormError(null);
+  };
+
+  const vehicleOptions = useMemo(
+    () =>
+      vehicles?.map((vehicle) => ({
+        value: vehicle.id,
+        label: `${vehicle.name} (${vehicle.license_plate})${vehicle.is_pool ? " • Pool" : ""}`,
+      })) ?? [],
+    [vehicles]
+  );
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
       <Button variant="outline" onClick={() => navigate(-1)}>
@@ -199,27 +286,72 @@ export const TimesheetDetailPage = () => {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => sendMutation.mutate()}
-              disabled={sendMutation.isPending}
-            >
-              Per E-Mail senden
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => approveMutation.mutate()}
-              disabled={approveMutation.isPending || data.status === "approved"}
-            >
-              Genehmigen
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => rejectMutation.mutate()}
-              disabled={rejectMutation.isPending}
-            >
-              Ablehnen
-            </Button>
+            {canEdit && (
+              <>
+                {!isEditing ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Bearbeiten
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleSaveEntries}
+                      disabled={updateMutation.isPending}
+                    >
+                      {updateMutation.isPending ? "Speichere..." : "Speichern"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                    >
+                      Abbrechen
+                    </Button>
+                  </>
+                )}
+                <Button
+                  onClick={handleSubmitTimesheet}
+                  disabled={sendMutation.isPending || isEditing}
+                >
+                  {sendMutation.isPending ? "Sende..." : "Absenden & per E-Mail senden"}
+                </Button>
+              </>
+            )}
+            {!canEdit && data.status === "draft" && (
+              <Button
+                onClick={handleSubmitTimesheet}
+                disabled={sendMutation.isPending}
+              >
+                {sendMutation.isPending ? "Sende..." : "Absenden & per E-Mail senden"}
+              </Button>
+            )}
+            {isAccounting && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => sendMutation.mutate()}
+                  disabled={sendMutation.isPending}
+                >
+                  Per E-Mail senden
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => approveMutation.mutate()}
+                  disabled={approveMutation.isPending || data.status === "approved"}
+                >
+                  Genehmigen
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => rejectMutation.mutate()}
+                  disabled={rejectMutation.isPending}
+                >
+                  Ablehnen
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -303,6 +435,9 @@ export const TimesheetDetailPage = () => {
           </div>
         )}
 
+        {message && <Alert variant="success">{message}</Alert>}
+        {formError && <Alert variant="destructive">{formError}</Alert>}
+
         <div className="mt-6 overflow-hidden rounded-lg border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
@@ -313,23 +448,127 @@ export const TimesheetDetailPage = () => {
                 <th className="px-4 py-3">Pause</th>
                 <th className="px-4 py-3">Aufgaben</th>
                 <th className="px-4 py-3">Projekt</th>
+                <th className="px-4 py-3">Ort</th>
+                {isEditing && <th className="px-4 py-3">Fahrzeug</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {data.entries.map((entry, index) => (
+              {(isEditing ? editingEntries : data.entries).map((entry, index) => (
                 <tr key={`${entry.date}-${index}`}>
                   <td className="px-4 py-3 text-gray-600">
-                    {new Date(entry.date).toLocaleDateString("de-DE")}
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        value={entry.date}
+                        onChange={(event) =>
+                          handleEntryChange(index, "date", event.target.value)
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      new Date(entry.date).toLocaleDateString("de-DE")
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{entry.start_time}</td>
-                  <td className="px-4 py-3 text-gray-600">{entry.end_time}</td>
                   <td className="px-4 py-3 text-gray-600">
-                    {entry.break_minutes} Min
+                    {isEditing ? (
+                      <Input
+                        type="time"
+                        value={entry.start_time}
+                        onChange={(event) =>
+                          handleEntryChange(index, "start_time", event.target.value)
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      entry.start_time
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{entry.tasks}</td>
                   <td className="px-4 py-3 text-gray-600">
-                    {entry.customer_project || "-"}
+                    {isEditing ? (
+                      <Input
+                        type="time"
+                        value={entry.end_time}
+                        onChange={(event) =>
+                          handleEntryChange(index, "end_time", event.target.value)
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      entry.end_time
+                    )}
                   </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        value={entry.break_minutes}
+                        onChange={(event) =>
+                          handleEntryChange(index, "break_minutes", Number(event.target.value))
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      `${entry.break_minutes} Min`
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {isEditing ? (
+                      <Input
+                        value={entry.tasks}
+                        onChange={(event) =>
+                          handleEntryChange(index, "tasks", event.target.value)
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      entry.tasks
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {isEditing ? (
+                      <Input
+                        value={entry.customer_project}
+                        onChange={(event) =>
+                          handleEntryChange(index, "customer_project", event.target.value)
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      entry.customer_project || "-"
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {isEditing ? (
+                      <Input
+                        value={entry.location}
+                        onChange={(event) =>
+                          handleEntryChange(index, "location", event.target.value)
+                        }
+                        className="w-full"
+                      />
+                    ) : (
+                      entry.location || "-"
+                    )}
+                  </td>
+                  {isEditing && (
+                    <td className="px-4 py-3 text-gray-600">
+                      <select
+                        className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                        value={entry.vehicle_id ?? ""}
+                        onChange={(event) =>
+                          handleEntryChange(index, "vehicle_id", event.target.value || null)
+                        }
+                      >
+                        <option value="">— Kein Fahrzeug —</option>
+                        {vehicleOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

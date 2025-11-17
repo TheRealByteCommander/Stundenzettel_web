@@ -219,6 +219,23 @@ export interface AdminUserSummary {
   name: string;
   role: Role;
   is_admin?: boolean;
+  weekly_hours?: number;
+}
+
+export interface UserCreateRequest {
+  email: string;
+  name: string;
+  password: string;
+  role: Role;
+  weekly_hours?: number;
+}
+
+export interface UserUpdateRequest {
+  email?: string;
+  name?: string;
+  role?: Role;
+  weekly_hours?: number;
+  password?: string;
 }
 
 export interface Vehicle {

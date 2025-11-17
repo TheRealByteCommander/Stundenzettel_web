@@ -12,6 +12,7 @@ import { TimesheetAdminPage } from "../modules/timesheets/pages/TimesheetAdminPa
 import { ExpensesOverviewPage } from "../modules/expenses/pages/ExpensesOverviewPage";
 import { ExpenseReportDetailPage } from "../modules/expenses/pages/ExpenseReportDetailPage";
 import { VehicleManagementPage } from "../modules/admin/pages/VehicleManagementPage";
+import { UserManagementPage } from "../modules/admin/pages/UserManagementPage";
 import { ProtectedLayout } from "./layouts/ProtectedLayout";
 
 const router = createBrowserRouter([
@@ -71,6 +72,10 @@ const router = createBrowserRouter([
           {
             path: "vehicles",
             element: <VehicleManagementPage />,
+          },
+          {
+            path: "users",
+            element: <UserManagementPage />,
           },
         ],
       },
