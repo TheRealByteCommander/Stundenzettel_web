@@ -55,12 +55,10 @@ source venv/bin/activate
 pip install -r requirements.txt --upgrade
 
 # 5. Service neu starten
-sudo systemctl restart stundenzettel-backend
-# oder falls Sie einen anderen Service-Namen haben:
-# sudo systemctl restart agents
+sudo systemctl restart tick-guard-backend
 
 # 6. Status überprüfen
-sudo systemctl status stundenzettel-backend
+sudo systemctl status tick-guard-backend
 ```
 
 ### Environment-Variablen aktualisieren:
@@ -77,7 +75,7 @@ nano /opt/stundenzettel_web/backend/.env
 # OLLAMA_TIMEOUT=600
 
 # Service neu starten
-sudo systemctl restart stundenzettel-backend
+sudo systemctl restart tick-guard-backend
 ```
 
 ---
@@ -107,11 +105,11 @@ pip install -r requirements.txt --upgrade
 
 # Service neu starten
 echo "🔄 Service wird neu gestartet..."
-sudo systemctl restart stundenzettel-backend
+sudo systemctl restart tick-guard-backend
 
 # Status anzeigen
 echo "✅ Update abgeschlossen!"
-sudo systemctl status stundenzettel-backend --no-pager
+sudo systemctl status tick-guard-backend --no-pager
 ```
 
 **Verwendung:**
@@ -165,7 +163,7 @@ curl http://192.168.178.155:11434/api/tags
 docker compose -f docker-compose.agents.yml ps
 
 # Systemd
-sudo systemctl status stundenzettel-backend
+sudo systemctl status tick-guard-backend
 ```
 
 ### 3. Logs überprüfen
@@ -175,7 +173,7 @@ sudo systemctl status stundenzettel-backend
 docker compose -f docker-compose.agents.yml logs -f agents
 
 # Systemd
-sudo journalctl -u stundenzettel-backend -f
+sudo journalctl -u tick-guard-backend -f
 ```
 
 ### 4. LLM-Verbindung testen
@@ -293,7 +291,7 @@ cd backend && git pull && docker compose -f docker-compose.agents.yml restart ag
 
 **Schnell-Update (Systemd):**
 ```bash
-cd /opt/stundenzettel_web/backend && git pull && sudo systemctl restart stundenzettel-backend
+cd /opt/tick-guard/stundenzettel_web/backend && git pull && sudo systemctl restart tick-guard-backend
 ```
 
 **Vollständiges Update (Docker):**
