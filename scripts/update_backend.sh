@@ -18,6 +18,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/tick-guard}"
 PROJECT_DIR="${PROJECT_DIR:-$INSTALL_DIR/Stundenzettel_web}"
 BACKEND_DIR="$PROJECT_DIR/backend"
 SERVICE_NAME="${SERVICE_NAME:-tick-guard-backend}"
+SERVICE_USER="${SERVICE_USER:-tickguard}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tick-guard}"
 SKIP_BACKUP="${SKIP_BACKUP:-false}"
@@ -115,6 +116,22 @@ fi
 # .env Datei prüfen und aktualisieren (nur neue Variablen hinzufügen, bestehende nicht überschreiben)
 if [[ -f ".env" ]]; then
   log ".env Datei wird geprüft..."
+  
+  # Prüfe und korrigiere LOCAL_RECEIPTS_PATH (muss absolut sein)
+  if grep -q "^LOCAL_RECEIPTS_PATH=" .env; then
+    CURRENT_PATH=$(grep "^LOCAL_RECEIPTS_PATH=" .env | cut -d= -f2- | xargs)
+    if [[ -n "$CURRENT_PATH" ]] && [[ ! "$CURRENT_PATH" = /* ]]; then
+      warn "LOCAL_RECEIPTS_PATH ist nicht absolut: '$CURRENT_PATH' - wird korrigiert..."
+      # Korrigiere zu absolutem Pfad
+      ABSOLUTE_PATH="/var/tick-guard/receipts"
+      sed -i "s|^LOCAL_RECEIPTS_PATH=.*|LOCAL_RECEIPTS_PATH=$ABSOLUTE_PATH|" .env
+      log "LOCAL_RECEIPTS_PATH korrigiert zu: $ABSOLUTE_PATH"
+      # Stelle sicher, dass das Verzeichnis existiert
+      mkdir -p "$ABSOLUTE_PATH"
+      chown -R "$SERVICE_USER":"$SERVICE_USER" "$ABSOLUTE_PATH" 2>/dev/null || true
+    fi
+  fi
+  
   # Prüfe ob neue Variablen in .env.example existieren (falls vorhanden)
   if [[ -f ".env.example" ]]; then
     while IFS= read -r line; do
