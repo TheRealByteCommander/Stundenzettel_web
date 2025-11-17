@@ -20,7 +20,12 @@ PROJECT_DIR="${PROJECT_DIR:-$INSTALL_DIR/Stundenzettel_web}"
 BACKEND_DIR="$PROJECT_DIR/backend"
 SERVICE_USER="${SERVICE_USER:-tickguard}"
 SERVICE_NAME="${SERVICE_NAME:-tick-guard-backend}"
+# Stelle sicher, dass RECEIPTS_PATH absolut ist
 RECEIPTS_PATH="${LOCAL_RECEIPTS_PATH:-/var/tick-guard/receipts}"
+# Konvertiere zu absolutem Pfad falls relativ
+if [[ ! "$RECEIPTS_PATH" = /* ]]; then
+  RECEIPTS_PATH="$(realpath -m "$RECEIPTS_PATH" 2>/dev/null || echo "/var/tick-guard/receipts")"
+fi
 FRONTEND_IP="${FRONTEND_IP:-192.168.178.150}"
 BACKEND_IP="${BACKEND_IP:-192.168.178.151}"
 OLLAMA_IP="${OLLAMA_IP:-192.168.178.155}"
