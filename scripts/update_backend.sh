@@ -145,7 +145,12 @@ log "Service-Status wird geprüft..."
 if systemctl is-active --quiet "$SERVICE_NAME"; then
   log "✅ Service $SERVICE_NAME läuft erfolgreich"
 else
-  abort "❌ Service $SERVICE_NAME konnte nicht gestartet werden"
+  warn "❌ Service $SERVICE_NAME konnte nicht gestartet werden"
+  log "Letzte Service-Logs (Fehleranalyse):"
+  journalctl -u "$SERVICE_NAME" -n 30 --no-pager || true
+  log "Versuche Service-Status anzuzeigen:"
+  systemctl status "$SERVICE_NAME" --no-pager -l || true
+  abort "Service konnte nicht gestartet werden. Bitte Logs prüfen: journalctl -u $SERVICE_NAME -n 50"
 fi
 
 # Health-Check
