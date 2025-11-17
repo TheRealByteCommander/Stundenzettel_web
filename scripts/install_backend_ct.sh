@@ -25,10 +25,11 @@ FRONTEND_IP="${FRONTEND_IP:-192.168.178.150}"
 BACKEND_IP="${BACKEND_IP:-192.168.178.151}"
 OLLAMA_IP="${OLLAMA_IP:-192.168.178.155}"
 DDNS_DOMAIN="${DDNS_DOMAIN:-${FRONTEND_IP}}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.2}"
-OLLAMA_MODEL_CHAT="${OLLAMA_MODEL_CHAT:-$OLLAMA_MODEL}"
-OLLAMA_MODEL_DOCUMENT="${OLLAMA_MODEL_DOCUMENT:-mistral-nemo}"
-OLLAMA_MODEL_ACCOUNTING="${OLLAMA_MODEL_ACCOUNTING:-llama3.1}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-Qwen2.5:32B}"
+OLLAMA_MODEL_CHAT="${OLLAMA_MODEL_CHAT:-Qwen2.5:32B}"
+OLLAMA_MODEL_DOCUMENT="${OLLAMA_MODEL_DOCUMENT:-Qwen2.5vl:7b}"
+OLLAMA_MODEL_ACCOUNTING="${OLLAMA_MODEL_ACCOUNTING:-DeepSeek-R1:32B}"
+OLLAMA_TIMEOUT="${OLLAMA_TIMEOUT:-600}"
 CORS_ORIGINS="${CORS_ORIGINS:-http://$FRONTEND_IP}"
 VAPID_PUBLIC_KEY="${VAPID_PUBLIC_KEY:-}"
 VAPID_PRIVATE_KEY="${VAPID_PRIVATE_KEY:-}"
@@ -139,7 +140,7 @@ OLLAMA_MODEL=$OLLAMA_MODEL
 OLLAMA_MODEL_CHAT=$OLLAMA_MODEL_CHAT
 OLLAMA_MODEL_DOCUMENT=$OLLAMA_MODEL_DOCUMENT
 OLLAMA_MODEL_ACCOUNTING=$OLLAMA_MODEL_ACCOUNTING
-OLLAMA_TIMEOUT=300
+OLLAMA_TIMEOUT=$OLLAMA_TIMEOUT
 OLLAMA_MAX_RETRIES=3
 CORS_ORIGINS=$CORS_ORIGINS
 VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
@@ -189,13 +190,36 @@ systemctl status "$SERVICE_NAME" --no-pager || warn "Service $SERVICE_NAME konnt
 
 log "Gesundheitscheck:"
 if command -v curl >/dev/null 2>&1; then
-  if curl -sSf http://localhost:8000/health >/dev/null; then
-    log "Health-Check erfolgreich."
-  else
-    warn "Health-Check fehlgeschlagen – bitte Logs (`journalctl -u $SERVICE_NAME`) prüfen."
-  fi
+  MAX_RETRIES=5
+  RETRY_COUNT=0
+  while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+    if curl -sSf http://localhost:8000/health >/dev/null; then
+      log "✅ Health-Check erfolgreich."
+      break
+    else
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      if [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; then
+        log "Health-Check fehlgeschlagen - warte 3 Sekunden und versuche es erneut ($RETRY_COUNT/$MAX_RETRIES)..."
+        sleep 3
+      else
+        warn "⚠️  Health-Check fehlgeschlagen nach $MAX_RETRIES Versuchen – bitte Logs (`journalctl -u $SERVICE_NAME`) prüfen."
+      fi
+    fi
+  done
 else
   warn "curl nicht verfügbar, Health-Check übersprungen."
+fi
+
+# Ollama-Verbindung testen
+log "Ollama-Verbindung wird getestet..."
+if command -v curl >/dev/null 2>&1; then
+  if curl -sSf "http://$OLLAMA_IP:11434/api/tags" >/dev/null; then
+    log "✅ Ollama erreichbar unter http://$OLLAMA_IP:11434"
+  else
+    warn "⚠️  Ollama nicht erreichbar unter http://$OLLAMA_IP:11434 - bitte Netzwerk und Firewall prüfen"
+  fi
+else
+  warn "curl nicht verfügbar, Ollama-Check übersprungen."
 fi
 
 cat <<SUMMARY
@@ -212,7 +236,11 @@ Wichtige Pfade:
 Nächste Schritte:
   - Überprüfe die .env, ggf. VAPID- oder SMTP-Werte ergänzen.
   - Stelle sicher, dass Ollama unter http://$OLLAMA_IP:11434 erreichbar ist.
+  - Prüfe die Modelle auf dem Ollama-Server: ollama list
   - Frontend-Container konfigurieren (install_frontend_ct.sh).
+  
+Update-Script:
+  - Für zukünftige Updates: sudo scripts/update_backend.sh
 
 SUMMARY
 

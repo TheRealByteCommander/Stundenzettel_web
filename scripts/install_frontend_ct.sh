@@ -209,11 +209,34 @@ if [[ "${RUN_CERTBOT,,}" == "true" ]]; then
   fi
 fi
 
+# Health-Check
+log "Frontend-Health-Check wird durchgeführt..."
+if command -v curl >/dev/null 2>&1; then
+  MAX_RETRIES=3
+  RETRY_COUNT=0
+  while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+    if curl -sSf "http://$PUBLIC_HOST/" >/dev/null; then
+      log "✅ Frontend erreichbar unter http://$PUBLIC_HOST/"
+      break
+    else
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      if [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; then
+        log "Frontend-Check fehlgeschlagen - warte 2 Sekunden und versuche es erneut ($RETRY_COUNT/$MAX_RETRIES)..."
+        sleep 2
+      else
+        warn "⚠️  Frontend-Check fehlgeschlagen nach $MAX_RETRIES Versuchen"
+      fi
+    fi
+  done
+else
+  warn "curl nicht verfügbar - Frontend-Check übersprungen"
+fi
+
 log "Installation abgeschlossen. Teste Frontend unter http://$PUBLIC_HOST/"
 
 cat <<SUMMARY
 
-Automatische Installation abgeschlossen.
+✅ Automatische Installation abgeschlossen.
 
 Wichtige Pfade:
   Projektpfad:  $PROJECT_DIR
@@ -224,6 +247,9 @@ Wichtige Pfade:
 
 Falls TLS benötigt wird:
   sudo RUN_CERTBOT=true CERTBOT_EMAIL=admin@$PUBLIC_HOST PUBLIC_HOST=$PUBLIC_HOST DDNS_DOMAIN=$PUBLIC_HOST bash scripts/install_frontend_ct.sh
+
+Update-Script:
+  - Für zukünftige Updates: sudo scripts/update_frontend.sh
 
 SUMMARY
 
