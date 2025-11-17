@@ -61,10 +61,10 @@ Ollama hört standardmäßig auf `0.0.0.0:11434`, also sollten Sie von anderen R
 
 ```bash
 # UFW (Ubuntu/Debian)
-sudo ufw allow from 192.168.1.0/24 to any port 11434
+sudo ufw allow from 192.168.178.0/24 to any port 11434
 
 # Firewalld (CentOS/RHEL)
-sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" port protocol="tcp" port="11434" accept'
+sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.178.0/24" port protocol="tcp" port="11434" accept'
 sudo firewall-cmd --reload
 ```
 
@@ -77,7 +77,7 @@ ip addr show
 hostname -I
 ```
 
-Notieren Sie sich die IP-Adresse (z.B. `192.168.1.100`).
+Notieren Sie sich die IP-Adresse (z.B. `192.168.178.155`).
 
 ### 4. Environment-Variablen konfigurieren
 
@@ -87,7 +87,7 @@ Erstellen Sie `.env` Datei in `backend/`:
 
 ```bash
 # .env
-OLLAMA_BASE_URL=http://192.168.1.100:11434
+OLLAMA_BASE_URL=http://192.168.178.155:11434
 OLLAMA_MODEL=llama3.2
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3
@@ -100,7 +100,7 @@ In `docker-compose.agents.yml` oder `.env`:
 
 ```yaml
 environment:
-  - OLLAMA_BASE_URL=http://192.168.1.100:11434
+  - OLLAMA_BASE_URL=http://192.168.178.155:11434
   - OLLAMA_MODEL=llama3.2
 ```
 
@@ -187,7 +187,7 @@ environment:
 
 ```bash
 # Von Proxmox (Agent-Server)
-curl http://192.168.1.100:11434/api/tags
+curl http://192.168.178.155:11434/api/tags
 
 # Sollte JSON mit verfügbaren Modellen zurückgeben:
 # {"models": [{"name": "llama3.2", ...}]}
@@ -198,7 +198,7 @@ curl http://192.168.1.100:11434/api/tags
 ```python
 from agents import OllamaLLM
 
-llm = OllamaLLM(base_url="http://192.168.1.100:11434")
+llm = OllamaLLM(base_url="http://192.168.178.155:11434")
 is_healthy = await llm.health_check()
 print(f"Ollama erreichbar: {is_healthy}")
 ```
@@ -208,7 +208,7 @@ print(f"Ollama erreichbar: {is_healthy}")
 ```python
 from agents import OllamaLLM
 
-llm = OllamaLLM(base_url="http://192.168.1.100:11434", model="llama3.2")
+llm = OllamaLLM(base_url="http://192.168.178.155:11434", model="llama3.2")
 response = await llm.chat([
     {"role": "user", "content": "Hallo, kannst du mich hören?"}
 ])
@@ -247,7 +247,7 @@ print(response)
 1. Erhöhen Sie `OLLAMA_TIMEOUT` in `.env`
 2. Überprüfen Sie Netzwerk-Latenz:
    ```bash
-   ping 192.168.1.100
+   ping 192.168.178.155
    ```
 
 ### Problem: "Model not found"
@@ -293,7 +293,7 @@ Beschränken Sie Zugriff auf Ollama nur auf Proxmox-Server:
 
 ```bash
 # Auf GMKTec (UFW)
-sudo ufw allow from 192.168.1.50 to any port 11434  # Proxmox IP
+sudo ufw allow from 192.168.178.0/24 to any port 11434  # Proxmox Netzwerk
 sudo ufw deny 11434  # Alle anderen blockieren
 ```
 
@@ -317,10 +317,12 @@ journalctl -u ollama -f
 
 ```bash
 # Regelmäßiger Health Check
-*/5 * * * * curl -f http://192.168.1.100:11434/api/tags || echo "Ollama down" | mail -s "Alert" admin@example.com
+*/5 * * * * curl -f http://192.168.178.155:11434/api/tags || echo "Ollama down" | mail -s "Alert" admin@example.com
 ```
 
 ## Modell-Empfehlungen
+
+### Übersicht
 
 | Modell | Größe | RAM | Geschwindigkeit | Qualität |
 |--------|-------|-----|-----------------|----------|
@@ -329,7 +331,18 @@ journalctl -u ollama -f
 | mistral:7b | 7B | ~10GB | ⚡⚡ | ⭐⭐⭐⭐ |
 | llama3:70b | 70B | ~80GB | ⚡ | ⭐⭐⭐⭐⭐ |
 
-**Empfehlung:** `llama3.1:8b` oder `mistral:7b` für gute Balance zwischen Qualität und Performance.
+### Agent-spezifische Empfehlungen
+
+Jeder Agent hat unterschiedliche Anforderungen. **Siehe [AGENT_LLM_CONFIG.md](AGENT_LLM_CONFIG.md) für detaillierte Empfehlungen!**
+
+**Schnellüberblick (aktuell konfiguriert):**
+- **ChatAgent**: `Qwen2.5:32B` (hohe Qualität für Dialoge)
+- **DocumentAgent**: `Qwen2.5vl:7b` (Vision-Modell für Dokumente und Bilder)
+- **AccountingAgent**: `DeepSeek-R1:32B` (Reasoning-Modell für komplexe Logik)
+
+**Hinweis:** Siehe [AGENT_LLM_CONFIG.md](AGENT_LLM_CONFIG.md) für vollständige Details zu den aktuellen Modellen.
+
+**Vollständige Konfiguration:** Siehe [AGENT_LLM_CONFIG.md](AGENT_LLM_CONFIG.md)
 
 ## Nächste Schritte
 

@@ -101,7 +101,7 @@ ENCRYPTION_KEY=generate-with: python -c "from cryptography.fernet import Fernet;
 
 # Ollama LLM (für AI-Agenten)
 # Für Proxmox: LLMs laufen auf GMKTec evo x2 im lokalen Netzwerk
-OLLAMA_BASE_URL=http://192.168.1.100:11434  # IP des GMKTec-Servers
+OLLAMA_BASE_URL=http://192.168.178.155:11434  # IP des GMKTec evo x2 Servers
 OLLAMA_MODEL=llama3.2
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3

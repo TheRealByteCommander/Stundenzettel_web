@@ -15,10 +15,16 @@ services:
       - DB_NAME=${DB_NAME:-stundenzettel}
       
       # Ollama auf GMKTec evo x2 (Netzwerk-IP)
-      # WICHTIG: Ersetzen Sie 192.168.1.100 mit der tatsächlichen IP des GMKTec-Servers
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.100:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
-      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-300}
+      # GMKTec evo x2 IP: 192.168.178.155
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.178.155:11434}
+      # Standard-Modell (Fallback für alle Agents, falls nicht spezifisch konfiguriert)
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-Qwen2.5:32B}
+      # Agent-spezifische Modelle (siehe AGENT_LLM_CONFIG.md für Empfehlungen)
+      - OLLAMA_MODEL_CHAT=${OLLAMA_MODEL_CHAT:-Qwen2.5:32B}
+      - OLLAMA_MODEL_DOCUMENT=${OLLAMA_MODEL_DOCUMENT:-Qwen2.5vl:7b}
+      - OLLAMA_MODEL_ACCOUNTING=${OLLAMA_MODEL_ACCOUNTING:-DeepSeek-R1:32B}
+      # Timeout-Konfiguration (länger für große Modelle)
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-600}
       - OLLAMA_MAX_RETRIES=${OLLAMA_MAX_RETRIES:-3}
       - OLLAMA_RETRY_DELAY=${OLLAMA_RETRY_DELAY:-2.0}
       
@@ -54,12 +60,12 @@ services:
       sh -c "
         while true; do
           echo 'Checking Ollama connection...'
-          curl -f ${OLLAMA_BASE_URL:-http://192.168.1.100:11434}/api/tags || echo 'Ollama not reachable'
+          curl -f ${OLLAMA_BASE_URL:-http://192.168.178.155:11434}/api/tags || echo 'Ollama not reachable'
           sleep 60
         done
       "
     environment:
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.100:11434}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.178.155:11434}
     networks:
       - agents_network
     restart: unless-stopped

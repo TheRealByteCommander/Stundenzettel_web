@@ -38,9 +38,9 @@ MEMORY_SUMMARY_INTERVAL = int(os.getenv('AGENT_MEMORY_SUMMARY_INTERVAL', '100'))
 # Ollama configuration
 # For Proxmox deployment: LLMs run on GMKTec evo x2 in local network
 # Default: http://localhost:11434 (local)
-# Network: http://GMKTEC_IP:11434 (e.g. http://192.168.1.100:11434)
+# Network: http://GMKTEC_IP:11434 (e.g. http://192.168.178.155:11434)
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'Qwen2.5:32B')
 OLLAMA_MODEL_CHAT = os.getenv('OLLAMA_MODEL_CHAT', OLLAMA_MODEL)
 OLLAMA_MODEL_DOCUMENT = os.getenv('OLLAMA_MODEL_DOCUMENT', OLLAMA_MODEL)
 OLLAMA_MODEL_ACCOUNTING = os.getenv('OLLAMA_MODEL_ACCOUNTING', OLLAMA_MODEL)

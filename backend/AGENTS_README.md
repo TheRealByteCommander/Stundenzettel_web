@@ -97,21 +97,33 @@ Dieses Modul implementiert ein Netzwerk von spezialisierten AI-Agenten zur autom
 
 ```env
 # Netzwerk-Zugriff auf GMKTec evo x2
-OLLAMA_BASE_URL=http://192.168.1.100:11434  # IP des GMKTec-Servers
-OLLAMA_MODEL=llama3.2
+OLLAMA_BASE_URL=http://192.168.178.155:11434  # IP des GMKTec evo x2 Servers
+
+# Agent-spezifische Modelle (aktuell konfiguriert)
+OLLAMA_MODEL_CHAT=Qwen2.5:32B           # Hohe Qualität für Dialoge
+OLLAMA_MODEL_DOCUMENT=Qwen2.5vl:7b      # Vision-Modell für Dokumente und Bilder
+OLLAMA_MODEL_ACCOUNTING=DeepSeek-R1:32B # Reasoning-Modell für komplexe Logik
+
+# Oder ein Modell für alle (einfacher, aber weniger optimiert)
+OLLAMA_MODEL=llama3.2  # Fallback für alle Agents
+
+# Timeout-Konfiguration
 OLLAMA_TIMEOUT=300  # 5 Minuten (für große Modelle)
 OLLAMA_MAX_RETRIES=3  # Retries bei Netzwerkfehlern
 OLLAMA_RETRY_DELAY=2.0  # Sekunden zwischen Retries
 ```
 
 **Features:**
+- ✅ Agent-spezifische LLM-Konfiguration (jeder Agent bekommt optimales Modell)
 - ✅ Connection Pooling für bessere Performance
 - ✅ Automatische Retry-Logic bei Netzwerkfehlern
 - ✅ Health Checks vor Verwendung
 - ✅ Timeout-Konfiguration für große Modelle
 - ✅ Detaillierte Fehlerbehandlung
 
-Siehe **[LLM_INTEGRATION.md](LLM_INTEGRATION.md)** für vollständige Setup-Anleitung.
+**Siehe:**
+- **[AGENT_LLM_CONFIG.md](AGENT_LLM_CONFIG.md)** für detaillierte LLM-Empfehlungen pro Agent
+- **[LLM_INTEGRATION.md](LLM_INTEGRATION.md)** für vollständige Setup-Anleitung
 
 ### Spesensätze
 Die Spesensätze werden in `MEAL_ALLOWANCE_RATES` gespeichert (Quelle: Bundesfinanzministerium) als Fallback.
@@ -156,7 +168,7 @@ response = await orchestrator.handle_user_message(report_id, user_message, db)
 ```python
 from agents import OllamaLLM
 
-llm = OllamaLLM(base_url="http://192.168.1.100:11434")
+llm = OllamaLLM(base_url="http://192.168.178.155:11434")
 is_healthy = await llm.health_check()
 print(f"Ollama erreichbar: {is_healthy}")
 ```
