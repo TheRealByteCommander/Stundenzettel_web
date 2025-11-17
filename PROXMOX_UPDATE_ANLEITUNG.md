@@ -18,7 +18,10 @@ ssh root@192.168.178.151  # Ihre Backend-IP
 cd /opt/tick-guard/Stundenzettel_web
 
 # 3. Update-Script ausführen
-sudo scripts/update_backend.sh
+cd scripts
+sudo ./update_backend.sh
+# Oder mit vollständigem Pfad:
+# sudo /opt/tick-guard/Stundenzettel_web/scripts/update_backend.sh
 ```
 
 Das Script führt automatisch aus:
@@ -39,7 +42,10 @@ ssh root@192.168.178.150  # Ihre Frontend-IP
 cd /opt/tick-guard/Stundenzettel_web
 
 # 3. Update-Script ausführen
-sudo scripts/update_frontend.sh
+cd scripts
+sudo ./update_frontend.sh
+# Oder mit vollständigem Pfad:
+# sudo /opt/tick-guard/Stundenzettel_web/scripts/update_frontend.sh
 ```
 
 Das Script führt automatisch aus:
@@ -114,29 +120,29 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ```bash
 # Backup überspringen
-sudo SKIP_BACKUP=true scripts/update_backend.sh
+sudo SKIP_BACKUP=true ./update_backend.sh
 
 # Abhängigkeiten immer aktualisieren (auch wenn requirements.txt unverändert)
-sudo FORCE_UPDATE_DEPS=true scripts/update_backend.sh
+sudo FORCE_UPDATE_DEPS=true ./update_backend.sh
 
 # Beide Optionen kombinieren
-sudo SKIP_BACKUP=true FORCE_UPDATE_DEPS=true scripts/update_backend.sh
+sudo SKIP_BACKUP=true FORCE_UPDATE_DEPS=true ./update_backend.sh
 ```
 
 ### Frontend-Update mit Optionen
 
 ```bash
 # Backup überspringen
-sudo SKIP_BACKUP=true scripts/update_frontend.sh
+sudo SKIP_BACKUP=true ./update_frontend.sh
 
 # Abhängigkeiten immer aktualisieren
-sudo FORCE_UPDATE_DEPS=true scripts/update_frontend.sh
+sudo FORCE_UPDATE_DEPS=true ./update_frontend.sh
 
 # Build überspringen (nur Git-Pull und Dependencies)
-sudo SKIP_BUILD=true scripts/update_frontend.sh
+sudo SKIP_BUILD=true ./update_frontend.sh
 
 # Alle Optionen kombinieren
-sudo SKIP_BACKUP=true FORCE_UPDATE_DEPS=true scripts/update_frontend.sh
+sudo SKIP_BACKUP=true FORCE_UPDATE_DEPS=true ./update_frontend.sh
 ```
 
 ---
@@ -248,24 +254,24 @@ git stash pop
 
 ```bash
 ssh root@192.168.178.151
-cd /opt/tick-guard/Stundenzettel_web && sudo scripts/update_backend.sh
+cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_backend.sh
 ```
 
 ### Frontend-Update (Schnell)
 
 ```bash
 ssh root@192.168.178.150
-cd /opt/tick-guard/Stundenzettel_web && sudo scripts/update_frontend.sh
+cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_frontend.sh
 ```
 
 ### Beide Container aktualisieren
 
 ```bash
 # Backend
-ssh root@192.168.178.151 "cd /opt/tick-guard/Stundenzettel_web && sudo scripts/update_backend.sh"
+ssh root@192.168.178.151 "cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_backend.sh"
 
 # Frontend
-ssh root@192.168.178.150 "cd /opt/tick-guard/Stundenzettel_web && sudo scripts/update_frontend.sh"
+ssh root@192.168.178.150 "cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_frontend.sh"
 ```
 
 ---
@@ -290,7 +296,7 @@ Für automatische Updates können Sie einen Cron-Job einrichten:
 sudo crontab -e
 
 # Beispiel: Täglich um 3 Uhr morgens Backend aktualisieren
-0 3 * * * cd /opt/tick-guard/Stundenzettel_web && /bin/bash scripts/update_backend.sh >> /var/log/tick-guard-update.log 2>&1
+0 3 * * * cd /opt/tick-guard/Stundenzettel_web/scripts && /bin/bash ./update_backend.sh >> /var/log/tick-guard-update.log 2>&1
 ```
 
 **⚠️ Wichtig:** Automatische Updates sollten nur mit Vorsicht verwendet werden. Besser: Regelmäßig manuell updaten und vorher testen.
