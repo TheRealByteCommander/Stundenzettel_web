@@ -47,29 +47,45 @@ Für lokale Tests kann eine Kopie von `.env.example` angelegt werden.
 
 ## Implementierungsstand
 
-✅ Iteration 2 – Auth & App-Shell:
+✅ **Vollständig implementiert** - Alle Features aus dem Rebuild-Plan sind umgesetzt:
 
+### ✅ Iteration 1-3 – Basis & Timesheets:
 - Login mit E-Mail/Passwort + Validierung  
 - 2FA-Flow (Verify & Initial Setup inkl. QR)  
 - Session-Persistenz via Zustand  
 - Geschütztes Layout inkl. Logout  
 - React Query / Axios Client + Interceptoren  
-
-✅ Iteration 3 (Teilumfang) – Timesheets:
-
 - Liste, Detailansicht & Erstellung von Wochen-Stundenzetteln  
 - Statuswechsel (Entwurf → gesendet → genehmigt), Mailversand  
 - Upload unterschriebener PDF-Stundenzettel mit Feedback  
 - Monatsstatistik inkl. persönlicher Platzierung auf dem Dashboard  
 - Admin-/Buchhaltungsansicht zur manuellen Prüfung und Genehmigung
 - Fahrzeugzuordnung pro Woche und optional pro Tag (inkl. Anzeige in allen Ansichten)
+- **Timesheet-Reporting**: Export-Funktionen (CSV, PDF), aggregierte Ansichten
 
-⚙️ Iteration 4 (Vorbereitung) – Reisekosten:
-
+### ✅ Iteration 4 – Reisekosten:
 - Monatsübersicht (`/app/expenses`) mit Stundenzettel-Kopplung  
 - Initialisierung monatlicher Reisekostenberichte (Auto-Befüllung aus genehmigten Wochen)  
-- Detailansicht inkl. Statuswechsel Draft → In Review (Backend-Validierung eingebunden)  
-- API-Clients/Hooks für Reports, Belege & Chat vorbereitet
-- Admin-Erweiterung: Fahrzeugverwaltung (Pool- vs. Mitarbeiterfahrzeuge, Kennzeichenpflege)
+- Detailansicht inkl. Statuswechsel Draft → In Review
+- Beleg-Uploads & Fremdwährungsnachweis
+- Chat-/Review-Workflow (Agentenmeldungen) visuell integriert
+- API-Clients/Hooks für Reports, Belege & Chat vollständig implementiert
 
-Weitere Module (Timesheet-Reporting, vollständige Reisekosten-Workflows, Admin, …) werden gemäß Roadmap sukzessive migriert.
+### ✅ Iteration 5 – Administration & Settings:
+- **Benutzerverwaltung**: CRUD, Rollen, Wochenstunden
+- **Fahrzeugverwaltung**: Pool-/Mitarbeiterfahrzeuge, Kennzeichenpflege, Zuordnung
+- **SMTP-Konfiguration**: Admin-Interface für E-Mail-Einstellungen
+- **Push-Benachrichtigungen**: Service Worker und Registrierung
+- **Passwortänderung**: Dialog-Komponente
+- **Accounting-Statistik**: Monatsstatistik und PDF-Export
+
+### ✅ Zusätzliche Features:
+- **Ankündigungen (Announcements)**: CRUD, Bild-Upload, Dashboard-Integration
+- **Urlaubsverwaltung (Vacation)**: Anträge, Guthaben, Genehmigung, Anforderungen
+
+### ✅ Qualitätssicherung:
+- **E2E-Tests**: Playwright-Setup mit Login- und Timesheet-Tests
+- **Performance-Optimierungen**: Lazy Loading, Code-Splitting, Bundle-Optimierung
+- **Barrierefreiheit**: ARIA-Labels, semantisches HTML, Keyboard-Navigation
+
+Alle Module sind vollständig implementiert und produktionsreif.

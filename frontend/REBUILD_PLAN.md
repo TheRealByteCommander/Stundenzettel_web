@@ -72,13 +72,17 @@
    - [x] Rate-Limits (Backend), Audits (Backend), Datenschutz-Hinweise.
    - [x] Passwortänderung im Frontend.
 
-## Arbeitspakete (Iteration 6 – Abschluss)
+## Arbeitspakete (Iteration 6 – Abschluss) ✅
 1. **E2E-/Regressionstests**  
-   - Realistische Szenarien automatisieren.
+   - [x] Realistische Szenarien automatisieren (Playwright-Setup mit Login- und Timesheet-Tests).
 2. **Optimierungen/Refactoring**  
-   - Performance, Bundle-Größe, Barrierefreiheit.
+   - [x] Performance (Lazy Loading für alle Routen, Code-Splitting, Bundle-Optimierung).
+   - [x] Bundle-Größe (manuelle Chunks für React, Query, UI-Vendor).
+   - [x] Barrierefreiheit (ARIA-Labels, semantisches HTML, Keyboard-Navigation).
 3. **Rollout-Plan**  
-   - Deployment-Schritte, Migrationshinweise, Dokumentation.
+   - [x] Deployment-Schritte dokumentiert.
+   - [x] Migrationshinweise vorhanden.
+   - [x] Dokumentation aktualisiert.
 
 ## Zusätzlich implementierte Features ✅
 1. **Ankündigungen (Announcements)**
@@ -97,9 +101,13 @@
    - [x] Monatsstatistik für Buchhaltung.
    - [x] PDF-Export-Funktion.
 
-## Nächste Schritte (Optional)
-1. Timesheet-Reporting erweitern (Exports, aggregierte Ansichten).
-2. E2E-Tests automatisieren.
-3. Performance-Optimierungen.
-4. Barrierefreiheit prüfen und verbessern.
+## ✅ Alle Schritte abgeschlossen!
+
+**Vollständig umgesetzt:**
+1. ✅ Timesheet-Reporting erweitert (Exports: CSV, PDF, aggregierte Ansichten).
+2. ✅ E2E-Tests automatisiert (Playwright-Setup).
+3. ✅ Performance-Optimierungen (Lazy Loading, Code-Splitting, Bundle-Optimierung).
+4. ✅ Barrierefreiheit verbessert (ARIA-Labels, semantisches HTML, Keyboard-Navigation).
+
+**Status:** Alle geplanten Features sind implementiert und produktionsreif. Die Anwendung ist vollständig funktionsfähig.
 

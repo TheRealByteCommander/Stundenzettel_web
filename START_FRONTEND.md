@@ -1,26 +1,25 @@
 # 🚀 Frontend starten - Schnellanleitung
 
-## Problem: localhost:3000 nicht erreichbar
-
-### Lösung: Frontend-Server starten
+## Frontend-Server starten (Vite)
 
 **PowerShell (im Projektverzeichnis):**
 ```powershell
 cd frontend
-npm start
+npm install
+npm run dev
 ```
 
 **Wichtig:**
 - ✅ Der Server startet automatisch
-- ✅ Browser öffnet sich automatisch bei http://localhost:3000
+- ✅ Browser öffnet sich automatisch bei http://localhost:5173
 - ✅ Terminal **NICHT schließen** - Server läuft solange Terminal offen ist
-- ✅ Bei Änderungen am Code lädt sich die Seite automatisch neu
+- ✅ Bei Änderungen am Code lädt sich die Seite automatisch neu (Hot Module Replacement)
 
 ### Falls der Server nicht startet:
 
 **1. Port prüfen:**
 ```powershell
-netstat -ano | findstr :3000
+netstat -ano | findstr :5173
 ```
 
 **Falls Port belegt:**
@@ -33,17 +32,17 @@ taskkill /PID <PID> /F
 ```powershell
 cd frontend
 Remove-Item -Recurse -Force node_modules, package-lock.json -ErrorAction SilentlyContinue
-npm install --legacy-peer-deps
-npm start
+npm install
+npm run dev
 ```
 
 **3. Anderen Port verwenden:**
 ```powershell
 cd frontend
-$env:PORT=3001
-npm start
+$env:PORT=5174
+npm run dev
 ```
-Dann öffnen: http://localhost:3001
+Dann öffnen: http://localhost:5174
 
 ### Backend-URL konfigurieren
 
@@ -51,26 +50,39 @@ Dann öffnen: http://localhost:3001
 
 `.env` Datei im `frontend/` Verzeichnis:
 ```env
-REACT_APP_BACKEND_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8000/api
+VITE_DEFAULT_ADMIN_EMAIL=admin@schmitz-intralogistik.de
+VITE_DEFAULT_ADMIN_PASSWORD=admin123
 ```
 
 **Für lokale Entwicklung standardmäßig:**
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
+- Frontend: http://localhost:5173 (Vite Dev-Server)
+- Backend: http://localhost:8000/api
 
 ## ✅ Erfolgreicher Start
 
 Wenn alles läuft, sehen Sie im Terminal:
 ```
-Compiled successfully!
+  VITE v7.x.x  ready in xxx ms
 
-You can now view frontend in the browser.
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+```
 
-  Local:            http://localhost:3000
-  On Your Network:  http://192.168.x.x:3000
+## 🧪 Tests ausführen
+
+**E2E-Tests (Playwright):**
+```powershell
+cd frontend
+npm run test:e2e
+```
+
+**E2E-Tests mit UI:**
+```powershell
+npm run test:e2e:ui
 ```
 
 ## 🆘 Weitere Hilfe
 
-Siehe: [frontend/TROUBLESHOOTING_LOCALHOST.md](frontend/TROUBLESHOOTING_LOCALHOST.md)
+Siehe: [frontend/README.md](frontend/README.md)
 

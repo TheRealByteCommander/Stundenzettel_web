@@ -180,6 +180,11 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
 - [x] **Erinnerungsmails**
   - `POST /vacation/send-reminders` - Wöchentliche Erinnerungen (Admin)
   - Automatische Erinnerung an User, die Anforderungen nicht erfüllt haben
+- [x] **Frontend**: Vollständig implementiert
+  - Urlaubsanträge erstellen und verwalten
+  - Urlaubsguthaben anzeigen
+  - Genehmigung/Ablehnung durch Admin/Accounting
+  - Anforderungen und Validierung
 
 ---
 
@@ -195,6 +200,7 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
 - [x] **Features**
   - Aktiv/Inaktiv-Status
   - Bild-Upload (Base64)
+  - **Frontend**: Vollständig implementiert (CRUD, Bild-Upload, Dashboard-Integration)
   - Anzeige auf App-Auswahlseite
 
 ---
@@ -204,9 +210,11 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
 - [x] **SMTP-Konfiguration**
   - `GET /admin/smtp-config` - SMTP-Konfiguration abrufen
   - `POST /admin/smtp-config` - SMTP-Konfiguration setzen
+  - **Frontend**: Vollständig implementiert (Admin-Interface für E-Mail-Einstellungen)
 
 - [x] **User-Verwaltung**
   - Alle User sehen, bearbeiten, löschen
+  - **Frontend**: Vollständig implementiert (CRUD, Rollen, Wochenstunden)
   - Rollen vergeben (User, Admin, Accounting)
   - Wochenstunden pro User konfigurieren
 

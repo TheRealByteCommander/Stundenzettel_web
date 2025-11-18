@@ -1,9 +1,18 @@
 # Frontend Funktionsinventur (Stand: Neuaufbauplanung)
 
-> **Rebuild-Status (Nov 2025)**  
-> - Auth & App-Shell: ✓ vollständig umgesetzt  
-> - Timesheets: Liste, Detail, Erstellung & Monatsstatistik ✓ – Admin-Notizen & erweiterte Reports folgen  
-> - Übrige Module (Reisekosten, Urlaub, Admin, Push) folgen in kommenden Iterationen
+> **Rebuild-Status (Jan 2025)**  
+> - ✅ **Vollständig umgesetzt**: Alle Features aus dem Rebuild-Plan sind implementiert
+> - ✅ Auth & App-Shell: vollständig umgesetzt  
+> - ✅ Timesheets: Liste, Detail, Erstellung, Monatsstatistik, Reporting & Export-Funktionen
+> - ✅ Reisekosten: Vollständige Workflows mit Beleg-Uploads, Chat & Fremdwährungsnachweis
+> - ✅ Urlaub: Anträge, Guthaben, Genehmigung, Anforderungen
+> - ✅ Admin: Benutzerverwaltung, Fahrzeuge, SMTP, Accounting-Statistik
+> - ✅ Ankündigungen: CRUD, Bild-Upload, Dashboard-Integration
+> - ✅ Push-Benachrichtigungen: Service Worker & Registrierung
+> - ✅ Passwortänderung: Dialog-Komponente
+> - ✅ E2E-Tests: Playwright-Setup
+> - ✅ Performance-Optimierungen: Lazy Loading, Code-Splitting
+> - ✅ Barrierefreiheit: ARIA-Labels, semantisches HTML
 
 Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden React-Anwendung sowie die angebundenen API-Endpunkte und Kern-Datenmodelle. Grundlage sind `frontend/src/App.js` und die FastAPI-Definitionen in `backend/server.py`. Diese Inventur dient als Referenz für den schrittweisen Neuaufbau.
 

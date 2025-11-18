@@ -40,8 +40,7 @@ pip install -r requirements.txt
 
 # Frontend setup
 cd ..\frontend
-npm install -g yarn
-npm install --legacy-peer-deps
+npm install
 ```
 
 **Linux/Mac:**
@@ -57,8 +56,7 @@ pip install -r requirements.txt
 
 # Frontend setup
 cd ../frontend
-npm install -g yarn
-npm install --legacy-peer-deps
+npm install
 ```
 
 ### **2. Konfigurationsdateien erstellen:**
@@ -88,13 +86,17 @@ echo "DB_NAME=stundenzettel" >> .env
 ```powershell
 # Windows PowerShell
 cd ..\frontend
-Set-Content .env "REACT_APP_BACKEND_URL=http://localhost:8000"
+Set-Content .env "VITE_API_BASE_URL=http://localhost:8000/api"
+Add-Content .env "VITE_DEFAULT_ADMIN_EMAIL=admin@schmitz-intralogistik.de"
+Add-Content .env "VITE_DEFAULT_ADMIN_PASSWORD=admin123"
 ```
 
 ```bash
 # Linux/Mac
 cd ../frontend
-echo "REACT_APP_BACKEND_URL=http://localhost:8000" > .env
+echo "VITE_API_BASE_URL=http://localhost:8000/api" > .env
+echo "VITE_DEFAULT_ADMIN_EMAIL=admin@schmitz-intralogistik.de" >> .env
+echo "VITE_DEFAULT_ADMIN_PASSWORD=admin123" >> .env
 ```
 
 ### **3. MongoDB starten:**
@@ -156,17 +158,17 @@ uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```powershell
 # Windows PowerShell
 cd frontend
-npm start
+npm run dev
 ```
 
 ```bash
 # Linux/Mac
 cd frontend
-npm start
+npm run dev
 ```
 
 ### **5. Erste Anmeldung:**
-- **URL:** http://localhost:3000
+- **URL:** http://localhost:5173 (Vite Dev-Server)
 - **Login:** admin@schmitz-intralogistik.de
 - **Passwort:** admin123
 
@@ -198,9 +200,9 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "3000:3000"
+      - "5173:5173"
     environment:
-      - REACT_APP_BACKEND_URL=http://localhost:8001
+      - VITE_API_BASE_URL=http://localhost:8001/api
     depends_on:
       - backend
 
@@ -256,7 +258,7 @@ pip install -r requirements.txt
 
 # Node-Fehler?
 rm -rf node_modules package-lock.json
-yarn install
+npm install
 
 # Port bereits belegt?
 sudo netstat -tulpn | grep :8001
@@ -269,7 +271,7 @@ sudo kill -9 <PID>
 
 **Frontend .env anpassen:**
 ```env
-REACT_APP_BACKEND_URL=http://IHR-SERVER-IP:8001
+VITE_API_BASE_URL=http://IHR-SERVER-IP:8001/api
 ```
 
 **Backend für externe Zugriffe:**
@@ -282,6 +284,8 @@ uvicorn server:app --host 0.0.0.0 --port 8001
 **✅ Fertig! Das Zeiterfassungs-System läuft!**
 
 **Wichtige URLs:**
-- **Anwendung:** http://localhost:3000
-- **API-Dokumentation:** http://localhost:8001/docs
+- **Anwendung:** http://localhost:5173 (Vite Dev-Server)
+- **API-Dokumentation:** http://localhost:8000/docs
 - **Admin-Login:** admin@schmitz-intralogistik.de / admin123
+
+**Hinweis:** Das Frontend verwendet jetzt Vite statt Create React App. Der Dev-Server läuft standardmäßig auf Port 5173.

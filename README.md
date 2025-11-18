@@ -81,9 +81,18 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 ### Weitere Features
 - ✅ Benutzer- und Adminverwaltung mit Rollen (User, Admin, Buchhaltung)
 - ✅ Obligatorische 2FA (Google Authenticator)
-- ✅ Ankündigungen/News-System mit Bildern
+- ✅ Ankündigungen/News-System mit Bildern (CRUD, Bild-Upload, Dashboard-Integration)
+- ✅ Urlaubsverwaltung (Anträge, Guthaben, Genehmigung, Anforderungen)
+- ✅ SMTP-Konfiguration (Admin-Interface)
+- ✅ Push-Benachrichtigungen (Service Worker, Browser-Integration)
+- ✅ Passwortänderung (Dialog-Komponente)
+- ✅ Timesheet-Reporting (Export-Funktionen: CSV, PDF, aggregierte Ansichten)
+- ✅ Accounting-Statistik (Monatsstatistik, PDF-Export)
 - ✅ Mobile-First Responsive Web-Interface
 - ✅ PWA-Support (Installierbar auf Mobilgeräten)
+- ✅ E2E-Tests (Playwright)
+- ✅ Performance-Optimierungen (Lazy Loading, Code-Splitting)
+- ✅ Barrierefreiheit (ARIA-Labels, semantisches HTML)
 - ✅ DSGVO & EU-AI-Act Compliance
   - Datenverschlüsselung (Fernet/AES-128)
   - Audit-Logging

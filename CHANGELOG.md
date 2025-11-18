@@ -4,6 +4,19 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 
 ## [Unreleased]
 
+### Hinzugefügt (Jan 2025)
+- **Frontend Rebuild - Vollständige Umsetzung aller Features**:
+  - ✅ Ankündigungen (Announcements): CRUD, Bild-Upload, Dashboard-Integration
+  - ✅ Urlaubsverwaltung (Vacation): Anträge, Guthaben, Genehmigung, Anforderungen
+  - ✅ SMTP-Konfiguration: Admin-Interface für E-Mail-Einstellungen
+  - ✅ Push-Benachrichtigungen: Service Worker und Registrierung im Dashboard
+  - ✅ Passwortänderung: Dialog-Komponente in der Navigation
+  - ✅ Accounting-Statistik: Monatsstatistik und PDF-Export
+  - ✅ Timesheet-Reporting: Export-Funktionen (CSV, PDF), aggregierte Ansichten
+  - ✅ E2E-Tests: Playwright-Setup mit Login- und Timesheet-Tests
+  - ✅ Performance-Optimierungen: Lazy Loading für alle Routen, Code-Splitting, Bundle-Optimierung
+  - ✅ Barrierefreiheit: ARIA-Labels für alle Navigationselemente, semantisches HTML (role-Attribute)
+
 ### Geändert
 - **Daten aktualisiert**: Alle Dokumente auf Stand 2025 aktualisiert (BENUTZERANLEITUNG.md, SICHERHEIT.md, CYBER_SECURITY.md, README.md)
 - **Fahrzeit-Regelung präzisiert**:
