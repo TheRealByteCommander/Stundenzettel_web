@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Alert } from "../../../components/ui/alert";
+import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardTitle } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
@@ -7,6 +9,8 @@ import {
   useMonthlyRankQuery,
   useMonthlyStatsQuery,
 } from "../../timesheets/hooks/useTimesheetStats";
+import { useAnnouncementsQuery } from "../../announcements/hooks/useAnnouncements";
+import { PushNotificationButton } from "../../push/components/PushNotificationButton";
 
 const getCurrentMonth = () => {
   const now = new Date();
@@ -14,6 +18,7 @@ const getCurrentMonth = () => {
 };
 
 export const DashboardPage = () => {
+  const navigate = useNavigate();
   const { data: user } = useCurrentUserQuery();
   const [month, setMonth] = useState(getCurrentMonth);
 
@@ -23,8 +28,13 @@ export const DashboardPage = () => {
     error: statsError,
   } = useMonthlyStatsQuery(month);
   const { data: rankData } = useMonthlyRankQuery(month);
+  const { data: announcements } = useAnnouncementsQuery(true);
 
   const topStats = useMemo(() => stats?.stats ?? [], [stats]);
+  const activeAnnouncements = useMemo(
+    () => announcements?.filter((a) => a.active) ?? [],
+    [announcements]
+  );
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8">
@@ -38,14 +48,59 @@ export const DashboardPage = () => {
         </p>
       </div>
 
+      {activeAnnouncements.length > 0 && (
+        <Card>
+          <CardContent className="space-y-4 py-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base text-brand-gray">
+                Aktuelle Ankündigungen
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/app/announcements")}
+              >
+                Alle anzeigen
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {activeAnnouncements.slice(0, 3).map((announcement) => (
+                <div
+                  key={announcement.id}
+                  className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                >
+                  <h3 className="font-semibold text-brand-gray">
+                    {announcement.title}
+                  </h3>
+                  {announcement.image_url && (
+                    <img
+                      src={announcement.image_url}
+                      alt={announcement.image_filename ?? "Ankündigung"}
+                      className="mt-2 max-h-32 rounded-lg object-contain"
+                    />
+                  )}
+                  <div
+                    className="mt-2 text-sm text-gray-700"
+                    dangerouslySetInnerHTML={{ __html: announcement.content }}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
-        <CardContent className="space-y-2 py-6">
+        <CardContent className="space-y-4 py-6">
           <CardTitle className="text-base text-brand-gray">
             Angemeldete Sitzung
           </CardTitle>
           <div className="text-sm text-gray-600">
             <p>E-Mail: {user?.email ?? "–"}</p>
             <p>Rolle: {user?.role ?? "–"}</p>
+          </div>
+          <div className="border-t border-gray-200 pt-4">
+            <PushNotificationButton />
           </div>
         </CardContent>
       </Card>

@@ -1,19 +1,86 @@
+import { lazy } from "react";
 import {
   Navigate,
   RouterProvider,
   createBrowserRouter,
 } from "react-router-dom";
-import { LoginPage } from "../modules/auth/pages/LoginPage";
-import { DashboardPage } from "../modules/dashboard/pages/DashboardPage";
-import { TimesheetListPage } from "../modules/timesheets/pages/TimesheetListPage";
-import { TimesheetDetailPage } from "../modules/timesheets/pages/TimesheetDetailPage";
-import { TimesheetCreatePage } from "../modules/timesheets/pages/TimesheetCreatePage";
-import { TimesheetAdminPage } from "../modules/timesheets/pages/TimesheetAdminPage";
-import { ExpensesOverviewPage } from "../modules/expenses/pages/ExpensesOverviewPage";
-import { ExpenseReportDetailPage } from "../modules/expenses/pages/ExpenseReportDetailPage";
-import { VehicleManagementPage } from "../modules/admin/pages/VehicleManagementPage";
-import { UserManagementPage } from "../modules/admin/pages/UserManagementPage";
 import { ProtectedLayout } from "./layouts/ProtectedLayout";
+import { LazySuspense } from "../components/LazySuspense";
+
+// Lazy Loading für Performance-Optimierung
+const LoginPage = lazy(() =>
+  import("../modules/auth/pages/LoginPage").then((m) => ({ default: m.LoginPage }))
+);
+const DashboardPage = lazy(() =>
+  import("../modules/dashboard/pages/DashboardPage").then((m) => ({
+    default: m.DashboardPage,
+  }))
+);
+const TimesheetListPage = lazy(() =>
+  import("../modules/timesheets/pages/TimesheetListPage").then((m) => ({
+    default: m.TimesheetListPage,
+  }))
+);
+const TimesheetDetailPage = lazy(() =>
+  import("../modules/timesheets/pages/TimesheetDetailPage").then((m) => ({
+    default: m.TimesheetDetailPage,
+  }))
+);
+const TimesheetCreatePage = lazy(() =>
+  import("../modules/timesheets/pages/TimesheetCreatePage").then((m) => ({
+    default: m.TimesheetCreatePage,
+  }))
+);
+const TimesheetAdminPage = lazy(() =>
+  import("../modules/timesheets/pages/TimesheetAdminPage").then((m) => ({
+    default: m.TimesheetAdminPage,
+  }))
+);
+const TimesheetReportingPage = lazy(() =>
+  import("../modules/timesheets/pages/TimesheetReportingPage").then((m) => ({
+    default: m.TimesheetReportingPage,
+  }))
+);
+const ExpensesOverviewPage = lazy(() =>
+  import("../modules/expenses/pages/ExpensesOverviewPage").then((m) => ({
+    default: m.ExpensesOverviewPage,
+  }))
+);
+const ExpenseReportDetailPage = lazy(() =>
+  import("../modules/expenses/pages/ExpenseReportDetailPage").then((m) => ({
+    default: m.ExpenseReportDetailPage,
+  }))
+);
+const VehicleManagementPage = lazy(() =>
+  import("../modules/admin/pages/VehicleManagementPage").then((m) => ({
+    default: m.VehicleManagementPage,
+  }))
+);
+const UserManagementPage = lazy(() =>
+  import("../modules/admin/pages/UserManagementPage").then((m) => ({
+    default: m.UserManagementPage,
+  }))
+);
+const SMTPConfigPage = lazy(() =>
+  import("../modules/admin/pages/SMTPConfigPage").then((m) => ({
+    default: m.SMTPConfigPage,
+  }))
+);
+const AccountingPage = lazy(() =>
+  import("../modules/admin/pages/AccountingPage").then((m) => ({
+    default: m.AccountingPage,
+  }))
+);
+const AnnouncementsPage = lazy(() =>
+  import("../modules/announcements/pages/AnnouncementsPage").then((m) => ({
+    default: m.AnnouncementsPage,
+  }))
+);
+const VacationPage = lazy(() =>
+  import("../modules/vacation/pages/VacationPage").then((m) => ({
+    default: m.VacationPage,
+  }))
+);
 
 const router = createBrowserRouter([
   {
@@ -22,7 +89,11 @@ const router = createBrowserRouter([
   },
   {
     path: "/login",
-    element: <LoginPage />,
+    element: (
+      <LazySuspense>
+        <LoginPage />
+      </LazySuspense>
+    ),
   },
   {
     path: "/app",
@@ -30,26 +101,54 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardPage />,
+        element: (
+          <LazySuspense>
+            <DashboardPage />
+          </LazySuspense>
+        ),
       },
       {
         path: "timesheets",
         children: [
           {
             index: true,
-            element: <TimesheetListPage />,
+            element: (
+              <LazySuspense>
+                <TimesheetListPage />
+              </LazySuspense>
+            ),
           },
           {
             path: "new",
-            element: <TimesheetCreatePage />,
+            element: (
+              <LazySuspense>
+                <TimesheetCreatePage />
+              </LazySuspense>
+            ),
           },
           {
             path: "admin/review",
-            element: <TimesheetAdminPage />,
+            element: (
+              <LazySuspense>
+                <TimesheetAdminPage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "reporting",
+            element: (
+              <LazySuspense>
+                <TimesheetReportingPage />
+              </LazySuspense>
+            ),
           },
           {
             path: ":id",
-            element: <TimesheetDetailPage />,
+            element: (
+              <LazySuspense>
+                <TimesheetDetailPage />
+              </LazySuspense>
+            ),
           },
         ],
       },
@@ -58,11 +157,19 @@ const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <ExpensesOverviewPage />,
+            element: (
+              <LazySuspense>
+                <ExpensesOverviewPage />
+              </LazySuspense>
+            ),
           },
           {
             path: "reports/:id",
-            element: <ExpenseReportDetailPage />,
+            element: (
+              <LazySuspense>
+                <ExpenseReportDetailPage />
+              </LazySuspense>
+            ),
           },
         ],
       },
@@ -71,13 +178,53 @@ const router = createBrowserRouter([
         children: [
           {
             path: "vehicles",
-            element: <VehicleManagementPage />,
+            element: (
+              <LazySuspense>
+                <VehicleManagementPage />
+              </LazySuspense>
+            ),
           },
           {
             path: "users",
-            element: <UserManagementPage />,
+            element: (
+              <LazySuspense>
+                <UserManagementPage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "smtp",
+            element: (
+              <LazySuspense>
+                <SMTPConfigPage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "accounting",
+            element: (
+              <LazySuspense>
+                <AccountingPage />
+              </LazySuspense>
+            ),
           },
         ],
+      },
+      {
+        path: "announcements",
+        element: (
+          <LazySuspense>
+            <AnnouncementsPage />
+          </LazySuspense>
+        ),
+      },
+      {
+        path: "vacation",
+        element: (
+          <LazySuspense>
+            <VacationPage />
+          </LazySuspense>
+        ),
       },
     ],
   },

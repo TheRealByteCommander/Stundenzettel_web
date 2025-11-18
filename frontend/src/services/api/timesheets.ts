@@ -54,6 +54,13 @@ export const downloadAndEmailTimesheet = async (id: string) => {
   await apiClient.post(`/timesheets/${id}/download-and-email`);
 };
 
+export const downloadTimesheetPDF = async (id: string): Promise<Blob> => {
+  const { data } = await apiClient.get(`/timesheets/${id}/pdf`, {
+    responseType: "blob",
+  });
+  return data;
+};
+
 export const approveTimesheet = async (id: string) => {
   await apiClient.post(`/timesheets/${id}/approve`);
 };
@@ -112,4 +119,3 @@ export const fetchAccountingTimesheets = async (
   );
   return data;
 };
-

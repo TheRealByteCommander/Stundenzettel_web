@@ -47,25 +47,30 @@
 - [x] Verifikationshinweise & Admin-spezifische Aktionen (z. B. QA-Notizen).
 - [x] Fahrzeugzuweisung auf Wochen- und Tagesbasis inkl. Übersicht in allen Ansichten.
 
-## Arbeitspakete (Iteration 4 – Reisekosten**
+## Arbeitspakete (Iteration 4 – Reisekosten) ✅
 1. **Reisekostenmodul**  
-   - Genehmigte Stundenzettel importieren, Belege hochladen, Fremdwährungsnachweis.
-   - Chat mit Agenten, Statuswechsel.
-   - **Frontend-Stand**: Monatsinitialisierung & Detailansicht angebunden (Draft → In Review).
+   - [x] Genehmigte Stundenzettel importieren, Belege hochladen, Fremdwährungsnachweis.
+   - [x] Chat mit Agenten, Statuswechsel.
+   - [x] **Frontend-Stand**: Monatsinitialisierung & Detailansicht angebunden (Draft → In Review).
+   - [x] Beleg-Uploads & Fremdwährungsnachweis im Frontend angebunden.
+   - [x] Chat-/Review-Workflow (Agentenmeldungen) visuell integriert.
 
 2. **Dokumenten-/Beleganalyse-UI**  
    - Darstellung extrahierter Daten, Validierungs-Hinweise.
 
-## Arbeitspakete (Iteration 5 – Administration & Settings)
+## Arbeitspakete (Iteration 5 – Administration & Settings) ✅
 1. **Benutzerverwaltung**  
-   - CRUD, Rollen, Wochenstunden.
-   - **Neu**: Fahrzeugverwaltung (Pool/Persönlich, Zuordnung zu Mitarbeitenden).
+   - [x] CRUD, Rollen, Wochenstunden.
+   - [x] **Neu**: Fahrzeugverwaltung (Pool/Persönlich, Zuordnung zu Mitarbeitenden).
 
 2. **SMTP/Push/Einstellungen**  
-   - Formulare & Validierung, Push-Registrierung.
+   - [x] Formulare & Validierung, Push-Registrierung.
+   - [x] SMTP-Konfiguration im Admin-Bereich.
+   - [x] Push-Benachrichtigungen mit Service Worker.
 
 3. **Sicherheit & Compliance**  
-   - Rate-Limits, Audits, Datenschutz-Hinweise.
+   - [x] Rate-Limits (Backend), Audits (Backend), Datenschutz-Hinweise.
+   - [x] Passwortänderung im Frontend.
 
 ## Arbeitspakete (Iteration 6 – Abschluss)
 1. **E2E-/Regressionstests**  
@@ -75,8 +80,26 @@
 3. **Rollout-Plan**  
    - Deployment-Schritte, Migrationshinweise, Dokumentation.
 
-## Nächste Schritte
-1. Reisekosten: Beleg-Uploads & Fremdwährungsnachweis im Frontend anbinden.
-2. Reisekosten: Chat-/Review-Workflow (Agentenmeldungen) visuell integrieren.
-3. Timesheet-Reporting vorbereiten (Exports, aggregierte Ansichten).
+## Zusätzlich implementierte Features ✅
+1. **Ankündigungen (Announcements)**
+   - [x] Liste aktiver Ankündigungen für alle Benutzer.
+   - [x] Admin-Verwaltung (Erstellen, Bearbeiten, Löschen).
+   - [x] Bild-Upload für Ankündigungen.
+   - [x] Anzeige im Dashboard.
+
+2. **Urlaubsverwaltung (Vacation)**
+   - [x] Urlaubsanträge erstellen und verwalten.
+   - [x] Urlaubsguthaben anzeigen.
+   - [x] Genehmigung/Ablehnung durch Admin/Accounting.
+   - [x] Anforderungen und Validierung.
+
+3. **Accounting-Statistik**
+   - [x] Monatsstatistik für Buchhaltung.
+   - [x] PDF-Export-Funktion.
+
+## Nächste Schritte (Optional)
+1. Timesheet-Reporting erweitern (Exports, aggregierte Ansichten).
+2. E2E-Tests automatisieren.
+3. Performance-Optimierungen.
+4. Barrierefreiheit prüfen und verbessern.
 

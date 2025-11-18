@@ -9,5 +9,18 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'build',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'query-vendor': ['@tanstack/react-query'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-slot'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
   },
 })
