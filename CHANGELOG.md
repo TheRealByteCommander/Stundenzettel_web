@@ -31,6 +31,11 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - ✅ **CurrencyValidatorTool**: Währungsvalidierung und -formatierung (ISO 4217) - primär für AccountingAgent
   - ✅ **RegexPatternMatcherTool**: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, etc.) - für alle Agents
   - ✅ **PDFMetadataTool**: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel, Seitenzahl) - primär für DocumentAgent
+  - ✅ **DuplicateDetectionTool** (Priorität 1): Duplikats-Erkennung durch Hash-Vergleich - für DocumentAgent und AccountingAgent
+  - ✅ **IBANValidatorTool** (Priorität 1): IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für DocumentAgent und AccountingAgent
+  - ✅ **ImageQualityTool** (Priorität 1): Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast) - für DocumentAgent
+  - ✅ **TimeZoneTool** (Priorität 1): Zeitzonen-Handling für internationale Reisen - für AccountingAgent und ChatAgent
+  - ✅ **EmailValidatorTool** (Priorität 1): E-Mail-Validierung (RFC 5322) und DNS-Prüfung - für DocumentAgent und ChatAgent
 
 ### Geändert
 - **Daten aktualisiert**: Alle Dokumente auf Stand 2025 aktualisiert (BENUTZERANLEITUNG.md, SICHERHEIT.md, CYBER_SECURITY.md, README.md)

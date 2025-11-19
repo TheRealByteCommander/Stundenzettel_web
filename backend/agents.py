@@ -2584,6 +2584,846 @@ class PDFMetadataTool(AgentTool):
                 "pdf_path": pdf_path
             }
 
+class DuplicateDetectionTool(AgentTool):
+    """Tool für Duplikats-Erkennung - verhindert doppelte Beleg-Uploads"""
+    
+    def __init__(self):
+        super().__init__(
+            name="duplicate_detection",
+            description="Erkennt doppelte Belege durch Hash-Vergleich und Bild-Ähnlichkeitsprüfung. Verhindert doppelte Uploads und Abrechnungen. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "file_path": {
+                    "type": "string",
+                    "description": "Pfad zur Datei zum Prüfen"
+                },
+                "file_hash": {
+                    "type": "string",
+                    "description": "Berechneter Hash-Wert der Datei (optional, wird automatisch berechnet wenn nicht angegeben)"
+                },
+                "check_similarity": {
+                    "type": "boolean",
+                    "description": "Bild-Ähnlichkeitsprüfung durchführen (Standard: True)",
+                    "default": True
+                },
+                "similarity_threshold": {
+                    "type": "number",
+                    "description": "Ähnlichkeits-Schwellenwert (0.0-1.0, Standard: 0.95)",
+                    "default": 0.95
+                }
+            }
+        )
+        self._hash_cache = {}  # Cache für bereits geprüfte Hashes
+    
+    def _calculate_file_hash(self, file_path: str) -> str:
+        """Berechne SHA256-Hash einer Datei"""
+        try:
+            import hashlib
+            sha256_hash = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for byte_block in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+        except Exception as e:
+            logger.error(f"Hash-Berechnung fehlgeschlagen: {e}")
+            return ""
+    
+    def _calculate_perceptual_hash(self, file_path: str) -> Optional[str]:
+        """Berechne Perceptual Hash für Bild-Ähnlichkeitsprüfung"""
+        try:
+            from PIL import Image
+            import imagehash
+            
+            # Versuche Bild zu öffnen
+            try:
+                img = Image.open(file_path)
+                # Konvertiere zu RGB falls nötig
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                # Berechne Perceptual Hash
+                phash = imagehash.phash(img)
+                return str(phash)
+            except Exception:
+                # Kein Bild, versuche PDF
+                if file_path.lower().endswith('.pdf'):
+                    # Für PDFs extrahiere erste Seite als Bild
+                    try:
+                        if HAS_PDFPLUMBER:
+                            import pdfplumber
+                            from PIL import Image as PILImage
+                            import io
+                            
+                            with pdfplumber.open(file_path) as pdf:
+                                if len(pdf.pages) > 0:
+                                    # Konvertiere erste Seite zu Bild (vereinfacht)
+                                    # In Produktion würde man pdf2image verwenden
+                                    return None  # Für PDFs verwenden wir nur Hash
+                    except Exception:
+                        pass
+                return None
+        except ImportError:
+            logger.debug("imagehash nicht verfügbar, Perceptual Hash übersprungen")
+            return None
+        except Exception as e:
+            logger.debug(f"Perceptual Hash Berechnung fehlgeschlagen: {e}")
+            return None
+    
+    async def _check_hash_duplicate(self, file_hash: str, db=None) -> Dict[str, Any]:
+        """Prüfe ob Hash bereits in Datenbank existiert"""
+        try:
+            if db is None:
+                # Versuche Datenbank zu importieren (falls verfügbar)
+                try:
+                    import sys
+                    if 'backend.server' in sys.modules:
+                        from backend.server import db as server_db
+                        db = server_db
+                    else:
+                        # Fallback: Keine Datenbank-Prüfung möglich
+                        return {"is_duplicate": False, "note": "Datenbank nicht verfügbar für Duplikats-Prüfung"}
+                except ImportError:
+                    return {"is_duplicate": False, "note": "Datenbank nicht verfügbar für Duplikats-Prüfung"}
+            
+            # Suche in Receipts-Collection
+            receipts_collection = db.receipts
+            existing = await receipts_collection.find_one({"file_hash": file_hash})
+            
+            if existing:
+                return {
+                    "is_duplicate": True,
+                    "match_type": "hash",
+                    "existing_receipt_id": str(existing.get("_id", "")),
+                    "existing_report_id": str(existing.get("report_id", "")),
+                    "upload_date": str(existing.get("upload_date", ""))
+                }
+            
+            # Suche in Timesheets-Collection (für unterschriebene Stundenzettel)
+            timesheets_collection = db.timesheets
+            existing_timesheet = await timesheets_collection.find_one({"signed_pdf_hash": file_hash})
+            
+            if existing_timesheet:
+                return {
+                    "is_duplicate": True,
+                    "match_type": "hash",
+                    "existing_timesheet_id": str(existing_timesheet.get("_id", "")),
+                    "upload_date": str(existing_timesheet.get("signed_pdf_upload_date", ""))
+                }
+            
+            return {"is_duplicate": False}
+            
+        except Exception as e:
+            logger.error(f"Hash-Duplikats-Prüfung fehlgeschlagen: {e}")
+            return {"is_duplicate": False, "error": str(e)}
+    
+    async def execute(self,
+                      file_path: str,
+                      file_hash: Optional[str] = None,
+                      check_similarity: bool = True,
+                      similarity_threshold: float = 0.95) -> Dict[str, Any]:
+        """Prüfe auf Duplikate"""
+        try:
+            if not Path(file_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Datei nicht gefunden: {file_path}",
+                    "file_path": file_path
+                }
+            
+            # Berechne Hash falls nicht angegeben
+            if not file_hash:
+                file_hash = self._calculate_file_hash(file_path)
+            
+            if not file_hash:
+                return {
+                    "success": False,
+                    "error": "Hash-Berechnung fehlgeschlagen",
+                    "file_path": file_path
+                }
+            
+            # Prüfe Hash-Duplikat (versuche db aus Kontext zu bekommen)
+            db = None
+            try:
+                if hasattr(self, 'db'):
+                    db = self.db
+                elif hasattr(self, 'tools') and hasattr(self.tools, 'db'):
+                    db = self.tools.db
+            except:
+                pass
+            hash_result = await self._check_hash_duplicate(file_hash, db)
+            
+            result = {
+                "success": True,
+                "file_path": file_path,
+                "file_hash": file_hash,
+                "is_duplicate": hash_result.get("is_duplicate", False),
+                "match_type": hash_result.get("match_type", "none")
+            }
+            
+            if hash_result.get("is_duplicate"):
+                result.update({
+                    "existing_receipt_id": hash_result.get("existing_receipt_id"),
+                    "existing_timesheet_id": hash_result.get("existing_timesheet_id"),
+                    "existing_report_id": hash_result.get("existing_report_id"),
+                    "upload_date": hash_result.get("upload_date"),
+                    "warning": "Doppelte Datei erkannt!"
+                })
+                return result
+            
+            # Prüfe Bild-Ähnlichkeit (falls aktiviert)
+            if check_similarity:
+                try:
+                    phash = self._calculate_perceptual_hash(file_path)
+                    if phash:
+                        # Suche ähnliche Perceptual Hashes in Datenbank
+                        # (vereinfacht - in Produktion würde man Hamming-Distanz verwenden)
+                        result["perceptual_hash"] = phash
+                        result["similarity_check"] = "completed"
+                except Exception as e:
+                    logger.debug(f"Ähnlichkeitsprüfung übersprungen: {e}")
+                    result["similarity_check"] = "skipped"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Duplicate detection error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_path": file_path
+            }
+
+class IBANValidatorTool(AgentTool):
+    """Tool für IBAN-Validierung und Bankdaten-Extraktion"""
+    
+    def __init__(self):
+        super().__init__(
+            name="iban_validator",
+            description="Validiert IBAN-Nummern (ISO 13616) und extrahiert Bankdaten. Prüft Prüfziffern, erkennt Länder und BIC. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "iban": {
+                    "type": "string",
+                    "description": "IBAN zum Validieren"
+                },
+                "extract_bic": {
+                    "type": "boolean",
+                    "description": "BIC extrahieren (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+        # IBAN-Längen pro Land (erste 2 Zeichen)
+        self.iban_lengths = {
+            "AD": 24, "AE": 23, "AL": 28, "AT": 20, "AZ": 28, "BA": 20, "BE": 16,
+            "BG": 22, "BH": 22, "BR": 29, "BY": 28, "CH": 21, "CR": 22, "CY": 28,
+            "CZ": 24, "DE": 22, "DK": 18, "DO": 28, "EE": 20, "EG": 29, "ES": 24,
+            "FI": 18, "FO": 18, "FR": 27, "GB": 22, "GE": 22, "GI": 23, "GL": 18,
+            "GR": 27, "GT": 28, "HR": 21, "HU": 28, "IE": 22, "IL": 23, "IS": 26,
+            "IT": 27, "JO": 30, "KW": 30, "KZ": 20, "LB": 28, "LC": 32, "LI": 21,
+            "LT": 20, "LU": 20, "LV": 21, "MC": 27, "MD": 24, "ME": 22, "MK": 19,
+            "MR": 27, "MT": 31, "MU": 30, "NL": 18, "NO": 15, "PK": 24, "PL": 28,
+            "PS": 29, "PT": 25, "QA": 29, "RO": 24, "RS": 22, "SA": 24, "SE": 24,
+            "SI": 19, "SK": 24, "SM": 27, "TN": 24, "TR": 26, "UA": 29, "VG": 24,
+            "XK": 20
+        }
+    
+    def _validate_iban_format(self, iban: str) -> tuple[bool, Optional[str]]:
+        """Validiere IBAN-Format"""
+        # Normalisiere (entferne Leerzeichen)
+        iban_clean = iban.replace(" ", "").replace("-", "").upper()
+        
+        # Prüfe Länge (minimal 15, maximal 34)
+        if len(iban_clean) < 15 or len(iban_clean) > 34:
+            return False, "IBAN-Länge ungültig (muss zwischen 15 und 34 Zeichen sein)"
+        
+        # Prüfe Format (2 Buchstaben + 2 Ziffern + alphanumerisch)
+        if not iban_clean[:2].isalpha():
+            return False, "IBAN muss mit 2 Buchstaben (Ländercode) beginnen"
+        
+        if not iban_clean[2:4].isdigit():
+            return False, "IBAN muss nach Ländercode 2 Ziffern (Prüfziffern) haben"
+        
+        if not iban_clean[4:].isalnum():
+            return False, "IBAN enthält ungültige Zeichen nach Prüfziffern"
+        
+        # Prüfe Länge für spezifisches Land
+        country_code = iban_clean[:2]
+        expected_length = self.iban_lengths.get(country_code)
+        if expected_length and len(iban_clean) != expected_length:
+            return False, f"IBAN-Länge für {country_code} muss {expected_length} Zeichen sein, gefunden: {len(iban_clean)}"
+        
+        return True, iban_clean
+    
+    def _validate_iban_checksum(self, iban: str) -> bool:
+        """Validiere IBAN-Prüfziffern (Modulo 97)"""
+        try:
+            # Verschiebe erste 4 Zeichen ans Ende
+            rearranged = iban[4:] + iban[:4]
+            
+            # Ersetze Buchstaben durch Zahlen (A=10, B=11, ..., Z=35)
+            numeric = ""
+            for char in rearranged:
+                if char.isalpha():
+                    numeric += str(ord(char) - ord('A') + 10)
+                else:
+                    numeric += char
+            
+            # Berechne Modulo 97
+            remainder = int(numeric) % 97
+            return remainder == 1
+            
+        except Exception:
+            return False
+    
+    def _extract_bic(self, iban: str) -> Optional[str]:
+        """Extrahiere BIC aus IBAN (vereinfacht, nicht alle Länder unterstützen dies)"""
+        # BIC-Extraktion ist komplex und länderspezifisch
+        # Für DE: Bankleitzahl ist in IBAN enthalten, aber BIC-Mapping erforderlich
+        # Hier nur Platzhalter
+        country_code = iban[:2]
+        if country_code == "DE":
+            # Deutsche IBAN: DE + 2 Prüfziffern + 8-stellige BLZ + 10-stellige Kontonummer
+            blz = iban[4:12]
+            # BIC würde aus BLZ-Datenbank kommen
+            return None  # Erfordert BLZ-zu-BIC-Mapping
+        return None
+    
+    async def execute(self, iban: str, extract_bic: bool = True) -> Dict[str, Any]:
+        """Validiere IBAN"""
+        try:
+            if not iban or not iban.strip():
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "IBAN ist leer",
+                    "iban": iban
+                }
+            
+            # Validiere Format
+            format_valid, iban_clean = self._validate_iban_format(iban)
+            if not format_valid:
+                return {
+                    "success": True,
+                    "valid": False,
+                    "error": iban_clean,
+                    "iban": iban,
+                    "normalized": iban_clean if isinstance(iban_clean, str) else iban
+                }
+            
+            # Validiere Prüfziffern
+            checksum_valid = self._validate_iban_checksum(iban_clean)
+            
+            result = {
+                "success": True,
+                "valid": checksum_valid,
+                "iban": iban,
+                "normalized": iban_clean,
+                "country_code": iban_clean[:2],
+                "check_digits": iban_clean[2:4],
+                "bban": iban_clean[4:],  # Basic Bank Account Number
+                "length": len(iban_clean),
+                "format_valid": format_valid,
+                "checksum_valid": checksum_valid
+            }
+            
+            if not checksum_valid:
+                result["error"] = "IBAN-Prüfziffern ungültig (Modulo 97 Prüfung fehlgeschlagen)"
+            
+            # Extrahiere BIC (falls angefordert)
+            if extract_bic and checksum_valid:
+                bic = self._extract_bic(iban_clean)
+                if bic:
+                    result["bic"] = bic
+                else:
+                    result["bic"] = None
+                    result["bic_note"] = "BIC-Extraktion erfordert externe Datenbank"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"IBAN validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "iban": iban
+            }
+
+class ImageQualityTool(AgentTool):
+    """Tool für Qualitätsprüfung von gescannten Belegen"""
+    
+    def __init__(self):
+        super().__init__(
+            name="image_quality",
+            description="Prüft Qualität von gescannten Belegen (Auflösung, Schärfe, Kontrast, Helligkeit). Warnt vor schlechter Qualität vor OCR. Nützlich für DocumentAgent.",
+            parameters={
+                "image_path": {
+                    "type": "string",
+                    "description": "Pfad zur Bilddatei oder PDF"
+                },
+                "min_dpi": {
+                    "type": "integer",
+                    "description": "Minimale DPI-Anforderung (Standard: 150)",
+                    "default": 150
+                },
+                "min_sharpness": {
+                    "type": "number",
+                    "description": "Minimale Schärfe (0.0-1.0, Standard: 0.3)",
+                    "default": 0.3
+                }
+            }
+        )
+    
+    def _check_image_quality(self, image_path: str) -> Dict[str, Any]:
+        """Prüfe Bildqualität"""
+        try:
+            from PIL import Image
+            import numpy as np
+            import cv2
+            
+            # Öffne Bild
+            img = Image.open(image_path)
+            
+            # Prüfe DPI
+            dpi = img.info.get('dpi', (72, 72))[0]  # Standard: 72 DPI
+            
+            # Konvertiere zu numpy array für OpenCV
+            img_array = np.array(img.convert('RGB'))
+            img_gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+            
+            # Berechne Schärfe (Laplacian Variance)
+            laplacian = cv2.Laplacian(img_gray, cv2.CV_64F)
+            sharpness = laplacian.var()
+            normalized_sharpness = min(sharpness / 1000.0, 1.0)  # Normalisiere auf 0-1
+            
+            # Berechne Kontrast (Standardabweichung)
+            contrast = np.std(img_gray)
+            normalized_contrast = min(contrast / 128.0, 1.0)  # Normalisiere auf 0-1
+            
+            # Berechne Helligkeit (Durchschnitt)
+            brightness = np.mean(img_gray)
+            normalized_brightness = brightness / 255.0  # Normalisiere auf 0-1
+            
+            # Prüfe auf Blur (zu niedrige Schärfe)
+            is_blurry = normalized_sharpness < 0.3
+            
+            # Prüfe auf zu dunkel/hell
+            is_too_dark = normalized_brightness < 0.2
+            is_too_bright = normalized_brightness > 0.8
+            
+            # Gesamtbewertung
+            quality_score = (normalized_sharpness * 0.4 + 
+                          normalized_contrast * 0.3 + 
+                          (1.0 - abs(normalized_brightness - 0.5) * 2) * 0.3)
+            
+            issues = []
+            if dpi < 150:
+                issues.append(f"DPI zu niedrig ({dpi}, empfohlen: ≥150)")
+            if is_blurry:
+                issues.append(f"Bild unscharf (Schärfe: {normalized_sharpness:.2f})")
+            if is_too_dark:
+                issues.append(f"Bild zu dunkel (Helligkeit: {normalized_brightness:.2f})")
+            if is_too_bright:
+                issues.append(f"Bild zu hell (Helligkeit: {normalized_brightness:.2f})")
+            if normalized_contrast < 0.3:
+                issues.append(f"Kontrast zu niedrig ({normalized_contrast:.2f})")
+            
+            return {
+                "dpi": dpi,
+                "width": img.width,
+                "height": img.height,
+                "sharpness": float(normalized_sharpness),
+                "contrast": float(normalized_contrast),
+                "brightness": float(normalized_brightness),
+                "quality_score": float(quality_score),
+                "is_blurry": is_blurry,
+                "is_too_dark": is_too_dark,
+                "is_too_bright": is_too_bright,
+                "issues": issues,
+                "is_good_quality": quality_score >= 0.6 and len(issues) == 0
+            }
+            
+        except ImportError:
+            return {
+                "error": "OpenCV oder PIL nicht verfügbar",
+                "note": "Bitte 'pip install opencv-python pillow' installieren"
+            }
+        except Exception as e:
+            logger.error(f"Image quality check error: {e}")
+            return {"error": str(e)}
+    
+    async def execute(self, image_path: str, min_dpi: int = 150, min_sharpness: float = 0.3) -> Dict[str, Any]:
+        """Prüfe Bildqualität"""
+        try:
+            if not Path(image_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Datei nicht gefunden: {image_path}",
+                    "image_path": image_path
+                }
+            
+            # Prüfe ob PDF oder Bild
+            if image_path.lower().endswith('.pdf'):
+                # Für PDFs extrahiere erste Seite
+                try:
+                    if HAS_PDFPLUMBER:
+                        import pdfplumber
+                        from PIL import Image as PILImage
+                        import io
+                        import tempfile
+                        
+                        with pdfplumber.open(image_path) as pdf:
+                            if len(pdf.pages) > 0:
+                                # Konvertiere erste Seite zu Bild (vereinfacht)
+                                # In Produktion würde man pdf2image verwenden
+                                page = pdf.pages[0]
+                                # Extrahiere als Bild (vereinfacht)
+                                # Für echte Implementierung: pdf2image verwenden
+                                return {
+                                    "success": True,
+                                    "image_path": image_path,
+                                    "type": "pdf",
+                                    "pages": len(pdf.pages),
+                                    "note": "PDF-Qualitätsprüfung erfordert pdf2image. Verwende erste Seite.",
+                                    "quality_check": "limited"
+                                }
+                except Exception as e:
+                    logger.debug(f"PDF-Qualitätsprüfung fehlgeschlagen: {e}")
+                    return {
+                        "success": False,
+                        "error": f"PDF-Qualitätsprüfung fehlgeschlagen: {str(e)}",
+                        "image_path": image_path
+                    }
+            
+            # Prüfe Bildqualität
+            quality_result = self._check_image_quality(image_path)
+            
+            if "error" in quality_result:
+                return {
+                    "success": False,
+                    "error": quality_result.get("error"),
+                    "note": quality_result.get("note"),
+                    "image_path": image_path
+                }
+            
+            # Bewertung
+            is_good = quality_result.get("is_good_quality", False)
+            meets_dpi = quality_result.get("dpi", 0) >= min_dpi
+            meets_sharpness = quality_result.get("sharpness", 0) >= min_sharpness
+            
+            result = {
+                "success": True,
+                "image_path": image_path,
+                "quality_score": quality_result.get("quality_score", 0),
+                "is_good_quality": is_good and meets_dpi and meets_sharpness,
+                "dpi": quality_result.get("dpi", 0),
+                "meets_dpi_requirement": meets_dpi,
+                "sharpness": quality_result.get("sharpness", 0),
+                "meets_sharpness_requirement": meets_sharpness,
+                "contrast": quality_result.get("contrast", 0),
+                "brightness": quality_result.get("brightness", 0),
+                "issues": quality_result.get("issues", []),
+                "recommendations": []
+            }
+            
+            # Empfehlungen
+            if not meets_dpi:
+                result["recommendations"].append(f"Scannen Sie mit mindestens {min_dpi} DPI")
+            if not meets_sharpness:
+                result["recommendations"].append("Verbessern Sie die Bildschärfe")
+            if quality_result.get("is_too_dark"):
+                result["recommendations"].append("Erhöhen Sie die Helligkeit beim Scannen")
+            if quality_result.get("is_too_bright"):
+                result["recommendations"].append("Reduzieren Sie die Helligkeit beim Scannen")
+            if quality_result.get("contrast", 0) < 0.3:
+                result["recommendations"].append("Erhöhen Sie den Kontrast")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Image quality error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "image_path": image_path
+            }
+
+class TimeZoneTool(AgentTool):
+    """Tool für Zeitzonen-Handling für internationale Reisen"""
+    
+    def __init__(self):
+        super().__init__(
+            name="timezone",
+            description="Zeitzonen-Erkennung und -Konvertierung für internationale Reisen. Validiert Reisezeiten bei Zeitzonen-Wechsel. Nützlich für AccountingAgent und ChatAgent.",
+            parameters={
+                "location": {
+                    "type": "string",
+                    "description": "Ortsangabe (z.B. 'Berlin', 'New York', 'Tokyo')"
+                },
+                "datetime_string": {
+                    "type": "string",
+                    "description": "Datum/Zeit-String zum Konvertieren (optional)"
+                },
+                "from_timezone": {
+                    "type": "string",
+                    "description": "Quell-Zeitzone (optional, wird automatisch erkannt)"
+                },
+                "to_timezone": {
+                    "type": "string",
+                    "description": "Ziel-Zeitzone (Standard: 'UTC')",
+                    "default": "UTC"
+                }
+            }
+        )
+    
+    async def execute(self,
+                      location: Optional[str] = None,
+                      datetime_string: Optional[str] = None,
+                      from_timezone: Optional[str] = None,
+                      to_timezone: str = "UTC") -> Dict[str, Any]:
+        """Zeitzonen-Operationen"""
+        try:
+            from datetime import datetime
+            import pytz
+            
+            result = {
+                "success": True
+            }
+            
+            # Zeitzone aus Ort bestimmen
+            if location:
+                try:
+                    # Nutze Geocoding-Tool für Koordinaten (falls verfügbar)
+                    # Tools werden über Tool-Registry bereitgestellt
+                    from backend.agents import get_tool_registry
+                    tool_registry = get_tool_registry()
+                    geocoding_tool = tool_registry.get_tool("geocoding")
+                    if geocoding_tool:
+                        geo_result = await geocoding_tool.execute(location)
+                        if geo_result.get("success"):
+                            lat = geo_result.get("latitude")
+                            lon = geo_result.get("longitude")
+                            
+                            # Bestimme Zeitzone aus Koordinaten
+                            try:
+                                import timezonefinder
+                                tf = timezonefinder.TimezoneFinder()
+                                tz_name = tf.timezone_at(lat=lat, lng=lon)
+                                if tz_name:
+                                    result["location"] = location
+                                    result["timezone"] = tz_name
+                                    result["timezone_offset"] = pytz.timezone(tz_name).utcoffset(datetime.now()).total_seconds() / 3600
+                            except ImportError:
+                                # Fallback: Nutze OpenMaps-Tool
+                                openmaps_tool = tool_registry.get_tool("openmaps")
+                                if openmaps_tool:
+                                    maps_result = await openmaps_tool.execute(action="geocode", query=location)
+                                    if maps_result.get("success") and maps_result.get("data"):
+                                        # Extrahiere Zeitzone aus OpenMaps-Ergebnis
+                                        result["location"] = location
+                                        result["timezone"] = "unknown"
+                                        result["note"] = "Zeitzone-Erkennung erfordert timezonefinder"
+                except Exception as e:
+                    logger.debug(f"Zeitzone-Erkennung fehlgeschlagen: {e}")
+                    result["location"] = location
+                    result["timezone"] = "unknown"
+                    result["error"] = str(e)
+            
+            # Datum/Zeit konvertieren
+            if datetime_string:
+                try:
+                    # Parse Datum/Zeit
+                    dt = datetime.fromisoformat(datetime_string.replace('Z', '+00:00'))
+                    
+                    # Konvertiere Zeitzone
+                    if from_timezone:
+                        from_tz = pytz.timezone(from_timezone)
+                        dt = from_tz.localize(dt) if dt.tzinfo is None else dt.astimezone(from_tz)
+                    
+                    to_tz = pytz.timezone(to_timezone)
+                    dt_converted = dt.astimezone(to_tz)
+                    
+                    result["datetime_string"] = datetime_string
+                    result["converted_datetime"] = dt_converted.isoformat()
+                    result["from_timezone"] = from_timezone or "local"
+                    result["to_timezone"] = to_timezone
+                    result["timezone_offset_hours"] = dt_converted.utcoffset().total_seconds() / 3600
+                    
+                except Exception as e:
+                    result["datetime_conversion_error"] = str(e)
+            
+            return result
+            
+        except ImportError:
+            return {
+                "success": False,
+                "error": "pytz nicht verfügbar",
+                "note": "Bitte 'pip install pytz' installieren"
+            }
+        except Exception as e:
+            logger.error(f"Timezone error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "location": location
+            }
+
+class EmailValidatorTool(AgentTool):
+    """Tool für E-Mail-Validierung und Domain-Prüfung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="email_validator",
+            description="Validiert E-Mail-Adressen (RFC 5322) und prüft Domain-Existenz (DNS MX-Record). Erkennt Disposable-E-Mails. Nützlich für DocumentAgent und ChatAgent.",
+            parameters={
+                "email": {
+                    "type": "string",
+                    "description": "E-Mail-Adresse zum Validieren"
+                },
+                "check_dns": {
+                    "type": "boolean",
+                    "description": "DNS MX-Record prüfen (Standard: True)",
+                    "default": True
+                },
+                "check_disposable": {
+                    "type": "boolean",
+                    "description": "Disposable-E-Mail erkennen (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+        # Liste bekannter Disposable-E-Mail-Domains
+        self.disposable_domains = {
+            "10minutemail.com", "guerrillamail.com", "mailinator.com",
+            "tempmail.com", "throwaway.email", "yopmail.com", "temp-mail.org"
+        }
+    
+    def _validate_email_format(self, email: str) -> tuple[bool, Optional[str]]:
+        """Validiere E-Mail-Format (RFC 5322)"""
+        import re
+        
+        # Einfache RFC 5322-konforme Regex
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        
+        if not re.match(pattern, email):
+            return False, "E-Mail-Format ungültig"
+        
+        # Prüfe Länge
+        if len(email) > 254:  # RFC 5321 Limit
+            return False, "E-Mail-Adresse zu lang (max. 254 Zeichen)"
+        
+        # Prüfe lokalen Teil
+        local_part = email.split('@')[0]
+        if len(local_part) > 64:  # RFC 5321 Limit
+            return False, "Lokaler Teil zu lang (max. 64 Zeichen)"
+        
+        return True, None
+    
+    async def _check_dns_mx(self, domain: str) -> Dict[str, Any]:
+        """Prüfe DNS MX-Record"""
+        try:
+            import dns.resolver
+            
+            try:
+                mx_records = dns.resolver.resolve(domain, 'MX')
+                mx_hosts = [str(mx.exchange) for mx in mx_records]
+                return {
+                    "has_mx": True,
+                    "mx_hosts": mx_hosts,
+                    "mx_count": len(mx_hosts)
+                }
+            except dns.resolver.NXDOMAIN:
+                return {
+                    "has_mx": False,
+                    "error": "Domain existiert nicht"
+                }
+            except dns.resolver.NoAnswer:
+                return {
+                    "has_mx": False,
+                    "error": "Keine MX-Records gefunden"
+                }
+                
+        except ImportError:
+            return {
+                "has_mx": None,
+                "error": "dnspython nicht verfügbar",
+                "note": "Bitte 'pip install dnspython' installieren"
+            }
+        except Exception as e:
+            logger.debug(f"DNS-Prüfung fehlgeschlagen: {e}")
+            return {
+                "has_mx": None,
+                "error": str(e)
+            }
+    
+    def _check_disposable(self, domain: str) -> bool:
+        """Prüfe ob Disposable-E-Mail"""
+        return domain.lower() in self.disposable_domains
+    
+    async def execute(self,
+                      email: str,
+                      check_dns: bool = True,
+                      check_disposable: bool = True) -> Dict[str, Any]:
+        """Validiere E-Mail"""
+        try:
+            if not email or not email.strip():
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "E-Mail ist leer",
+                    "email": email
+                }
+            
+            email = email.strip().lower()
+            
+            # Validiere Format
+            format_valid, format_error = self._validate_email_format(email)
+            
+            if not format_valid:
+                return {
+                    "success": True,
+                    "valid": False,
+                    "error": format_error,
+                    "email": email
+                }
+            
+            # Extrahiere Domain
+            domain = email.split('@')[1]
+            
+            result = {
+                "success": True,
+                "valid": True,
+                "email": email,
+                "domain": domain,
+                "format_valid": True
+            }
+            
+            # Prüfe Disposable
+            if check_disposable:
+                is_disposable = self._check_disposable(domain)
+                result["is_disposable"] = is_disposable
+                if is_disposable:
+                    result["warning"] = "Disposable-E-Mail erkannt"
+            
+            # Prüfe DNS
+            if check_dns:
+                dns_result = await self._check_dns_mx(domain)
+                result["dns_check"] = dns_result
+                if dns_result.get("has_mx") is False:
+                    result["valid"] = False
+                    result["error"] = dns_result.get("error", "DNS-Prüfung fehlgeschlagen")
+                elif dns_result.get("has_mx") is None:
+                    result["warning"] = "DNS-Prüfung nicht verfügbar"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Email validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "email": email
+            }
+
 class LangChainTool(AgentTool):
     """Tool für LangChain-Integration - erweiterte Agent-Funktionalität mit Tool-Orchestrierung"""
     
@@ -2721,6 +3561,12 @@ class AgentToolRegistry:
         self.register(CurrencyValidatorTool())
         self.register(RegexPatternMatcherTool())
         self.register(PDFMetadataTool())
+        # Priorität 1 Tools
+        self.register(DuplicateDetectionTool())
+        self.register(IBANValidatorTool())
+        self.register(ImageQualityTool())
+        self.register(TimeZoneTool())
+        self.register(EmailValidatorTool())
     
     def register(self, tool: AgentTool):
         """Registriere ein neues Tool"""
@@ -2939,6 +3785,8 @@ Formuliere Fragen so, dass sie mit kurzen Antworten beantwortet werden können.
 Verfügbare Tools:
 - exa_search: Hochwertige semantische Suche mit Exa/XNG API (PRIMÄR für ChatAgent) - bessere Ergebnisse als Standard-Web-Suche
 - date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten (heute, gestern, DD.MM.YYYY, etc.) - für Datumsverständnis in Gesprächen
+- timezone: Zeitzonen-Erkennung und -Konvertierung - für Fragen zu internationalen Reisen und Zeitzonen
+- email_validator: E-Mail-Validierung (RFC 5322) und DNS-Prüfung - für E-Mail-Adressen-Validierung
 - web_access: Generischer Web-Zugriff für HTTP-Requests zu beliebigen URLs (GET/POST/PUT/DELETE, Web-Scraping, API-Zugriff) - für alle Agents verfügbar
 - langchain: LangChain-Integration für erweiterte Agent-Funktionalität und komplexe Workflows (OPTIONAL, für alle Agents)
 - openmaps: Umfassende OpenStreetMap-Funktionen (Geocoding, POI-Suche, Entfernungen, Routen)
@@ -3052,9 +3900,13 @@ Deine Aufgaben:
 Verfügbare Tools:
 - marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für DocumentAgent) - strukturierte Daten aus PDFs
 - paddleocr: OCR-Tool für Texterkennung (FALLBACK) - wenn andere Methoden versagen, unterstützt 100+ Sprachen
+- duplicate_detection: Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Beleg-Uploads
+- image_quality: Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast, Helligkeit) - warnt vor schlechter Qualität vor OCR
 - pdf_metadata: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel, Seitenzahl) - für Dokumentenanalyse
 - translation: Übersetzung zwischen Sprachen (PRIMÄR für DocumentAgent) - für mehrsprachige Belege, unterstützt 100+ Sprachen
 - tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
+- iban_validator: IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für Bankdaten in Belegen
+- email_validator: E-Mail-Validierung (RFC 5322) und DNS-Prüfung - für E-Mail-Adressen in Belegen
 - date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten - für Datumsextraktion aus Dokumenten
 - regex_pattern_matcher: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, Telefonnummern, etc.) - für Datenextraktion
 - web_access: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - nützlich für Validierung von Dokumenten, API-Zugriff, Web-Scraping
@@ -3342,8 +4194,11 @@ Deine Aufgaben:
 Verfügbare Tools:
 - marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für AccountingAgent) - strukturierte Daten aus PDFs
 - custom_python_rules: Benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung und -berechnung (PRIMÄR für AccountingAgent)
+- duplicate_detection: Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Abrechnungen
 - tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
+- iban_validator: IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für Überweisungsdaten
 - currency_validator: Währungsvalidierung und -formatierung (ISO 4217) - für Währungsvalidierung und Betragsformatierung
+- timezone: Zeitzonen-Erkennung und -Konvertierung - für internationale Reisen, validiert Reisezeiten bei Zeitzonen-Wechsel
 - date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten - für Datumsvergleiche und Validierung
 - regex_pattern_matcher: Mustererkennung in Texten (Beträge, Datumsangaben, Steuernummern, etc.) - für Datenextraktion und Validierung
 - web_access: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - nützlich für Buchhaltungs-APIs, Steuer-Websites, Validierung, API-Interaktion

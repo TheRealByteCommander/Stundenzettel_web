@@ -46,3 +46,10 @@ slowapi>=0.1.9
 # LangChain (optional, für alle Agents)
 # langchain>=0.1.0
 # langchain-openai>=0.0.5
+
+# Priorität 1 Tools (optional, aber empfohlen)
+# imagehash>=4.3.1  # Für DuplicateDetectionTool (Perceptual Hash)
+# opencv-python>=4.8.0  # Für ImageQualityTool
+# pytz>=2023.3  # Für TimeZoneTool
+# timezonefinder>=6.2.0  # Für TimeZoneTool (erweiterte Zeitzonen-Erkennung)
+# dnspython>=2.4.0  # Für EmailValidatorTool (DNS MX-Record-Prüfung)

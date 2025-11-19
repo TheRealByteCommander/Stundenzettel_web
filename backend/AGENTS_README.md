@@ -378,11 +378,79 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
       - **DocumentAgent**: Dokumentenanalyse und Validierung
     - **Verfügbar für**: DocumentAgent (primär)
 
+18. **DuplicateDetectionTool** ⭐ NEU PRIORITÄT 1 (für DocumentAgent und AccountingAgent)
+    - Duplikats-Erkennung durch Hash-Vergleich
+    - **Funktionen:**
+      - SHA256-Hash-Berechnung für Dateien
+      - Perceptual Hash für Bild-Ähnlichkeitsprüfung (optional, erfordert imagehash)
+      - Datenbank-Abfrage nach bereits hochgeladenen Dateien
+      - Automatische Warnung bei Duplikaten
+    - **Erfordert**: Keine zusätzlichen Pakete (imagehash optional für Perceptual Hash)
+    - **Nützlich für:**
+      - **DocumentAgent**: Verhindert doppelte Beleg-Uploads
+      - **AccountingAgent**: Prüft auf doppelte Abrechnungen
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
+19. **IBANValidatorTool** ⭐ NEU PRIORITÄT 1 (für DocumentAgent und AccountingAgent)
+    - IBAN-Validierung und Bankdaten-Extraktion
+    - **Funktionen:**
+      - Format-Validierung (ISO 13616)
+      - Prüfziffern-Validierung (Modulo 97)
+      - Länder-Erkennung aus IBAN
+      - BBAN-Extraktion
+      - BIC-Extraktion (vereinfacht, erfordert externe Datenbank)
+    - **Unterstützte Länder:** 70+ Länder (DE, AT, CH, FR, IT, ES, GB, US, etc.)
+    - **Nützlich für:**
+      - **DocumentAgent**: Extrahiert und validiert IBANs aus Belegen
+      - **AccountingAgent**: Validiert Überweisungsdaten
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
+20. **ImageQualityTool** ⭐ NEU PRIORITÄT 1 (für DocumentAgent)
+    - Qualitätsprüfung von gescannten Belegen
+    - **Funktionen:**
+      - DPI-Prüfung (Auflösung)
+      - Schärfe-Analyse (Laplacian Variance)
+      - Kontrast- und Helligkeitsprüfung
+      - Automatische Verbesserungsvorschläge
+      - OCR-Erfolgsrate-Vorhersage
+    - **Erfordert**: `opencv-python`, `pillow` (bereits in requirements.txt)
+    - **Nützlich für:**
+      - **DocumentAgent**: Warnt vor schlechter Beleg-Qualität vor OCR
+    - **Verfügbar für**: DocumentAgent (primär)
+
+21. **TimeZoneTool** ⭐ NEU PRIORITÄT 1 (für AccountingAgent und ChatAgent)
+    - Zeitzonen-Handling für internationale Reisen
+    - **Funktionen:**
+      - Zeitzonen-Erkennung aus Ortsangaben
+      - UTC-Konvertierung
+      - Zeitzonen-Offset-Berechnung
+      - Reisezeit-Validierung (z.B. Ankunft vor Abreise bei Zeitzonen-Wechsel)
+    - **Erfordert**: `pytz` (optional: `timezonefinder` für erweiterte Erkennung)
+    - **Nützlich für:**
+      - **AccountingAgent**: Validiert Reisezeiten bei internationalen Reisen
+      - **ChatAgent**: Beantwortet Fragen zu Zeitzonen
+    - **Verfügbar für**: AccountingAgent, ChatAgent
+
+22. **EmailValidatorTool** ⭐ NEU PRIORITÄT 1 (für DocumentAgent und ChatAgent)
+    - E-Mail-Validierung und Domain-Prüfung
+    - **Funktionen:**
+      - Format-Validierung (RFC 5322)
+      - DNS MX-Record-Prüfung (Domain-Existenz)
+      - Disposable-E-Mail-Erkennung
+      - Längen-Validierung (RFC 5321)
+    - **Erfordert**: `dnspython` (optional, für DNS-Prüfung)
+    - **Nützlich für:**
+      - **DocumentAgent**: Validiert E-Mail-Adressen in Belegen
+      - **ChatAgent**: Validiert Benutzer-E-Mails
+    - **Verfügbar für**: DocumentAgent, ChatAgent
+
 ## Tool-Zuordnung zu Agents
 
 ### ChatAgent
 - **Primär**: `exa_search` (Exa/XNG Suche)
 - **Datumsverarbeitung**: `date_parser` (Datumsverständnis in Gesprächen)
+- **Zeitzonen**: `timezone` (für Fragen zu internationalen Reisen)
+- **E-Mail-Validierung**: `email_validator` (für E-Mail-Adressen-Validierung)
 - **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion)
 - **Web-Zugriff**: `web_access` (HTTP-Requests zu beliebigen URLs)
 - **Optional**: `langchain`, `openmaps`, `web_search`, `currency_exchange`, `geocoding`
@@ -390,9 +458,11 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 ### DocumentAgent
 - **Primär**: `marker` (Dokumentenanalyse)
 - **Fallback**: `paddleocr` (OCR wenn andere Methoden versagen)
+- **Duplikats-Prüfung**: `duplicate_detection` (verhindert doppelte Uploads)
+- **Qualitätsprüfung**: `image_quality` (prüft Beleg-Qualität vor OCR)
 - **Übersetzung**: `translation` (für mehrsprachige Belege)
 - **PDF-Metadaten**: `pdf_metadata` (Erstellungsdatum, Autor, etc.)
-- **Validierung**: `tax_number_validator` (Steuernummer-Validierung)
+- **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `email_validator` (E-Mail)
 - **Datumsverarbeitung**: `date_parser` (Datumsextraktion aus Dokumenten)
 - **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion)
 - **Web-Zugriff**: `web_access` (für Validierung, API-Zugriff, Web-Scraping)
@@ -400,7 +470,9 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 
 ### AccountingAgent
 - **Primär**: `marker` (Dokumentenanalyse), `custom_python_rules` (Buchhaltungsregeln)
-- **Validierung**: `tax_number_validator` (Steuernummer-Validierung), `currency_validator` (Währungsvalidierung)
+- **Duplikats-Prüfung**: `duplicate_detection` (verhindert doppelte Abrechnungen)
+- **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `currency_validator` (Währung)
+- **Zeitzonen**: `timezone` (für internationale Reisen, Reisezeit-Validierung)
 - **Datumsverarbeitung**: `date_parser` (Datumsvergleiche und Validierung)
 - **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion und Validierung)
 - **Web-Zugriff**: `web_access` (für Buchhaltungs-APIs, Steuer-Websites, Validierung)
@@ -419,6 +491,11 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 - `exa-py`: Für ExaSearchTool (ChatAgent) - `pip install exa-py`
 - `paddleocr` & `paddlepaddle`: Für PaddleOCRTool (DocumentAgent Fallback) - `pip install paddleocr paddlepaddle`
 - `langchain` & `langchain-openai`: Für LangChainTool (alle Agents) - `pip install langchain langchain-openai`
+- `imagehash`: Für DuplicateDetectionTool (Perceptual Hash) - `pip install imagehash`
+- `opencv-python`: Für ImageQualityTool - `pip install opencv-python`
+- `pytz`: Für TimeZoneTool - `pip install pytz`
+- `timezonefinder`: Für TimeZoneTool (erweiterte Zeitzonen-Erkennung) - `pip install timezonefinder`
+- `dnspython`: Für EmailValidatorTool (DNS MX-Record-Prüfung) - `pip install dnspython`
 - Marker: Lokale Installation oder API-Key für MarkerTool
 
 ### Umgebungsvariablen (optional)

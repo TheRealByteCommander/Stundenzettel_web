@@ -65,6 +65,11 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
     - **Currency Validator**: Währungsvalidierung und -formatierung (ISO 4217) - primär für AccountingAgent
     - **Regex Pattern Matcher**: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, etc.) - für alle Agents
     - **PDF Metadata**: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel) - primär für DocumentAgent
+    - **Duplicate Detection** (Priorität 1): Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Uploads
+    - **IBAN Validator** (Priorität 1): IBAN-Validierung und Bankdaten-Extraktion (ISO 13616)
+    - **Image Quality** (Priorität 1): Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast)
+    - **Timezone** (Priorität 1): Zeitzonen-Handling für internationale Reisen
+    - **Email Validator** (Priorität 1): E-Mail-Validierung (RFC 5322) und DNS-Prüfung
   - **Web-Tools**: Zugriff auf aktuelle Daten
     - Aktuelle Spesensätze aus dem Internet
     - Währungswechselkurse in Echtzeit
