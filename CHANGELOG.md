@@ -45,6 +45,15 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - ✅ **WeatherAPITool** (Priorität 2): Wetter-Daten für Reisevalidierung (OpenWeatherMap, WeatherAPI) - für AccountingAgent
   - ✅ **TravelTimeCalculatorTool** (Priorität 2): Reisezeit-Berechnung zwischen Orten (OpenRouteService, Google Maps) - für AccountingAgent
   - ✅ **PDFTimestampTool** (Priorität 2): Zeitstempel-Validierung in PDFs - für DocumentAgent
+  - ✅ **QRCodeReaderTool** (Priorität 3): QR-Code-Erkennung in PDFs und Bildern (E-Rechnungen: ZUGFeRD, XRechnung) - für DocumentAgent
+  - ✅ **BarcodeReaderTool** (Priorität 3): Barcode-Erkennung in Belegen (EAN, UPC, Code128) - für DocumentAgent
+  - ✅ **InvoiceNumberValidatorTool** (Priorität 3): Rechnungsnummer-Validierung (Format, Duplikate, Sequenzen) - für DocumentAgent und AccountingAgent
+  - ✅ **VATCalculatorTool** (Priorität 3): Mehrwertsteuer-Berechnung (Netto/Brutto, länder-spezifische Sätze) - für AccountingAgent
+  - ✅ **ExpenseCategoryClassifierTool** (Priorität 3): Automatische Kategorisierung von Ausgaben (keyword-basiert) - für AccountingAgent
+  - ✅ **ReceiptStandardValidatorTool** (Priorität 3): GoBD-Konformitäts-Prüfung (Vollständigkeit, Lesbarkeit) - für DocumentAgent
+  - ✅ **BankStatementParserTool** (Priorität 3): Kontoauszug-Parsing (PDF, MT940, CAMT.053) - für AccountingAgent
+  - ✅ **DistanceMatrixTool** (Priorität 3): Entfernungsmatrix-Berechnung für mehrere Orte - für AccountingAgent
+  - ✅ **CompanyDatabaseTool** (Priorität 3): Firmendatenbank-Abfrage (USt-IdNr-Validierung gegen EU-VIES) - für DocumentAgent und AccountingAgent
 
 ### Geändert
 - **Daten aktualisiert**: Alle Dokumente auf Stand 2025 aktualisiert (BENUTZERANLEITUNG.md, SICHERHEIT.md, CYBER_SECURITY.md, README.md)

@@ -79,6 +79,15 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
     - **Weather API** (Priorität 2): Wetter-Daten für Reisevalidierung
     - **Travel Time Calculator** (Priorität 2): Reisezeit-Berechnung zwischen Orten
     - **PDF Timestamp** (Priorität 2): Zeitstempel-Validierung in PDFs
+    - **QR Code Reader** (Priorität 3): QR-Code-Erkennung (E-Rechnungen: ZUGFeRD, XRechnung)
+    - **Barcode Reader** (Priorität 3): Barcode-Erkennung (EAN, UPC, Code128)
+    - **Invoice Number Validator** (Priorität 3): Rechnungsnummer-Validierung
+    - **VAT Calculator** (Priorität 3): Mehrwertsteuer-Berechnung
+    - **Expense Category Classifier** (Priorität 3): Automatische Kategorisierung von Ausgaben
+    - **Receipt Standard Validator** (Priorität 3): GoBD-Konformitäts-Prüfung
+    - **Bank Statement Parser** (Priorität 3): Kontoauszug-Parsing
+    - **Distance Matrix** (Priorität 3): Entfernungsmatrix-Berechnung
+    - **Company Database** (Priorität 3): Firmendatenbank-Abfrage (EU-VIES)
   - **Web-Tools**: Zugriff auf aktuelle Daten
     - Aktuelle Spesensätze aus dem Internet
     - Währungswechselkurse in Echtzeit

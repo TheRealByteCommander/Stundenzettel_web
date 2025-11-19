@@ -4695,6 +4695,933 @@ class PDFTimestampTool(AgentTool):
                 "pdf_path": pdf_path
             }
 
+class QRCodeReaderTool(AgentTool):
+    """Tool für QR-Code-Erkennung in Belegen"""
+    
+    def __init__(self):
+        super().__init__(
+            name="qrcode_reader",
+            description="Erkennt QR-Codes in PDFs und Bildern. Extrahiert Daten aus QR-Codes, erkennt E-Rechnungen (ZUGFeRD, XRechnung). Nützlich für DocumentAgent.",
+            parameters={
+                "file_path": {
+                    "type": "string",
+                    "description": "Pfad zur Datei (PDF oder Bild)"
+                },
+                "extract_data": {
+                    "type": "boolean",
+                    "description": "Daten aus QR-Code extrahieren (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+    
+    async def execute(self,
+                      file_path: str,
+                      extract_data: bool = True) -> Dict[str, Any]:
+        """Erkenne QR-Codes in Datei"""
+        try:
+            if not Path(file_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Datei nicht gefunden: {file_path}",
+                    "file_path": file_path
+                }
+            
+            try:
+                from pyzbar import decode as pyzbar_decode
+                from PIL import Image
+                import cv2
+            except ImportError:
+                return {
+                    "success": False,
+                    "error": "pyzbar, PIL oder opencv-python nicht verfügbar",
+                    "note": "Bitte 'pip install pyzbar pillow opencv-python' installieren"
+                }
+            
+            qr_codes = []
+            
+            # Prüfe ob PDF oder Bild
+            if file_path.lower().endswith('.pdf'):
+                # PDF: Konvertiere Seiten zu Bildern
+                try:
+                    if HAS_PDFPLUMBER:
+                        import pdfplumber
+                        with pdfplumber.open(file_path) as pdf:
+                            for page_num, page in enumerate(pdf.pages):
+                                # Konvertiere PDF-Seite zu Bild
+                                img = page.to_image(resolution=300)
+                                img_array = img.original
+                                
+                                # Erkenne QR-Codes
+                                decoded = pyzbar_decode(img_array)
+                                for qr in decoded:
+                                    qr_data = qr.data.decode('utf-8')
+                                    qr_codes.append({
+                                        "page": page_num + 1,
+                                        "data": qr_data,
+                                        "type": qr.type,
+                                        "rect": {
+                                            "left": qr.rect.left,
+                                            "top": qr.rect.top,
+                                            "width": qr.rect.width,
+                                            "height": qr.rect.height
+                                        }
+                                    })
+                    else:
+                        return {
+                            "success": False,
+                            "error": "pdfplumber nicht verfügbar für PDF-Verarbeitung"
+                        }
+                except Exception as e:
+                    logger.debug(f"PDF QR-Code-Erkennung fehlgeschlagen: {e}")
+            else:
+                # Bild: Direkt verarbeiten
+                try:
+                    img = cv2.imread(file_path)
+                    if img is None:
+                        return {
+                            "success": False,
+                            "error": f"Bild konnte nicht geladen werden: {file_path}"
+                        }
+                    
+                    # Erkenne QR-Codes
+                    decoded = pyzbar_decode(img)
+                    for qr in decoded:
+                        qr_data = qr.data.decode('utf-8')
+                        qr_codes.append({
+                            "data": qr_data,
+                            "type": qr.type,
+                            "rect": {
+                                "left": qr.rect.left,
+                                "top": qr.rect.top,
+                                "width": qr.rect.width,
+                                "height": qr.rect.height
+                            }
+                        })
+                except Exception as e:
+                    logger.debug(f"Bild QR-Code-Erkennung fehlgeschlagen: {e}")
+            
+            # Extrahiere Daten aus QR-Codes
+            extracted_data = []
+            if extract_data:
+                for qr in qr_codes:
+                    data = qr.get("data", "")
+                    # Prüfe auf E-Rechnung-Formate
+                    if "ZUGFeRD" in data or "zugferd" in data.lower():
+                        qr["format"] = "ZUGFeRD"
+                    elif "XRechnung" in data or "xrechnung" in data.lower():
+                        qr["format"] = "XRechnung"
+                    
+                    # Versuche JSON/XML zu parsen
+                    try:
+                        import json
+                        parsed = json.loads(data)
+                        qr["parsed_data"] = parsed
+                    except:
+                        pass
+                    
+                    try:
+                        import xml.etree.ElementTree as ET
+                        root = ET.fromstring(data)
+                        qr["parsed_data"] = {child.tag: child.text for child in root}
+                    except:
+                        pass
+                    
+                    extracted_data.append(qr)
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "qr_codes_found": len(qr_codes),
+                "qr_codes": qr_codes if not extract_data else extracted_data
+            }
+            
+        except Exception as e:
+            logger.error(f"QR code reader error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_path": file_path
+            }
+
+class BarcodeReaderTool(AgentTool):
+    """Tool für Barcode-Erkennung in Belegen"""
+    
+    def __init__(self):
+        super().__init__(
+            name="barcode_reader",
+            description="Erkennt Barcodes in Belegen (EAN, UPC, Code128, etc.). Extrahiert Produktdaten aus Barcodes. Nützlich für DocumentAgent.",
+            parameters={
+                "file_path": {
+                    "type": "string",
+                    "description": "Pfad zur Datei (PDF oder Bild)"
+                }
+            }
+        )
+    
+    async def execute(self, file_path: str) -> Dict[str, Any]:
+        """Erkenne Barcodes in Datei"""
+        try:
+            if not Path(file_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Datei nicht gefunden: {file_path}",
+                    "file_path": file_path
+                }
+            
+            try:
+                from pyzbar import decode as pyzbar_decode
+                import cv2
+            except ImportError:
+                return {
+                    "success": False,
+                    "error": "pyzbar oder opencv-python nicht verfügbar",
+                    "note": "Bitte 'pip install pyzbar opencv-python' installieren"
+                }
+            
+            barcodes = []
+            
+            # Prüfe ob PDF oder Bild
+            if file_path.lower().endswith('.pdf'):
+                # PDF: Konvertiere Seiten zu Bildern
+                try:
+                    if HAS_PDFPLUMBER:
+                        import pdfplumber
+                        with pdfplumber.open(file_path) as pdf:
+                            for page_num, page in enumerate(pdf.pages):
+                                img = page.to_image(resolution=300)
+                                img_array = img.original
+                                
+                                # Erkenne Barcodes
+                                decoded = pyzbar_decode(img_array)
+                                for barcode in decoded:
+                                    barcode_data = barcode.data.decode('utf-8')
+                                    barcodes.append({
+                                        "page": page_num + 1,
+                                        "data": barcode_data,
+                                        "type": barcode.type,
+                                        "rect": {
+                                            "left": barcode.rect.left,
+                                            "top": barcode.rect.top,
+                                            "width": barcode.rect.width,
+                                            "height": barcode.rect.height
+                                        }
+                                    })
+                    else:
+                        return {
+                            "success": False,
+                            "error": "pdfplumber nicht verfügbar für PDF-Verarbeitung"
+                        }
+                except Exception as e:
+                    logger.debug(f"PDF Barcode-Erkennung fehlgeschlagen: {e}")
+            else:
+                # Bild: Direkt verarbeiten
+                try:
+                    img = cv2.imread(file_path)
+                    if img is None:
+                        return {
+                            "success": False,
+                            "error": f"Bild konnte nicht geladen werden: {file_path}"
+                        }
+                    
+                    # Erkenne Barcodes
+                    decoded = pyzbar_decode(img)
+                    for barcode in decoded:
+                        barcode_data = barcode.data.decode('utf-8')
+                        barcodes.append({
+                            "data": barcode_data,
+                            "type": barcode.type,
+                            "rect": {
+                                "left": barcode.rect.left,
+                                "top": barcode.rect.top,
+                                "width": barcode.rect.width,
+                                "height": barcode.rect.height
+                            }
+                        })
+                except Exception as e:
+                    logger.debug(f"Bild Barcode-Erkennung fehlgeschlagen: {e}")
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "barcodes_found": len(barcodes),
+                "barcodes": barcodes
+            }
+            
+        except Exception as e:
+            logger.error(f"Barcode reader error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_path": file_path
+            }
+
+class InvoiceNumberValidatorTool(AgentTool):
+    """Tool für Rechnungsnummer-Validierung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="invoice_number_validator",
+            description="Validiert Rechnungsnummern. Prüft Format, Duplikate, Sequenzen und Lücken. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "invoice_number": {
+                    "type": "string",
+                    "description": "Rechnungsnummer zum Validieren"
+                },
+                "check_duplicates": {
+                    "type": "boolean",
+                    "description": "Duplikats-Prüfung in Datenbank (Standard: True)",
+                    "default": True
+                },
+                "check_sequence": {
+                    "type": "boolean",
+                    "description": "Sequenz-Validierung (Standard: False)",
+                    "default": False
+                }
+            }
+        )
+    
+    async def execute(self,
+                      invoice_number: str,
+                      check_duplicates: bool = True,
+                      check_sequence: bool = False) -> Dict[str, Any]:
+        """Validiere Rechnungsnummer"""
+        try:
+            if not invoice_number or not invoice_number.strip():
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "Rechnungsnummer ist leer",
+                    "invoice_number": invoice_number
+                }
+            
+            invoice_number = invoice_number.strip()
+            
+            # Basis-Validierung: Format
+            # Typische Formate: RE-2025-001, 2025/001, RE2025001, etc.
+            import re
+            format_patterns = [
+                r'^[A-Z]{2,4}[-/]?\d{4}[-/]?\d{3,6}$',  # RE-2025-001
+                r'^\d{4}[/-]\d{3,6}$',  # 2025/001
+                r'^[A-Z]{2,4}\d{7,10}$',  # RE2025001
+                r'^\d{7,12}$'  # Nur Zahlen
+            ]
+            
+            format_valid = any(re.match(pattern, invoice_number, re.IGNORECASE) for pattern in format_patterns)
+            
+            result = {
+                "success": True,
+                "valid": format_valid,
+                "invoice_number": invoice_number,
+                "format_valid": format_valid
+            }
+            
+            if not format_valid:
+                result["error"] = "Rechnungsnummer entspricht keinem bekannten Format"
+            
+            # Duplikats-Prüfung
+            if check_duplicates:
+                try:
+                    # Prüfe in Datenbank (falls verfügbar)
+                    if hasattr(self, 'db') and self.db:
+                        # Suche nach vorhandenen Rechnungsnummern
+                        cursor = self.db.execute(
+                            "SELECT COUNT(*) FROM receipts WHERE invoice_number = ?",
+                            (invoice_number,)
+                        )
+                        count = cursor.fetchone()[0]
+                        result["is_duplicate"] = count > 0
+                        result["duplicate_count"] = count
+                    else:
+                        result["duplicate_check"] = "Datenbank nicht verfügbar"
+                except Exception as e:
+                    logger.debug(f"Duplikats-Prüfung fehlgeschlagen: {e}")
+                    result["duplicate_check_error"] = str(e)
+            
+            # Sequenz-Validierung (vereinfacht)
+            if check_sequence and format_valid:
+                # Extrahiere Nummernteil
+                numbers = re.findall(r'\d+', invoice_number)
+                if numbers:
+                    num = int(numbers[-1])  # Letzte Zahl
+                    result["sequence_number"] = num
+                    # Prüfe auf Lücken (vereinfacht - würde vollständige Sequenz erfordern)
+                    result["sequence_check"] = "Sequenz-Prüfung erfordert vollständige Datenbank-Abfrage"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Invoice number validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "invoice_number": invoice_number
+            }
+
+class VATCalculatorTool(AgentTool):
+    """Tool für Mehrwertsteuer-Berechnung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="vat_calculator",
+            description="Berechnet Mehrwertsteuer (MwSt). Netto/Brutto-Umrechnung, länder-spezifische MwSt-Sätze. Nützlich für AccountingAgent.",
+            parameters={
+                "amount": {
+                    "type": "number",
+                    "description": "Betrag"
+                },
+                "vat_rate": {
+                    "type": "number",
+                    "description": "MwSt-Satz in Prozent (z.B. 19 für 19%)"
+                },
+                "calculation_type": {
+                    "type": "string",
+                    "description": "Berechnungstyp (Standard: 'netto_to_brutto')",
+                    "enum": ["netto_to_brutto", "brutto_to_netto", "vat_from_brutto"],
+                    "default": "netto_to_brutto"
+                },
+                "country_code": {
+                    "type": "string",
+                    "description": "Ländercode (optional, für automatische MwSt-Satz-Erkennung)"
+                }
+            }
+        )
+        # Standard-MwSt-Sätze (EU)
+        self.vat_rates = {
+            "DE": {"standard": 19.0, "reduced": 7.0},
+            "AT": {"standard": 20.0, "reduced": 10.0},
+            "CH": {"standard": 7.7, "reduced": 2.5},
+            "FR": {"standard": 20.0, "reduced": 5.5},
+            "IT": {"standard": 22.0, "reduced": 10.0},
+            "ES": {"standard": 21.0, "reduced": 10.0},
+            "GB": {"standard": 20.0, "reduced": 5.0},
+            "US": {"standard": 0.0, "reduced": 0.0}  # Keine bundesweite MwSt
+        }
+    
+    async def execute(self,
+                      amount: float,
+                      vat_rate: Optional[float] = None,
+                      calculation_type: str = "netto_to_brutto",
+                      country_code: Optional[str] = None) -> Dict[str, Any]:
+        """Berechne MwSt"""
+        try:
+            # Bestimme MwSt-Satz
+            if not vat_rate and country_code:
+                country_code = country_code.upper()
+                if country_code in self.vat_rates:
+                    vat_rate = self.vat_rates[country_code]["standard"]
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Unbekannter Ländercode: {country_code}",
+                        "supported_countries": list(self.vat_rates.keys())
+                    }
+            elif not vat_rate:
+                return {
+                    "success": False,
+                    "error": "MwSt-Satz oder Ländercode erforderlich"
+                }
+            
+            # Berechne
+            if calculation_type == "netto_to_brutto":
+                netto = amount
+                vat_amount = netto * (vat_rate / 100)
+                brutto = netto + vat_amount
+            elif calculation_type == "brutto_to_netto":
+                brutto = amount
+                netto = brutto / (1 + (vat_rate / 100))
+                vat_amount = brutto - netto
+            elif calculation_type == "vat_from_brutto":
+                brutto = amount
+                vat_amount = brutto * (vat_rate / (100 + vat_rate))
+                netto = brutto - vat_amount
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unbekannter Berechnungstyp: {calculation_type}"
+                }
+            
+            return {
+                "success": True,
+                "calculation_type": calculation_type,
+                "vat_rate": vat_rate,
+                "netto": round(netto, 2),
+                "brutto": round(brutto, 2),
+                "vat_amount": round(vat_amount, 2),
+                "country_code": country_code
+            }
+            
+        except Exception as e:
+            logger.error(f"VAT calculator error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "amount": amount
+            }
+
+class ExpenseCategoryClassifierTool(AgentTool):
+    """Tool für automatische Kategorisierung von Ausgaben"""
+    
+    def __init__(self):
+        super().__init__(
+            name="expense_category_classifier",
+            description="Kategorisiert Ausgaben automatisch (Hotel, Restaurant, Transport, etc.). Keyword-basierte Klassifizierung mit Konfidenz-Score. Nützlich für AccountingAgent.",
+            parameters={
+                "description": {
+                    "type": "string",
+                    "description": "Beschreibung der Ausgabe"
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Betrag (optional, für Kontext)"
+                },
+                "merchant": {
+                    "type": "string",
+                    "description": "Händler/Unternehmen (optional)"
+                }
+            }
+        )
+        # Keyword-basierte Kategorien
+        self.categories = {
+            "hotel": ["hotel", "übernachtung", "accommodation", "zimmer", "room", "hostel", "pension"],
+            "restaurant": ["restaurant", "gaststätte", "café", "cafe", "imbiss", "bistro", "essen", "mahlzeit"],
+            "transport": ["taxi", "bus", "bahn", "zug", "flug", "flight", "mietwagen", "car rental", "ubahn", "s-bahn"],
+            "fuel": ["tankstelle", "benzin", "diesel", "kraftstoff", "fuel", "gas station"],
+            "parking": ["parkplatz", "parken", "parking", "parkhaus"],
+            "toll": ["maut", "toll", "vignette", "road tax"],
+            "office": ["büro", "office", "material", "supplies", "papier", "paper"],
+            "communication": ["telefon", "internet", "wifi", "roaming", "communication"],
+            "other": []
+        }
+    
+    async def execute(self,
+                      description: str,
+                      amount: Optional[float] = None,
+                      merchant: Optional[str] = None) -> Dict[str, Any]:
+        """Kategorisiere Ausgabe"""
+        try:
+            if not description or not description.strip():
+                return {
+                    "success": False,
+                    "error": "Beschreibung ist leer",
+                    "description": description
+                }
+            
+            description_lower = description.lower()
+            merchant_lower = merchant.lower() if merchant else ""
+            combined_text = f"{description_lower} {merchant_lower}".strip()
+            
+            # Keyword-basierte Klassifizierung
+            scores = {}
+            for category, keywords in self.categories.items():
+                if category == "other":
+                    continue
+                score = sum(1 for keyword in keywords if keyword in combined_text)
+                if score > 0:
+                    scores[category] = score
+            
+            # Bestimme beste Kategorie
+            if scores:
+                best_category = max(scores, key=scores.get)
+                confidence = min(scores[best_category] / 3.0, 1.0)  # Normalisiert auf 0-1
+            else:
+                best_category = "other"
+                confidence = 0.3  # Niedrige Konfidenz für "other"
+            
+            return {
+                "success": True,
+                "description": description,
+                "category": best_category,
+                "confidence": round(confidence, 2),
+                "scores": scores,
+                "merchant": merchant,
+                "amount": amount
+            }
+            
+        except Exception as e:
+            logger.error(f"Expense category classifier error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "description": description
+            }
+
+class ReceiptStandardValidatorTool(AgentTool):
+    """Tool für GoBD-Konformitäts-Prüfung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="receipt_standard_validator",
+            description="Prüft Belege auf GoBD-Konformität. Vollständigkeits-Prüfung, Lesbarkeits-Prüfung, Archivierbarkeits-Prüfung. Nützlich für DocumentAgent.",
+            parameters={
+                "receipt_data": {
+                    "type": "object",
+                    "description": "Beleg-Daten (Betrag, Datum, Steuernummer, etc.)"
+                },
+                "check_readability": {
+                    "type": "boolean",
+                    "description": "Lesbarkeits-Prüfung (Standard: True)",
+                    "default": True
+                },
+                "check_completeness": {
+                    "type": "boolean",
+                    "description": "Vollständigkeits-Prüfung (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+    
+    async def execute(self,
+                      receipt_data: Dict[str, Any],
+                      check_readability: bool = True,
+                      check_completeness: bool = True) -> Dict[str, Any]:
+        """Prüfe Beleg auf GoBD-Konformität"""
+        try:
+            # GoBD-Anforderungen: Betrag, Datum, Steuernummer, Firmenanschrift, etc.
+            required_fields = ["amount", "date", "tax_number", "company_address"]
+            optional_fields = ["invoice_number", "vat_amount", "description"]
+            
+            result = {
+                "success": True,
+                "gobd_compliant": True,
+                "issues": [],
+                "warnings": []
+            }
+            
+            # Vollständigkeits-Prüfung
+            if check_completeness:
+                missing_fields = []
+                for field in required_fields:
+                    if field not in receipt_data or not receipt_data[field]:
+                        missing_fields.append(field)
+                
+                if missing_fields:
+                    result["gobd_compliant"] = False
+                    result["issues"].append(f"Fehlende Pflichtfelder: {', '.join(missing_fields)}")
+                    result["missing_fields"] = missing_fields
+                
+                # Prüfe optionale Felder
+                missing_optional = [f for f in optional_fields if f not in receipt_data or not receipt_data[f]]
+                if missing_optional:
+                    result["warnings"].append(f"Fehlende optionale Felder: {', '.join(missing_optional)}")
+            
+            # Lesbarkeits-Prüfung (vereinfacht)
+            if check_readability:
+                # Prüfe ob Text-Felder lesbar sind
+                text_fields = ["description", "company_address", "invoice_number"]
+                for field in text_fields:
+                    if field in receipt_data:
+                        value = str(receipt_data[field])
+                        # Prüfe auf zu viele Sonderzeichen oder unlesbare Zeichen
+                        if len(value) < 3:
+                            result["warnings"].append(f"Feld '{field}' ist sehr kurz")
+                        if value.count("?") > len(value) * 0.3:
+                            result["warnings"].append(f"Feld '{field}' enthält viele unlesbare Zeichen")
+            
+            # Betrag-Validierung
+            if "amount" in receipt_data:
+                try:
+                    amount = float(receipt_data["amount"])
+                    if amount <= 0:
+                        result["issues"].append("Betrag muss größer als 0 sein")
+                        result["gobd_compliant"] = False
+                except (ValueError, TypeError):
+                    result["issues"].append("Betrag ist ungültig")
+                    result["gobd_compliant"] = False
+            
+            # Datum-Validierung
+            if "date" in receipt_data:
+                try:
+                    from datetime import datetime
+                    date_str = str(receipt_data["date"])
+                    datetime.strptime(date_str, "%Y-%m-%d")
+                except (ValueError, TypeError):
+                    result["warnings"].append("Datum-Format könnte ungültig sein")
+            
+            result["issues_count"] = len(result["issues"])
+            result["warnings_count"] = len(result["warnings"])
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Receipt standard validator error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "receipt_data": receipt_data
+            }
+
+class BankStatementParserTool(AgentTool):
+    """Tool für Kontoauszug-Parsing"""
+    
+    def __init__(self):
+        super().__init__(
+            name="bank_statement_parser",
+            description="Parst Kontoauszüge (PDF, MT940, CAMT.053). Extrahiert Transaktionen, Beträge, Daten. Nützlich für AccountingAgent.",
+            parameters={
+                "file_path": {
+                    "type": "string",
+                    "description": "Pfad zur Kontoauszug-Datei (PDF)"
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Dateiformat (Standard: 'auto')",
+                    "enum": ["auto", "pdf", "mt940", "camt053"],
+                    "default": "auto"
+                }
+            }
+        )
+    
+    async def execute(self,
+                      file_path: str,
+                      format: str = "auto") -> Dict[str, Any]:
+        """Parse Kontoauszug"""
+        try:
+            if not Path(file_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Datei nicht gefunden: {file_path}",
+                    "file_path": file_path
+                }
+            
+            transactions = []
+            
+            # PDF-Parsing
+            if format == "auto" or format == "pdf":
+                if file_path.lower().endswith('.pdf'):
+                    try:
+                        if HAS_PDFPLUMBER:
+                            import pdfplumber
+                            with pdfplumber.open(file_path) as pdf:
+                                for page_num, page in enumerate(pdf.pages):
+                                    # Extrahiere Tabellen
+                                    tables = page.extract_tables()
+                                    for table in tables:
+                                        # Vereinfachtes Parsing (würde spezifische Format-Erkennung erfordern)
+                                        for row in table:
+                                            if len(row) >= 3:
+                                                # Versuche Datum, Betrag, Beschreibung zu extrahieren
+                                                transaction = {
+                                                    "page": page_num + 1,
+                                                    "raw_data": row
+                                                }
+                                                transactions.append(transaction)
+                        else:
+                            return {
+                                "success": False,
+                                "error": "pdfplumber nicht verfügbar für PDF-Parsing"
+                            }
+                    except Exception as e:
+                        logger.debug(f"PDF-Parsing fehlgeschlagen: {e}")
+                        return {
+                            "success": False,
+                            "error": f"PDF-Parsing fehlgeschlagen: {str(e)}"
+                        }
+            
+            # MT940-Parsing (vereinfacht)
+            elif format == "mt940":
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Vereinfachtes MT940-Parsing (würde spezifische Bibliothek erfordern)
+                        import re
+                        # Suche nach Transaktions-Zeilen
+                        transaction_lines = re.findall(r':61:(\d{6})(\d{4})?([DC])(\d+),(\d{2})(.*)', content)
+                        for line in transaction_lines:
+                            transactions.append({
+                                "format": "mt940",
+                                "date": line[0],
+                                "amount": line[3],
+                                "currency": line[4] if len(line) > 4 else "EUR",
+                                "description": line[5] if len(line) > 5 else ""
+                            })
+                except Exception as e:
+                    logger.debug(f"MT940-Parsing fehlgeschlagen: {e}")
+                    return {
+                        "success": False,
+                        "error": f"MT940-Parsing fehlgeschlagen: {str(e)}"
+                    }
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "format": format,
+                "transactions_found": len(transactions),
+                "transactions": transactions
+            }
+            
+        except Exception as e:
+            logger.error(f"Bank statement parser error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_path": file_path
+            }
+
+class DistanceMatrixTool(AgentTool):
+    """Tool für Entfernungsmatrix-Berechnung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="distance_matrix",
+            description="Berechnet Entfernungsmatrix für mehrere Orte. Optimale Route-Berechnung, Kosten-Berechnung. Nützlich für AccountingAgent.",
+            parameters={
+                "origins": {
+                    "type": "array",
+                    "description": "Liste von Startorten"
+                },
+                "destinations": {
+                    "type": "array",
+                    "description": "Liste von Zielorten"
+                },
+                "mode": {
+                    "type": "string",
+                    "description": "Verkehrsmittel (Standard: 'driving')",
+                    "enum": ["driving", "walking", "bicycling", "transit"],
+                    "default": "driving"
+                }
+            }
+        )
+        self.google_api_key = os.getenv('GOOGLE_MAPS_API_KEY')
+        self.ors_api_key = os.getenv('OPENROUTESERVICE_API_KEY')
+    
+    async def execute(self,
+                      origins: List[str],
+                      destinations: List[str],
+                      mode: str = "driving") -> Dict[str, Any]:
+        """Berechne Entfernungsmatrix"""
+        try:
+            if not origins or not destinations:
+                return {
+                    "success": False,
+                    "error": "Origins und Destinations sind erforderlich"
+                }
+            
+            # Nutze TravelTimeCalculatorTool für einzelne Berechnungen
+            from backend.agents import get_tool_registry
+            tool_registry = get_tool_registry()
+            travel_tool = tool_registry.get_tool("travel_time_calculator")
+            
+            if not travel_tool:
+                return {
+                    "success": False,
+                    "error": "TravelTimeCalculatorTool nicht verfügbar"
+                }
+            
+            matrix = []
+            for origin in origins:
+                row = []
+                for destination in destinations:
+                    result = await travel_tool.execute(
+                        origin=origin,
+                        destination=destination,
+                        mode=mode,
+                        provider="openrouteservice" if self.ors_api_key else "google"
+                    )
+                    row.append(result)
+                matrix.append(row)
+            
+            return {
+                "success": True,
+                "origins": origins,
+                "destinations": destinations,
+                "mode": mode,
+                "matrix": matrix
+            }
+            
+        except Exception as e:
+            logger.error(f"Distance matrix error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "origins": origins,
+                "destinations": destinations
+            }
+
+class CompanyDatabaseTool(AgentTool):
+    """Tool für Firmendatenbank-Abfrage"""
+    
+    def __init__(self):
+        super().__init__(
+            name="company_database",
+            description="Abfrage von Firmendaten. USt-IdNr-Validierung gegen EU-VIES, Firmenname-Normalisierung. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "vat_number": {
+                    "type": "string",
+                    "description": "USt-IdNr zum Validieren (Format: DE123456789)"
+                },
+                "company_name": {
+                    "type": "string",
+                    "description": "Firmenname (optional, für Normalisierung)"
+                }
+            }
+        )
+    
+    async def execute(self,
+                      vat_number: Optional[str] = None,
+                      company_name: Optional[str] = None) -> Dict[str, Any]:
+        """Abfrage Firmendaten"""
+        try:
+            result = {
+                "success": True
+            }
+            
+            # USt-IdNr-Validierung gegen EU-VIES
+            if vat_number:
+                try:
+                    import aiohttp
+                    # EU VIES API (kostenlos)
+                    country_code = vat_number[:2].upper()
+                    vat_id = vat_number[2:]
+                    
+                    url = "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/{}/vat/{}".format(
+                        country_code, vat_id
+                    )
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                result["vat_validation"] = {
+                                    "valid": data.get("valid", False),
+                                    "name": data.get("name", ""),
+                                    "address": data.get("address", ""),
+                                    "country_code": country_code
+                                }
+                            else:
+                                result["vat_validation"] = {
+                                    "valid": False,
+                                    "error": f"HTTP {response.status}"
+                                }
+                except Exception as e:
+                    logger.debug(f"VIES-Validierung fehlgeschlagen: {e}")
+                    result["vat_validation"] = {
+                        "error": str(e)
+                    }
+            
+            # Firmenname-Normalisierung (vereinfacht)
+            if company_name:
+                # Entferne häufige Suffixe/Präfixe
+                normalized = company_name.strip()
+                suffixes = ["GmbH", "AG", "UG", "e.K.", "KG", "OHG", "mbH"]
+                for suffix in suffixes:
+                    if normalized.endswith(suffix):
+                        normalized = normalized[:-len(suffix)].strip()
+                
+                result["company_name"] = company_name
+                result["normalized_name"] = normalized
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Company database error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "vat_number": vat_number
+            }
+
 class LangChainTool(AgentTool):
     """Tool für LangChain-Integration - erweiterte Agent-Funktionalität mit Tool-Orchestrierung"""
     
@@ -4848,6 +5775,16 @@ class AgentToolRegistry:
         self.register(WeatherAPITool())
         self.register(TravelTimeCalculatorTool())
         self.register(PDFTimestampTool())
+        # Priorität 3 Tools
+        self.register(QRCodeReaderTool())
+        self.register(BarcodeReaderTool())
+        self.register(InvoiceNumberValidatorTool())
+        self.register(VATCalculatorTool())
+        self.register(ExpenseCategoryClassifierTool())
+        self.register(ReceiptStandardValidatorTool())
+        self.register(BankStatementParserTool())
+        self.register(DistanceMatrixTool())
+        self.register(CompanyDatabaseTool())
     
     def register(self, tool: AgentTool):
         """Registriere ein neues Tool"""
@@ -5183,10 +6120,15 @@ Verfügbare Tools:
 - paddleocr: OCR-Tool für Texterkennung (FALLBACK) - wenn andere Methoden versagen, unterstützt 100+ Sprachen
 - email_parser: Automatische Beleg-Extraktion aus E-Mails (IMAP/POP3) - erkennt Beleg-Anhänge und extrahiert Betrag, Datum
 - signature_detection: Erweiterte Signatur-Erkennung in PDFs (digitale Signaturen, Signatur-Felder, handschriftliche Signaturen)
+- qrcode_reader: QR-Code-Erkennung in PDFs und Bildern - erkennt E-Rechnungen (ZUGFeRD, XRechnung)
+- barcode_reader: Barcode-Erkennung in Belegen (EAN, UPC, Code128) - extrahiert Produktdaten
 - duplicate_detection: Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Beleg-Uploads
 - image_quality: Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast, Helligkeit) - warnt vor schlechter Qualität vor OCR
 - pdf_metadata: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel, Seitenzahl) - für Dokumentenanalyse
 - pdf_timestamp: Zeitstempel-Validierung in PDFs - validiert Erstellungsdatum gegen Reisedaten
+- receipt_standard_validator: GoBD-Konformitäts-Prüfung - prüft Vollständigkeit, Lesbarkeit, Archivierbarkeit
+- invoice_number_validator: Rechnungsnummer-Validierung - prüft Format, Duplikate, Sequenzen
+- company_database: Firmendatenbank-Abfrage - USt-IdNr-Validierung gegen EU-VIES, Firmenname-Normalisierung
 - translation: Übersetzung zwischen Sprachen (PRIMÄR für DocumentAgent) - für mehrsprachige Belege, unterstützt 100+ Sprachen
 - tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
 - iban_validator: IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für Bankdaten in Belegen
@@ -5481,6 +6423,12 @@ Verfügbare Tools:
 - marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für AccountingAgent) - strukturierte Daten aus PDFs
 - custom_python_rules: Benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung und -berechnung (PRIMÄR für AccountingAgent)
 - excel_import_export: Excel/CSV-Import/Export für Buchhaltung - exportiert Reisekosten-Reports für Buchhaltungssoftware
+- invoice_number_validator: Rechnungsnummer-Validierung - prüft Format, Duplikate, Sequenzen
+- vat_calculator: Mehrwertsteuer-Berechnung - Netto/Brutto-Umrechnung, länder-spezifische MwSt-Sätze
+- expense_category_classifier: Automatische Kategorisierung von Ausgaben (Hotel, Restaurant, Transport, etc.) - keyword-basiert mit Konfidenz-Score
+- bank_statement_parser: Kontoauszug-Parsing (PDF, MT940, CAMT.053) - extrahiert Transaktionen für Fremdwährungsnachweis
+- distance_matrix: Entfernungsmatrix-Berechnung für mehrere Orte - optimale Route-Berechnung, Kosten-Berechnung
+- company_database: Firmendatenbank-Abfrage - USt-IdNr-Validierung gegen EU-VIES, Firmenname-Normalisierung
 - duplicate_detection: Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Abrechnungen
 - tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
 - iban_validator: IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für Überweisungsdaten

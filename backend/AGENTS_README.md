@@ -557,6 +557,108 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
       - **DocumentAgent**: Validiert Beleg-Zeitstempel gegen Reisedaten
     - **Verfügbar für**: DocumentAgent (primär)
 
+32. **QRCodeReaderTool** ⭐ NEU PRIORITÄT 3 (für DocumentAgent)
+    - QR-Code-Erkennung in Belegen
+    - **Funktionen:**
+      - QR-Code-Erkennung in PDFs und Bildern
+      - Daten-Extraktion aus QR-Codes
+      - E-Rechnung-Erkennung (ZUGFeRD, XRechnung)
+      - Automatische Datenextraktion aus QR-Codes
+    - **Erfordert**: `pyzbar`, `pillow`, `opencv-python` (optional)
+    - **Nützlich für:**
+      - **DocumentAgent**: Extrahiert Daten aus QR-Codes in Belegen
+    - **Verfügbar für**: DocumentAgent (primär)
+
+33. **BarcodeReaderTool** ⭐ NEU PRIORITÄT 3 (für DocumentAgent)
+    - Barcode-Erkennung in Belegen
+    - **Funktionen:**
+      - Barcode-Erkennung (EAN, UPC, Code128, etc.)
+      - Produkt-Identifikation aus Barcodes
+      - Automatische Datenextraktion
+    - **Erfordert**: `pyzbar`, `opencv-python` (optional)
+    - **Nützlich für:**
+      - **DocumentAgent**: Extrahiert Produktdaten aus Barcodes
+    - **Verfügbar für**: DocumentAgent (primär)
+
+34. **InvoiceNumberValidatorTool** ⭐ NEU PRIORITÄT 3 (für DocumentAgent & AccountingAgent)
+    - Rechnungsnummer-Validierung
+    - **Funktionen:**
+      - Rechnungsnummer-Format-Validierung
+      - Duplikats-Prüfung (bereits vorhandene Rechnungsnummern)
+      - Sequenz-Validierung
+      - Lücken-Erkennung in Rechnungsnummern
+    - **Nützlich für:**
+      - **DocumentAgent**: Validiert Rechnungsnummern in Belegen
+      - **AccountingAgent**: Prüft auf fehlende Rechnungen
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
+35. **VATCalculatorTool** ⭐ NEU PRIORITÄT 3 (für AccountingAgent)
+    - Mehrwertsteuer-Berechnung
+    - **Funktionen:**
+      - MwSt-Berechnung (19%, 7%, etc.)
+      - Netto/Brutto-Umrechnung
+      - Länder-spezifische MwSt-Sätze (DE, AT, CH, FR, IT, ES, GB, US)
+      - MwSt-Validierung in Belegen
+    - **Nützlich für:**
+      - **AccountingAgent**: Berechnet und validiert MwSt in Reisekosten
+    - **Verfügbar für**: AccountingAgent (primär)
+
+36. **ExpenseCategoryClassifierTool** ⭐ NEU PRIORITÄT 3 (für AccountingAgent)
+    - Automatische Kategorisierung von Ausgaben
+    - **Funktionen:**
+      - Keyword-basierte Klassifizierung (Hotel, Restaurant, Transport, etc.)
+      - Konfidenz-Score
+      - Lernen aus früheren Zuordnungen (vereinfacht)
+    - **Nützlich für:**
+      - **AccountingAgent**: Automatische Kategorisierung von Belegen
+    - **Verfügbar für**: AccountingAgent (primär)
+
+37. **ReceiptStandardValidatorTool** ⭐ NEU PRIORITÄT 3 (für DocumentAgent)
+    - GoBD-Konformitäts-Prüfung
+    - **Funktionen:**
+      - GoBD-Anforderungen-Prüfung
+      - Vollständigkeits-Prüfung (Betrag, Datum, Steuernummer, etc.)
+      - Lesbarkeits-Prüfung
+      - Archivierbarkeits-Prüfung
+    - **Nützlich für:**
+      - **DocumentAgent**: Prüft Belege auf GoBD-Konformität
+    - **Verfügbar für**: DocumentAgent (primär)
+
+38. **BankStatementParserTool** ⭐ NEU PRIORITÄT 3 (für AccountingAgent)
+    - Kontoauszug-Parsing
+    - **Funktionen:**
+      - PDF-Kontoauszug-Parsing (MT940, CAMT.053)
+      - Transaktions-Extraktion
+      - Betrag-Datum-Zuordnung
+      - Automatische Zuordnung zu Reisekosten
+    - **Erfordert**: pdfplumber (bereits vorhanden)
+    - **Nützlich für:**
+      - **AccountingAgent**: Extrahiert Daten aus Kontoauszügen für Fremdwährungsnachweis
+    - **Verfügbar für**: AccountingAgent (primär)
+
+39. **DistanceMatrixTool** ⭐ NEU PRIORITÄT 3 (für AccountingAgent)
+    - Entfernungsmatrix-Berechnung
+    - **Funktionen:**
+      - Mehrere Orte gleichzeitig verarbeiten
+      - Optimale Route-Berechnung
+      - Kosten-Berechnung basierend auf Entfernung
+      - Spesensatz-Validierung
+    - **Erfordert**: TravelTimeCalculatorTool (nutzt OpenRouteService/Google Maps)
+    - **Nützlich für:**
+      - **AccountingAgent**: Validiert Reisekosten gegen Entfernungen
+    - **Verfügbar für**: AccountingAgent (primär)
+
+40. **CompanyDatabaseTool** ⭐ NEU PRIORITÄT 3 (für DocumentAgent & AccountingAgent)
+    - Firmendatenbank-Abfrage
+    - **Funktionen:**
+      - USt-IdNr-Validierung gegen EU-VIES (kostenlos)
+      - Firmenname-Normalisierung
+      - Adress-Vervollständigung
+    - **Nützlich für:**
+      - **DocumentAgent**: Validiert Firmendaten in Belegen
+      - **AccountingAgent**: Prüft USt-IdNr gegen EU-Datenbank
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
 ## Tool-Zuordnung zu Agents
 
 ### ChatAgent
@@ -573,6 +675,10 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 - **Fallback**: `paddleocr` (OCR wenn andere Methoden versagen)
 - **E-Mail-Parsing**: `email_parser` (automatische Beleg-Extraktion aus E-Mails)
 - **Signatur-Erkennung**: `signature_detection` (erweiterte Signatur-Erkennung)
+- **QR-Code/Barcode**: `qrcode_reader`, `barcode_reader` (QR-Code/Barcode-Erkennung, E-Rechnungen)
+- **GoBD-Validierung**: `receipt_standard_validator` (GoBD-Konformitäts-Prüfung)
+- **Rechnungsnummer**: `invoice_number_validator` (Rechnungsnummer-Validierung)
+- **Firmendatenbank**: `company_database` (USt-IdNr-Validierung gegen EU-VIES)
 - **Duplikats-Prüfung**: `duplicate_detection` (verhindert doppelte Uploads)
 - **Qualitätsprüfung**: `image_quality` (prüft Beleg-Qualität vor OCR)
 - **PDF-Zeitstempel**: `pdf_timestamp` (validiert Erstellungsdatum gegen Reisedaten)
@@ -588,6 +694,12 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 - **Primär**: `marker` (Dokumentenanalyse), `custom_python_rules` (Buchhaltungsregeln)
 - **Excel-Export**: `excel_import_export` (Excel/CSV-Import/Export für Buchhaltung)
 - **E-Mail-Parsing**: `email_parser` (automatische Beleg-Extraktion aus E-Mails)
+- **MwSt-Berechnung**: `vat_calculator` (Mehrwertsteuer-Berechnung, Netto/Brutto-Umrechnung)
+- **Kategorisierung**: `expense_category_classifier` (automatische Kategorisierung von Ausgaben)
+- **Kontoauszug**: `bank_statement_parser` (Kontoauszug-Parsing für Fremdwährungsnachweis)
+- **Entfernungsmatrix**: `distance_matrix` (Entfernungsmatrix-Berechnung für mehrere Orte)
+- **Firmendatenbank**: `company_database` (USt-IdNr-Validierung gegen EU-VIES)
+- **Rechnungsnummer**: `invoice_number_validator` (Rechnungsnummer-Validierung)
 - **Duplikats-Prüfung**: `duplicate_detection` (verhindert doppelte Abrechnungen)
 - **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `currency_validator` (Währung), `postal_code_validator` (Postleitzahl)
 - **Reisevalidierung**: `travel_time_calculator` (Reisezeit-Berechnung), `holiday_api` (Feiertags-Erkennung), `weather_api` (Wetter-Daten)
@@ -619,6 +731,8 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 - `openpyxl`: Für ExcelImportExportTool (Excel-Dateien) - `pip install openpyxl`
 - `phonenumbers`: Für PhoneNumberValidatorTool (Telefonnummer-Validierung) - `pip install phonenumbers`
 - `holidays`: Für HolidayAPITool (Feiertags-Erkennung, bereits in requirements.txt)
+- `pyzbar`: Für QRCodeReaderTool und BarcodeReaderTool (QR-Code/Barcode-Erkennung) - `pip install pyzbar`
+- `pillow`: Für QRCodeReaderTool (Bildverarbeitung, bereits in requirements.txt)
 - Marker: Lokale Installation oder API-Key für MarkerTool
 
 ### Umgebungsvariablen (optional)

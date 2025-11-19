@@ -59,3 +59,8 @@ slowapi>=0.1.9
 # openpyxl>=3.1.0  # Für ExcelImportExportTool (Excel-Dateien)
 # phonenumbers>=8.13.0  # Für PhoneNumberValidatorTool (Telefonnummer-Validierung)
 # holidays>=0.36  # Für HolidayAPITool (Feiertags-Erkennung, bereits in requirements.txt)
+
+# Priorität 3 Tools (optional)
+# pyzbar>=0.1.9  # Für QRCodeReaderTool und BarcodeReaderTool (QR-Code/Barcode-Erkennung)
+# pillow>=10.0.0  # Für QRCodeReaderTool (Bildverarbeitung, bereits in requirements.txt)
+# opencv-python>=4.8.0  # Für QRCodeReaderTool und BarcodeReaderTool (Bildverarbeitung, bereits für ImageQualityTool)
