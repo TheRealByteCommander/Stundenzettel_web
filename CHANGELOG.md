@@ -36,6 +36,15 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - ✅ **ImageQualityTool** (Priorität 1): Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast) - für DocumentAgent
   - ✅ **TimeZoneTool** (Priorität 1): Zeitzonen-Handling für internationale Reisen - für AccountingAgent und ChatAgent
   - ✅ **EmailValidatorTool** (Priorität 1): E-Mail-Validierung (RFC 5322) und DNS-Prüfung - für DocumentAgent und ChatAgent
+  - ✅ **EmailParserTool** (Priorität 2): Automatische Beleg-Extraktion aus E-Mails (IMAP/POP3) - für DocumentAgent und AccountingAgent
+  - ✅ **SignatureDetectionTool** (Priorität 2): Erweiterte Signatur-Erkennung in PDFs - für DocumentAgent
+  - ✅ **ExcelImportExportTool** (Priorität 2): Excel/CSV-Import/Export für Buchhaltung - für AccountingAgent
+  - ✅ **PostalCodeValidatorTool** (Priorität 2): Postleitzahlen-Validierung (DE, AT, CH, FR, IT, ES, GB, US) - für DocumentAgent und AccountingAgent
+  - ✅ **PhoneNumberValidatorTool** (Priorität 2): Telefonnummer-Validierung und Formatierung (E.164) - für DocumentAgent
+  - ✅ **HolidayAPITool** (Priorität 2): Internationale Feiertags-Erkennung - für AccountingAgent
+  - ✅ **WeatherAPITool** (Priorität 2): Wetter-Daten für Reisevalidierung (OpenWeatherMap, WeatherAPI) - für AccountingAgent
+  - ✅ **TravelTimeCalculatorTool** (Priorität 2): Reisezeit-Berechnung zwischen Orten (OpenRouteService, Google Maps) - für AccountingAgent
+  - ✅ **PDFTimestampTool** (Priorität 2): Zeitstempel-Validierung in PDFs - für DocumentAgent
 
 ### Geändert
 - **Daten aktualisiert**: Alle Dokumente auf Stand 2025 aktualisiert (BENUTZERANLEITUNG.md, SICHERHEIT.md, CYBER_SECURITY.md, README.md)

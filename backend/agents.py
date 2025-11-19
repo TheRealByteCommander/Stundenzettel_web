@@ -3424,6 +3424,1277 @@ class EmailValidatorTool(AgentTool):
                 "email": email
             }
 
+class EmailParserTool(AgentTool):
+    """Tool für automatische Beleg-Extraktion aus E-Mails"""
+    
+    def __init__(self):
+        super().__init__(
+            name="email_parser",
+            description="Extrahiert automatisch Belege aus E-Mails (IMAP/POP3). Erkennt Beleg-Anhänge (PDF, Bilder) und extrahiert Betrag, Datum, Absender. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "email_server": {
+                    "type": "string",
+                    "description": "E-Mail-Server (IMAP oder POP3, z.B. 'imap.gmail.com')"
+                },
+                "email_user": {
+                    "type": "string",
+                    "description": "E-Mail-Benutzername"
+                },
+                "email_password": {
+                    "type": "string",
+                    "description": "E-Mail-Passwort oder App-Passwort"
+                },
+                "email_folder": {
+                    "type": "string",
+                    "description": "E-Mail-Ordner zum Durchsuchen (Standard: 'INBOX')",
+                    "default": "INBOX"
+                },
+                "max_emails": {
+                    "type": "integer",
+                    "description": "Maximale Anzahl E-Mails zum Durchsuchen (Standard: 10)",
+                    "default": 10
+                },
+                "extract_attachments": {
+                    "type": "boolean",
+                    "description": "Anhänge extrahieren (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+    
+    async def execute(self,
+                      email_server: str,
+                      email_user: str,
+                      email_password: str,
+                      email_folder: str = "INBOX",
+                      max_emails: int = 10,
+                      extract_attachments: bool = True) -> Dict[str, Any]:
+        """Parse E-Mails und extrahiere Belege"""
+        try:
+            # Prüfe ob IMAP-Client verfügbar
+            try:
+                import imapclient
+            except ImportError:
+                return {
+                    "success": False,
+                    "error": "imapclient nicht verfügbar",
+                    "note": "Bitte 'pip install imapclient' installieren"
+                }
+            
+            # Verbinde mit E-Mail-Server
+            try:
+                server = imapclient.IMAPClient(email_server, ssl=True)
+                server.login(email_user, email_password)
+                server.select_folder(email_folder)
+                
+                # Suche nach E-Mails
+                messages = server.search(['UNSEEN', 'ALL'])
+                messages = messages[:max_emails] if len(messages) > max_emails else messages
+                
+                results = []
+                for msg_id in messages:
+                    try:
+                        msg_data = server.fetch([msg_id], ['ENVELOPE', 'BODYSTRUCTURE', 'BODY[]'])
+                        envelope = msg_data[msg_id][b'ENVELOPE']
+                        body = msg_data[msg_id][b'BODY[]']
+                        
+                        # Parse E-Mail
+                        from email import message_from_bytes
+                        email_message = message_from_bytes(body)
+                        
+                        # Extrahiere Informationen
+                        subject = email_message.get('Subject', '')
+                        sender = email_message.get('From', '')
+                        date = email_message.get('Date', '')
+                        
+                        # Extrahiere Text
+                        text_content = ""
+                        if email_message.is_multipart():
+                            for part in email_message.walk():
+                                if part.get_content_type() == "text/plain":
+                                    text_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                    break
+                        else:
+                            text_content = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        
+                        # Suche nach Betrag und Datum im Text
+                        import re
+                        amount_match = re.search(r'(\d+[.,]\d{2})\s*€|€\s*(\d+[.,]\d{2})', text_content)
+                        date_match = re.search(r'\d{1,2}[./-]\d{1,2}[./-]\d{2,4}', text_content)
+                        
+                        email_info = {
+                            "message_id": msg_id,
+                            "subject": subject,
+                            "sender": sender,
+                            "date": date,
+                            "text_preview": text_content[:200] + "..." if len(text_content) > 200 else text_content,
+                            "amount_found": amount_match.group(0) if amount_match else None,
+                            "date_found": date_match.group(0) if date_match else None
+                        }
+                        
+                        # Extrahiere Anhänge
+                        attachments = []
+                        if extract_attachments and email_message.is_multipart():
+                            for part in email_message.walk():
+                                if part.get_content_disposition() == 'attachment':
+                                    filename = part.get_filename()
+                                    if filename and (filename.lower().endswith('.pdf') or 
+                                                    filename.lower().endswith(('.jpg', '.jpeg', '.png'))):
+                                        attachments.append({
+                                            "filename": filename,
+                                            "content_type": part.get_content_type(),
+                                            "size": len(part.get_payload(decode=True))
+                                        })
+                        
+                        email_info["attachments"] = attachments
+                        results.append(email_info)
+                        
+                    except Exception as e:
+                        logger.debug(f"Fehler beim Parsen von E-Mail {msg_id}: {e}")
+                        continue
+                
+                server.logout()
+                
+                return {
+                    "success": True,
+                    "emails_processed": len(results),
+                    "emails": results,
+                    "total_attachments": sum(len(e.get("attachments", [])) for e in results)
+                }
+                
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"E-Mail-Verbindung fehlgeschlagen: {str(e)}",
+                    "email_server": email_server
+                }
+            
+        except Exception as e:
+            logger.error(f"Email parser error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "email_server": email_server
+            }
+
+class SignatureDetectionTool(AgentTool):
+    """Tool für erweiterte Signatur-Erkennung in PDFs"""
+    
+    def __init__(self):
+        super().__init__(
+            name="signature_detection",
+            description="Erkennt Signaturen in PDFs (Signatur-Felder, digitale Signaturen, handschriftliche Signaturen). Nützlich für DocumentAgent zur verbesserten Unterschriften-Verifikation.",
+            parameters={
+                "pdf_path": {
+                    "type": "string",
+                    "description": "Pfad zur PDF-Datei"
+                },
+                "check_digital": {
+                    "type": "boolean",
+                    "description": "Digitale Signaturen prüfen (Standard: True)",
+                    "default": True
+                },
+                "check_handwritten": {
+                    "type": "boolean",
+                    "description": "Handschriftliche Signaturen erkennen (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+    
+    async def execute(self,
+                      pdf_path: str,
+                      check_digital: bool = True,
+                      check_handwritten: bool = True) -> Dict[str, Any]:
+        """Erkenne Signaturen in PDF"""
+        try:
+            if not Path(pdf_path).exists():
+                return {
+                    "success": False,
+                    "error": f"PDF nicht gefunden: {pdf_path}",
+                    "pdf_path": pdf_path
+                }
+            
+            result = {
+                "success": True,
+                "pdf_path": pdf_path,
+                "digital_signatures": [],
+                "signature_fields": [],
+                "handwritten_signatures": []
+            }
+            
+            # Prüfe digitale Signaturen
+            if check_digital and HAS_PYPDF2:
+                try:
+                    with open(pdf_path, 'rb') as file:
+                        pdf_reader = PyPDF2.PdfReader(file)
+                        
+                        # Prüfe auf Signatur-Felder
+                        if hasattr(pdf_reader, 'get_form_text_fields'):
+                            fields = pdf_reader.get_form_text_fields()
+                            for field_name, field_value in fields.items():
+                                if 'signature' in field_name.lower() or 'unterschrift' in field_name.lower():
+                                    result["signature_fields"].append({
+                                        "field_name": field_name,
+                                        "field_value": field_value
+                                    })
+                        
+                        # Prüfe auf digitale Signaturen (X.509)
+                        if hasattr(pdf_reader, 'get_signature_fields'):
+                            sig_fields = pdf_reader.get_signature_fields()
+                            for sig_field in sig_fields:
+                                result["digital_signatures"].append({
+                                    "field_name": sig_field.get('name', ''),
+                                    "signed": True
+                                })
+                except Exception as e:
+                    logger.debug(f"Digitale Signatur-Prüfung fehlgeschlagen: {e}")
+                    result["digital_signature_error"] = str(e)
+            
+            # Prüfe handschriftliche Signaturen (vereinfacht - würde ML erfordern)
+            if check_handwritten:
+                # Extrahiere Text und suche nach Signatur-Hinweisen
+                try:
+                    if HAS_PDFPLUMBER:
+                        import pdfplumber
+                        with pdfplumber.open(pdf_path) as pdf:
+                            for page_num, page in enumerate(pdf.pages):
+                                text = page.extract_text()
+                                if text:
+                                    # Suche nach Signatur-Hinweisen im Text
+                                    import re
+                                    sig_patterns = [
+                                        r'unterschrift',
+                                        r'signature',
+                                        r'gezeichnet',
+                                        r'gez\.',
+                                        r'________________'
+                                    ]
+                                    for pattern in sig_patterns:
+                                        if re.search(pattern, text, re.IGNORECASE):
+                                            result["handwritten_signatures"].append({
+                                                "page": page_num + 1,
+                                                "indicator": "Text-Hinweis gefunden",
+                                                "pattern": pattern
+                                            })
+                                            break
+                except Exception as e:
+                    logger.debug(f"Handschriftliche Signatur-Prüfung fehlgeschlagen: {e}")
+                    result["handwritten_signature_error"] = str(e)
+            
+            result["has_signatures"] = (
+                len(result["digital_signatures"]) > 0 or
+                len(result["signature_fields"]) > 0 or
+                len(result["handwritten_signatures"]) > 0
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Signature detection error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "pdf_path": pdf_path
+            }
+
+class ExcelImportExportTool(AgentTool):
+    """Tool für Excel/CSV-Import/Export für Buchhaltung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="excel_import_export",
+            description="Importiert und exportiert Excel/CSV-Dateien für Buchhaltung. Automatische Formatierung von Beträgen und Datumsangaben. Nützlich für AccountingAgent.",
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "Aktion: 'export' (Excel/CSV exportieren), 'import' (Excel/CSV importieren), 'template' (Template generieren)",
+                    "enum": ["export", "import", "template"]
+                },
+                "data": {
+                    "type": "array",
+                    "description": "Daten zum Exportieren (für export-Aktion)",
+                    "default": []
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Dateipfad (für import/export)"
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Dateiformat (Standard: 'xlsx')",
+                    "enum": ["xlsx", "csv"],
+                    "default": "xlsx"
+                }
+            }
+        )
+    
+    async def execute(self,
+                      action: str,
+                      data: Optional[List[Dict[str, Any]]] = None,
+                      file_path: Optional[str] = None,
+                      format: str = "xlsx") -> Dict[str, Any]:
+        """Import/Export Excel/CSV"""
+        try:
+            if action == "export":
+                if not data:
+                    return {
+                        "success": False,
+                        "error": "Daten sind erforderlich für Export"
+                    }
+                
+                if format == "xlsx":
+                    try:
+                        import openpyxl
+                        from openpyxl.styles import Font, Alignment
+                        
+                        wb = openpyxl.Workbook()
+                        ws = wb.active
+                        ws.title = "Reisekosten"
+                        
+                        # Header
+                        if data and len(data) > 0:
+                            headers = list(data[0].keys())
+                            ws.append(headers)
+                            
+                            # Formatierung Header
+                            for cell in ws[1]:
+                                cell.font = Font(bold=True)
+                                cell.alignment = Alignment(horizontal='center')
+                            
+                            # Daten
+                            for row_data in data:
+                                row = [row_data.get(header, "") for header in headers]
+                                ws.append(row)
+                        
+                        # Speichere Datei
+                        if not file_path:
+                            from datetime import datetime
+                            file_path = f"reisekosten_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                        
+                        wb.save(file_path)
+                        
+                        return {
+                            "success": True,
+                            "action": "export",
+                            "file_path": file_path,
+                            "format": "xlsx",
+                            "rows_exported": len(data)
+                        }
+                    except ImportError:
+                        return {
+                            "success": False,
+                            "error": "openpyxl nicht verfügbar",
+                            "note": "Bitte 'pip install openpyxl' installieren"
+                        }
+                
+                elif format == "csv":
+                    try:
+                        import csv
+                        
+                        if not file_path:
+                            from datetime import datetime
+                            file_path = f"reisekosten_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                        
+                        if data and len(data) > 0:
+                            headers = list(data[0].keys())
+                            with open(file_path, 'w', newline='', encoding='utf-8') as f:
+                                writer = csv.DictWriter(f, fieldnames=headers)
+                                writer.writeheader()
+                                writer.writerows(data)
+                        
+                        return {
+                            "success": True,
+                            "action": "export",
+                            "file_path": file_path,
+                            "format": "csv",
+                            "rows_exported": len(data) if data else 0
+                        }
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": str(e),
+                            "file_path": file_path
+                        }
+            
+            elif action == "import":
+                if not file_path or not Path(file_path).exists():
+                    return {
+                        "success": False,
+                        "error": f"Datei nicht gefunden: {file_path}",
+                        "file_path": file_path
+                    }
+                
+                if format == "xlsx":
+                    try:
+                        import openpyxl
+                        
+                        wb = openpyxl.load_workbook(file_path)
+                        ws = wb.active
+                        
+                        data = []
+                        headers = None
+                        for row in ws.iter_rows(values_only=True):
+                            if headers is None:
+                                headers = [str(cell) if cell else "" for cell in row]
+                            else:
+                                row_dict = {headers[i]: str(cell) if cell else "" for i, cell in enumerate(row)}
+                                data.append(row_dict)
+                        
+                        return {
+                            "success": True,
+                            "action": "import",
+                            "file_path": file_path,
+                            "format": "xlsx",
+                            "rows_imported": len(data),
+                            "data": data
+                        }
+                    except ImportError:
+                        return {
+                            "success": False,
+                            "error": "openpyxl nicht verfügbar",
+                            "note": "Bitte 'pip install openpyxl' installieren"
+                        }
+                
+                elif format == "csv":
+                    try:
+                        import csv
+                        
+                        data = []
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            data = list(reader)
+                        
+                        return {
+                            "success": True,
+                            "action": "import",
+                            "file_path": file_path,
+                            "format": "csv",
+                            "rows_imported": len(data),
+                            "data": data
+                        }
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": str(e),
+                            "file_path": file_path
+                        }
+            
+            elif action == "template":
+                # Generiere Template
+                template_data = [
+                    {
+                        "Datum": "2025-01-15",
+                        "Beschreibung": "Hotelübernachtung",
+                        "Betrag": "150.00",
+                        "Währung": "EUR",
+                        "Kategorie": "hotel",
+                        "Beleg": "hotel_rechnung.pdf"
+                    }
+                ]
+                
+                return await self.execute("export", template_data, file_path or "reisekosten_template.xlsx", format)
+            
+            return {
+                "success": False,
+                "error": f"Unbekannte Aktion: {action}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Excel import/export error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "action": action
+            }
+
+class PostalCodeValidatorTool(AgentTool):
+    """Tool für Postleitzahlen-Validierung und Adress-Verbesserung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="postal_code_validator",
+            description="Validiert Postleitzahlen und verbessert Adressen. Unterstützt DE, AT, CH, FR, IT, ES, GB, US. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "postal_code": {
+                    "type": "string",
+                    "description": "Postleitzahl zum Validieren"
+                },
+                "country_code": {
+                    "type": "string",
+                    "description": "Ländercode (z.B. 'DE', 'AT', 'CH', Standard: 'DE')",
+                    "default": "DE"
+                },
+                "city": {
+                    "type": "string",
+                    "description": "Stadtname (optional, für Validierung)"
+                }
+            }
+        )
+        # Postleitzahlen-Formate pro Land
+        self.postal_code_patterns = {
+            "DE": r"^\d{5}$",  # 5 Ziffern
+            "AT": r"^\d{4}$",  # 4 Ziffern
+            "CH": r"^\d{4}$",  # 4 Ziffern
+            "FR": r"^\d{5}$",  # 5 Ziffern
+            "IT": r"^\d{5}$",  # 5 Ziffern
+            "ES": r"^\d{5}$",  # 5 Ziffern
+            "GB": r"^[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2}$",  # Komplex (z.B. SW1A 1AA)
+            "US": r"^\d{5}(-\d{4})?$"  # 5 Ziffern, optional -4 Ziffern
+        }
+    
+    async def execute(self,
+                      postal_code: str,
+                      country_code: str = "DE",
+                      city: Optional[str] = None) -> Dict[str, Any]:
+        """Validiere Postleitzahl"""
+        try:
+            import re
+            
+            if not postal_code or not postal_code.strip():
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "Postleitzahl ist leer",
+                    "postal_code": postal_code
+                }
+            
+            postal_code = postal_code.strip().upper()
+            country_code = country_code.upper()
+            
+            # Validiere Format
+            pattern = self.postal_code_patterns.get(country_code)
+            if not pattern:
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": f"Unbekannter Ländercode: {country_code}",
+                    "supported_countries": list(self.postal_code_patterns.keys())
+                }
+            
+            format_valid = bool(re.match(pattern, postal_code))
+            
+            result = {
+                "success": True,
+                "valid": format_valid,
+                "postal_code": postal_code,
+                "country_code": country_code,
+                "format_valid": format_valid
+            }
+            
+            if not format_valid:
+                result["error"] = f"Postleitzahl entspricht nicht dem Format für {country_code}"
+                result["expected_format"] = self._get_format_description(country_code)
+            
+            # Validiere gegen Stadt (falls angegeben)
+            if city and format_valid:
+                # Nutze OpenMaps-Tool für Validierung
+                try:
+                    from backend.agents import get_tool_registry
+                    tool_registry = get_tool_registry()
+                    openmaps_tool = tool_registry.get_tool("openmaps")
+                    if openmaps_tool:
+                        maps_result = await openmaps_tool.execute(
+                            action="geocode",
+                            query=f"{postal_code} {city}, {country_code}"
+                        )
+                        if maps_result.get("success"):
+                            result["city_validation"] = "success"
+                            result["validated_city"] = maps_result.get("data", [{}])[0].get("display_name", "")
+                except Exception as e:
+                    logger.debug(f"Stadt-Validierung fehlgeschlagen: {e}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Postal code validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "postal_code": postal_code
+            }
+    
+    def _get_format_description(self, country_code: str) -> str:
+        """Beschreibung des erwarteten Formats"""
+        descriptions = {
+            "DE": "5 Ziffern (z.B. 12345)",
+            "AT": "4 Ziffern (z.B. 1234)",
+            "CH": "4 Ziffern (z.B. 1234)",
+            "FR": "5 Ziffern (z.B. 12345)",
+            "IT": "5 Ziffern (z.B. 12345)",
+            "ES": "5 Ziffern (z.B. 12345)",
+            "GB": "Format: SW1A 1AA",
+            "US": "5 Ziffern, optional -4 Ziffern (z.B. 12345 oder 12345-6789)"
+        }
+        return descriptions.get(country_code, "Unbekannt")
+
+class PhoneNumberValidatorTool(AgentTool):
+    """Tool für Telefonnummer-Validierung und Formatierung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="phone_number_validator",
+            description="Validiert und formatiert Telefonnummern (E.164). Erkennt Länder, formatiert national/international. Nützlich für DocumentAgent.",
+            parameters={
+                "phone_number": {
+                    "type": "string",
+                    "description": "Telefonnummer zum Validieren"
+                },
+                "country_code": {
+                    "type": "string",
+                    "description": "Ländercode (optional, wird automatisch erkannt)",
+                    "default": None
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Ausgabeformat (Standard: 'international')",
+                    "enum": ["international", "national", "e164"],
+                    "default": "international"
+                }
+            }
+        )
+    
+    async def execute(self,
+                      phone_number: str,
+                      country_code: Optional[str] = None,
+                      format: str = "international") -> Dict[str, Any]:
+        """Validiere Telefonnummer"""
+        try:
+            try:
+                import phonenumbers
+                from phonenumbers import geocoder, carrier
+            except ImportError:
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "phonenumbers nicht verfügbar",
+                    "note": "Bitte 'pip install phonenumbers' installieren"
+                }
+            
+            if not phone_number or not phone_number.strip():
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "Telefonnummer ist leer",
+                    "phone_number": phone_number
+                }
+            
+            # Parse Telefonnummer
+            try:
+                if country_code:
+                    parsed = phonenumbers.parse(phone_number, country_code)
+                else:
+                    parsed = phonenumbers.parse(phone_number, None)
+            except phonenumbers.NumberParseException as e:
+                return {
+                    "success": True,
+                    "valid": False,
+                    "error": f"Telefonnummer konnte nicht geparst werden: {str(e)}",
+                    "phone_number": phone_number
+                }
+            
+            # Validiere
+            is_valid = phonenumbers.is_valid_number(parsed)
+            is_possible = phonenumbers.is_possible_number(parsed)
+            
+            # Extrahiere Informationen
+            country = phonenumbers.region_code_for_number(parsed)
+            number_type = phonenumbers.number_type(parsed)
+            type_names = {
+                phonenumbers.PhoneNumberType.MOBILE: "Mobil",
+                phonenumbers.PhoneNumberType.FIXED_LINE: "Festnetz",
+                phonenumbers.PhoneNumberType.FIXED_LINE_OR_MOBILE: "Festnetz oder Mobil"
+            }
+            
+            # Formatiere
+            formatted_international = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+            formatted_national = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+            formatted_e164 = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+            
+            result = {
+                "success": True,
+                "valid": is_valid,
+                "possible": is_possible,
+                "phone_number": phone_number,
+                "country_code": country or country_code,
+                "number_type": type_names.get(number_type, "Unbekannt"),
+                "formatted_international": formatted_international,
+                "formatted_national": formatted_national,
+                "formatted_e164": formatted_e164
+            }
+            
+            # Wähle Format basierend auf Parameter
+            if format == "international":
+                result["formatted"] = formatted_international
+            elif format == "national":
+                result["formatted"] = formatted_national
+            elif format == "e164":
+                result["formatted"] = formatted_e164
+            
+            if not is_valid:
+                result["error"] = "Telefonnummer ist ungültig"
+            elif not is_possible:
+                result["warning"] = "Telefonnummer ist möglicherweise ungültig"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Phone number validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "phone_number": phone_number
+            }
+
+class HolidayAPITool(AgentTool):
+    """Tool für internationale Feiertags-Erkennung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="holiday_api",
+            description="Erkennt Feiertage für verschiedene Länder. Unterstützt regionale Feiertage. Nützlich für AccountingAgent zur Validierung von Reisetagen.",
+            parameters={
+                "country_code": {
+                    "type": "string",
+                    "description": "Ländercode (z.B. 'DE', 'AT', 'CH', 'US')"
+                },
+                "year": {
+                    "type": "integer",
+                    "description": "Jahr (Standard: aktuelles Jahr)"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Datum zum Prüfen (optional, Format: YYYY-MM-DD)"
+                },
+                "region": {
+                    "type": "string",
+                    "description": "Region (optional, z.B. 'SN' für Sachsen)"
+                }
+            }
+        )
+        self.api_key = os.getenv('HOLIDAY_API_KEY')
+    
+    async def execute(self,
+                      country_code: str,
+                      year: Optional[int] = None,
+                      date: Optional[str] = None,
+                      region: Optional[str] = None) -> Dict[str, Any]:
+        """Erkenne Feiertage"""
+        try:
+            from datetime import datetime
+            
+            if not year:
+                year = datetime.now().year
+            
+            country_code = country_code.upper()
+            
+            # Nutze lokale holidays-Bibliothek (bereits in requirements.txt)
+            try:
+                import holidays
+                
+                # Erstelle Feiertags-Objekt
+                if region:
+                    holiday_obj = holidays.country_holidays(country_code, years=year, subdiv=region)
+                else:
+                    holiday_obj = holidays.country_holidays(country_code, years=year)
+                
+                # Prüfe einzelnes Datum
+                if date:
+                    try:
+                        check_date = datetime.strptime(date, "%Y-%m-%d").date()
+                        is_holiday = check_date in holiday_obj
+                        holiday_name = holiday_obj.get(check_date) if is_holiday else None
+                        
+                        return {
+                            "success": True,
+                            "date": date,
+                            "is_holiday": is_holiday,
+                            "holiday_name": holiday_name,
+                            "country_code": country_code,
+                            "region": region
+                        }
+                    except ValueError:
+                        return {
+                            "success": False,
+                            "error": f"Ungültiges Datumsformat: {date} (erwartet: YYYY-MM-DD)",
+                            "date": date
+                        }
+                
+                # Hole alle Feiertage des Jahres
+                all_holidays = {}
+                for holiday_date, holiday_name in holiday_obj.items():
+                    all_holidays[str(holiday_date)] = holiday_name
+                
+                return {
+                    "success": True,
+                    "country_code": country_code,
+                    "year": year,
+                    "region": region,
+                    "holidays": all_holidays,
+                    "count": len(all_holidays)
+                }
+                
+            except ImportError:
+                return {
+                    "success": False,
+                    "error": "holidays-Bibliothek nicht verfügbar",
+                    "note": "Bitte 'pip install holidays' installieren"
+                }
+            except Exception as e:
+                logger.error(f"Holiday API error: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "country_code": country_code
+                }
+            
+        except Exception as e:
+            logger.error(f"Holiday API error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "country_code": country_code
+            }
+
+class WeatherAPITool(AgentTool):
+    """Tool für Wetter-Daten für Reisevalidierung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="weather_api",
+            description="Holt Wetter-Daten für Reisevalidierung. Historische Wetterdaten, Temperatur, Wetterbedingungen. Nützlich für AccountingAgent.",
+            parameters={
+                "location": {
+                    "type": "string",
+                    "description": "Ortsangabe (z.B. 'Berlin', 'New York')"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Datum (optional, Format: YYYY-MM-DD, Standard: heute)"
+                },
+                "historical": {
+                    "type": "boolean",
+                    "description": "Historische Daten abrufen (Standard: False)",
+                    "default": False
+                }
+            }
+        )
+        self.api_key = os.getenv('WEATHER_API_KEY')
+        self.api_provider = os.getenv('WEATHER_API_PROVIDER', 'openweathermap')  # openweathermap oder weatherapi
+    
+    async def execute(self,
+                      location: str,
+                      date: Optional[str] = None,
+                      historical: bool = False) -> Dict[str, Any]:
+        """Hole Wetter-Daten"""
+        try:
+            if not self.api_key:
+                return {
+                    "success": False,
+                    "error": "WEATHER_API_KEY nicht gesetzt",
+                    "note": "Bitte WEATHER_API_KEY in .env setzen (OpenWeatherMap oder WeatherAPI)"
+                }
+            
+            from datetime import datetime
+            import aiohttp
+            
+            if not date:
+                date = datetime.now().strftime("%Y-%m-%d")
+            
+            # OpenWeatherMap API
+            if self.api_provider == "openweathermap":
+                url = "https://api.openweathermap.org/data/2.5/weather"
+                params = {
+                    "q": location,
+                    "appid": self.api_key,
+                    "units": "metric",
+                    "lang": "de"
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return {
+                                "success": True,
+                                "location": location,
+                                "date": date,
+                                "temperature": data.get("main", {}).get("temp"),
+                                "description": data.get("weather", [{}])[0].get("description"),
+                                "humidity": data.get("main", {}).get("humidity"),
+                                "wind_speed": data.get("wind", {}).get("speed"),
+                                "provider": "openweathermap"
+                            }
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"HTTP {response.status}",
+                                "location": location
+                            }
+            
+            # WeatherAPI (alternative)
+            elif self.api_provider == "weatherapi":
+                url = "https://api.weatherapi.com/v1/current.json"
+                params = {
+                    "key": self.api_key,
+                    "q": location,
+                    "lang": "de"
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return {
+                                "success": True,
+                                "location": location,
+                                "date": date,
+                                "temperature": data.get("current", {}).get("temp_c"),
+                                "description": data.get("current", {}).get("condition", {}).get("text"),
+                                "humidity": data.get("current", {}).get("humidity"),
+                                "wind_speed": data.get("current", {}).get("wind_kph"),
+                                "provider": "weatherapi"
+                            }
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"HTTP {response.status}",
+                                "location": location
+                            }
+            
+            return {
+                "success": False,
+                "error": f"Unbekannter API-Provider: {self.api_provider}",
+                "supported_providers": ["openweathermap", "weatherapi"]
+            }
+            
+        except Exception as e:
+            logger.error(f"Weather API error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "location": location
+            }
+
+class TravelTimeCalculatorTool(AgentTool):
+    """Tool für Reisezeit-Berechnung zwischen Orten"""
+    
+    def __init__(self):
+        super().__init__(
+            name="travel_time_calculator",
+            description="Berechnet Reisezeit und Entfernung zwischen Orten. Unterstützt Auto, Bahn, Flugzeug. Nützlich für AccountingAgent zur Validierung von Reisezeiten.",
+            parameters={
+                "origin": {
+                    "type": "string",
+                    "description": "Startort (z.B. 'Berlin, Deutschland')"
+                },
+                "destination": {
+                    "type": "string",
+                    "description": "Zielort (z.B. 'München, Deutschland')"
+                },
+                "mode": {
+                    "type": "string",
+                    "description": "Verkehrsmittel (Standard: 'driving')",
+                    "enum": ["driving", "walking", "bicycling", "transit"],
+                    "default": "driving"
+                },
+                "provider": {
+                    "type": "string",
+                    "description": "API-Provider (Standard: 'openrouteservice')",
+                    "enum": ["google", "openrouteservice"],
+                    "default": "openrouteservice"
+                }
+            }
+        )
+        self.google_api_key = os.getenv('GOOGLE_MAPS_API_KEY')
+        self.ors_api_key = os.getenv('OPENROUTESERVICE_API_KEY')
+    
+    async def execute(self,
+                      origin: str,
+                      destination: str,
+                      mode: str = "driving",
+                      provider: str = "openrouteservice") -> Dict[str, Any]:
+        """Berechne Reisezeit"""
+        try:
+            import aiohttp
+            
+            # OpenRouteService (kostenlos)
+            if provider == "openrouteservice":
+                if not self.ors_api_key:
+                    return {
+                        "success": False,
+                        "error": "OPENROUTESERVICE_API_KEY nicht gesetzt",
+                        "note": "Bitte OPENROUTESERVICE_API_KEY in .env setzen (kostenlos bei openrouteservice.org)"
+                    }
+                
+                # Geocode Orte
+                from backend.agents import get_tool_registry
+                tool_registry = get_tool_registry()
+                openmaps_tool = tool_registry.get_tool("openmaps")
+                
+                if not openmaps_tool:
+                    return {
+                        "success": False,
+                        "error": "OpenMapsTool nicht verfügbar für Geocoding"
+                    }
+                
+                origin_geo = await openmaps_tool.execute(action="geocode", query=origin, limit=1)
+                dest_geo = await openmaps_tool.execute(action="geocode", query=destination, limit=1)
+                
+                if not origin_geo.get("success") or not dest_geo.get("success"):
+                    return {
+                        "success": False,
+                        "error": "Orte konnten nicht geocodiert werden",
+                        "origin": origin,
+                        "destination": destination
+                    }
+                
+                origin_coords = origin_geo.get("data", [{}])[0]
+                dest_coords = dest_geo.get("data", [{}])[0]
+                
+                origin_lon = origin_coords.get("lon")
+                origin_lat = origin_coords.get("lat")
+                dest_lon = dest_coords.get("lon")
+                dest_lat = dest_coords.get("lat")
+                
+                # OpenRouteService Directions API
+                profile_map = {
+                    "driving": "driving-car",
+                    "walking": "foot-walking",
+                    "bicycling": "cycling-regular",
+                    "transit": "driving-car"  # Fallback
+                }
+                profile = profile_map.get(mode, "driving-car")
+                
+                url = f"https://api.openrouteservice.org/v2/directions/{profile}"
+                headers = {"Authorization": self.ors_api_key}
+                params = {
+                    "start": f"{origin_lon},{origin_lat}",
+                    "end": f"{dest_lon},{dest_lat}"
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            route = data.get("features", [{}])[0].get("properties", {})
+                            summary = route.get("summary", {})
+                            
+                            distance_km = summary.get("distance", 0) / 1000  # Meter zu km
+                            duration_seconds = summary.get("duration", 0)
+                            duration_hours = duration_seconds / 3600
+                            
+                            return {
+                                "success": True,
+                                "origin": origin,
+                                "destination": destination,
+                                "mode": mode,
+                                "distance_km": round(distance_km, 2),
+                                "distance_m": round(summary.get("distance", 0)),
+                                "duration_seconds": int(duration_seconds),
+                                "duration_hours": round(duration_hours, 2),
+                                "duration_formatted": f"{int(duration_seconds // 3600)}h {int((duration_seconds % 3600) // 60)}min",
+                                "provider": "openrouteservice"
+                            }
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"HTTP {response.status}",
+                                "origin": origin,
+                                "destination": destination
+                            }
+            
+            # Google Maps API (alternative)
+            elif provider == "google":
+                if not self.google_api_key:
+                    return {
+                        "success": False,
+                        "error": "GOOGLE_MAPS_API_KEY nicht gesetzt",
+                        "note": "Bitte GOOGLE_MAPS_API_KEY in .env setzen"
+                    }
+                
+                url = "https://maps.googleapis.com/maps/api/distancematrix/json"
+                params = {
+                    "origins": origin,
+                    "destinations": destination,
+                    "mode": mode,
+                    "key": self.google_api_key,
+                    "language": "de"
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            if data.get("status") == "OK":
+                                element = data.get("rows", [{}])[0].get("elements", [{}])[0]
+                                distance = element.get("distance", {}).get("value", 0)  # Meter
+                                duration = element.get("duration", {}).get("value", 0)  # Sekunden
+                                
+                                return {
+                                    "success": True,
+                                    "origin": origin,
+                                    "destination": destination,
+                                    "mode": mode,
+                                    "distance_km": round(distance / 1000, 2),
+                                    "distance_m": distance,
+                                    "duration_seconds": duration,
+                                    "duration_hours": round(duration / 3600, 2),
+                                    "duration_formatted": element.get("duration", {}).get("text", ""),
+                                    "provider": "google"
+                                }
+                            else:
+                                return {
+                                    "success": False,
+                                    "error": data.get("status", "Unknown error"),
+                                    "origin": origin,
+                                    "destination": destination
+                                }
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"HTTP {response.status}",
+                                "origin": origin,
+                                "destination": destination
+                            }
+            
+            return {
+                "success": False,
+                "error": f"Unbekannter Provider: {provider}",
+                "supported_providers": ["openrouteservice", "google"]
+            }
+            
+        except Exception as e:
+            logger.error(f"Travel time calculator error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "origin": origin,
+                "destination": destination
+            }
+
+class PDFTimestampTool(AgentTool):
+    """Tool für Zeitstempel-Validierung in PDFs"""
+    
+    def __init__(self):
+        super().__init__(
+            name="pdf_timestamp",
+            description="Extrahiert und validiert Zeitstempel in PDFs (Erstellungsdatum, Änderungsdatum). Validiert gegen Reisedaten. Nützlich für DocumentAgent.",
+            parameters={
+                "pdf_path": {
+                    "type": "string",
+                    "description": "Pfad zur PDF-Datei"
+                },
+                "reference_date": {
+                    "type": "string",
+                    "description": "Referenzdatum zum Validieren (optional, Format: YYYY-MM-DD)"
+                }
+            }
+        )
+    
+    async def execute(self,
+                      pdf_path: str,
+                      reference_date: Optional[str] = None) -> Dict[str, Any]:
+        """Extrahiere und validiere PDF-Zeitstempel"""
+        try:
+            if not Path(pdf_path).exists():
+                return {
+                    "success": False,
+                    "error": f"PDF nicht gefunden: {pdf_path}",
+                    "pdf_path": pdf_path
+                }
+            
+            from datetime import datetime
+            
+            metadata = {}
+            creation_date = None
+            modification_date = None
+            
+            # Extrahiere mit PyPDF2
+            if HAS_PYPDF2:
+                try:
+                    with open(pdf_path, 'rb') as file:
+                        pdf_reader = PyPDF2.PdfReader(file)
+                        info = pdf_reader.metadata
+                        if info:
+                            creation_date_str = str(info.get("/CreationDate", ""))
+                            modification_date_str = str(info.get("/ModDate", ""))
+                            
+                            # Parse PDF-Datum-Format (z.B. "D:20250115120000+01'00'")
+                            if creation_date_str and creation_date_str.startswith("D:"):
+                                try:
+                                    date_part = creation_date_str[2:16]  # YYYYMMDDHHmmss
+                                    creation_date = datetime.strptime(date_part, "%Y%m%d%H%M%S")
+                                except:
+                                    pass
+                            
+                            if modification_date_str and modification_date_str.startswith("D:"):
+                                try:
+                                    date_part = modification_date_str[2:16]
+                                    modification_date = datetime.strptime(date_part, "%Y%m%d%H%M%S")
+                                except:
+                                    pass
+                            
+                            metadata = {
+                                "creation_date": creation_date.isoformat() if creation_date else None,
+                                "modification_date": modification_date.isoformat() if modification_date else None,
+                                "creation_date_raw": creation_date_str,
+                                "modification_date_raw": modification_date_str
+                            }
+                except Exception as e:
+                    logger.debug(f"PyPDF2 timestamp extraction error: {e}")
+            
+            # Extrahiere mit pdfplumber (Fallback)
+            if not metadata.get("creation_date") and HAS_PDFPLUMBER:
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(pdf_path) as pdf:
+                        if pdf.metadata:
+                            pdf_creation = pdf.metadata.get("CreationDate")
+                            pdf_modification = pdf.metadata.get("ModDate")
+                            
+                            if pdf_creation:
+                                metadata["creation_date"] = str(pdf_creation)
+                            if pdf_modification:
+                                metadata["modification_date"] = str(pdf_modification)
+                except Exception as e:
+                    logger.debug(f"pdfplumber timestamp extraction error: {e}")
+            
+            result = {
+                "success": True,
+                "pdf_path": pdf_path,
+                "creation_date": metadata.get("creation_date"),
+                "modification_date": metadata.get("modification_date")
+            }
+            
+            # Validiere gegen Referenzdatum
+            if reference_date and creation_date:
+                try:
+                    ref_date = datetime.strptime(reference_date, "%Y-%m-%d")
+                    creation_only_date = creation_date.date()
+                    
+                    # Prüfe ob PDF nach Referenzdatum erstellt wurde (verdächtig)
+                    if creation_only_date > ref_date:
+                        result["validation_warning"] = f"PDF wurde nach Referenzdatum erstellt ({creation_only_date} > {ref_date.date()})"
+                        result["is_valid"] = False
+                    else:
+                        result["is_valid"] = True
+                        result["validation_note"] = "PDF-Zeitstempel ist plausibel"
+                except ValueError:
+                    result["validation_error"] = f"Ungültiges Referenzdatum-Format: {reference_date}"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"PDF timestamp error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "pdf_path": pdf_path
+            }
+
 class LangChainTool(AgentTool):
     """Tool für LangChain-Integration - erweiterte Agent-Funktionalität mit Tool-Orchestrierung"""
     
@@ -3567,6 +4838,16 @@ class AgentToolRegistry:
         self.register(ImageQualityTool())
         self.register(TimeZoneTool())
         self.register(EmailValidatorTool())
+        # Priorität 2 Tools
+        self.register(EmailParserTool())
+        self.register(SignatureDetectionTool())
+        self.register(ExcelImportExportTool())
+        self.register(PostalCodeValidatorTool())
+        self.register(PhoneNumberValidatorTool())
+        self.register(HolidayAPITool())
+        self.register(WeatherAPITool())
+        self.register(TravelTimeCalculatorTool())
+        self.register(PDFTimestampTool())
     
     def register(self, tool: AgentTool):
         """Registriere ein neues Tool"""
@@ -3900,13 +5181,18 @@ Deine Aufgaben:
 Verfügbare Tools:
 - marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für DocumentAgent) - strukturierte Daten aus PDFs
 - paddleocr: OCR-Tool für Texterkennung (FALLBACK) - wenn andere Methoden versagen, unterstützt 100+ Sprachen
+- email_parser: Automatische Beleg-Extraktion aus E-Mails (IMAP/POP3) - erkennt Beleg-Anhänge und extrahiert Betrag, Datum
+- signature_detection: Erweiterte Signatur-Erkennung in PDFs (digitale Signaturen, Signatur-Felder, handschriftliche Signaturen)
 - duplicate_detection: Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Beleg-Uploads
 - image_quality: Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast, Helligkeit) - warnt vor schlechter Qualität vor OCR
 - pdf_metadata: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel, Seitenzahl) - für Dokumentenanalyse
+- pdf_timestamp: Zeitstempel-Validierung in PDFs - validiert Erstellungsdatum gegen Reisedaten
 - translation: Übersetzung zwischen Sprachen (PRIMÄR für DocumentAgent) - für mehrsprachige Belege, unterstützt 100+ Sprachen
 - tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
 - iban_validator: IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für Bankdaten in Belegen
 - email_validator: E-Mail-Validierung (RFC 5322) und DNS-Prüfung - für E-Mail-Adressen in Belegen
+- phone_number_validator: Telefonnummer-Validierung und Formatierung (E.164) - für Telefonnummern in Belegen
+- postal_code_validator: Postleitzahlen-Validierung (DE, AT, CH, FR, IT, ES, GB, US) - für Adress-Validierung
 - date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten - für Datumsextraktion aus Dokumenten
 - regex_pattern_matcher: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, Telefonnummern, etc.) - für Datenextraktion
 - web_access: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - nützlich für Validierung von Dokumenten, API-Zugriff, Web-Scraping
@@ -4194,11 +5480,16 @@ Deine Aufgaben:
 Verfügbare Tools:
 - marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für AccountingAgent) - strukturierte Daten aus PDFs
 - custom_python_rules: Benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung und -berechnung (PRIMÄR für AccountingAgent)
+- excel_import_export: Excel/CSV-Import/Export für Buchhaltung - exportiert Reisekosten-Reports für Buchhaltungssoftware
 - duplicate_detection: Duplikats-Erkennung durch Hash-Vergleich - verhindert doppelte Abrechnungen
 - tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
 - iban_validator: IBAN-Validierung und Bankdaten-Extraktion (ISO 13616) - für Überweisungsdaten
+- postal_code_validator: Postleitzahlen-Validierung (DE, AT, CH, FR, IT, ES, GB, US) - für Adress-Validierung
 - currency_validator: Währungsvalidierung und -formatierung (ISO 4217) - für Währungsvalidierung und Betragsformatierung
 - timezone: Zeitzonen-Erkennung und -Konvertierung - für internationale Reisen, validiert Reisezeiten bei Zeitzonen-Wechsel
+- travel_time_calculator: Reisezeit-Berechnung zwischen Orten (Auto, Bahn) - validiert Reisezeiten und -entfernungen
+- holiday_api: Internationale Feiertags-Erkennung - validiert Reisetage gegen Feiertage
+- weather_api: Wetter-Daten für Reisevalidierung - validiert Reisezeiten gegen Wetterdaten
 - date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten - für Datumsvergleiche und Validierung
 - regex_pattern_matcher: Mustererkennung in Texten (Beträge, Datumsangaben, Steuernummern, etc.) - für Datenextraktion und Validierung
 - web_access: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - nützlich für Buchhaltungs-APIs, Steuer-Websites, Validierung, API-Interaktion

@@ -174,6 +174,10 @@ VAPID_CLAIM_EMAIL=$VAPID_CLAIM_EMAIL
 # MARKER_API_KEY=your_marker_api_key_here
 # MARKER_BASE_URL=https://api.marker.io/v1
 # DEEPL_API_KEY=your_deepl_api_key_here (für TranslationTool - optional)
+# WEATHER_API_KEY=your_weather_api_key_here (für WeatherAPITool - optional, OpenWeatherMap oder WeatherAPI)
+# WEATHER_API_PROVIDER=openweathermap (Standard: openweathermap, alternativ: weatherapi)
+# GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here (für TravelTimeCalculatorTool - optional)
+# OPENROUTESERVICE_API_KEY=your_ors_api_key_here (für TravelTimeCalculatorTool - optional, kostenlos bei openrouteservice.org)
 # WEB_ACCESS_ALLOWED_DOMAINS=example.com,api.example.com (optional, leer = alle erlaubt)
 # WEB_ACCESS_BLOCKED_DOMAINS=localhost,127.0.0.1,0.0.0.0 (Standard)
 EOF

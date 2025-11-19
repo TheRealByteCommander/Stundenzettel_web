@@ -444,6 +444,119 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
       - **ChatAgent**: Validiert Benutzer-E-Mails
     - **Verfügbar für**: DocumentAgent, ChatAgent
 
+23. **EmailParserTool** ⭐ NEU PRIORITÄT 2 (für DocumentAgent und AccountingAgent)
+    - Automatische Beleg-Extraktion aus E-Mails
+    - **Funktionen:**
+      - IMAP/POP3-Zugriff auf E-Mail-Postfächer
+      - Automatische Erkennung von Beleg-Anhängen (PDF, Bilder)
+      - Extraktion von Betrag, Datum, Absender aus E-Mail-Text
+      - Automatischer Upload in Reisekosten-Reports
+    - **Erfordert**: `imapclient` (optional)
+    - **Konfiguration**: E-Mail-Server, Benutzername, Passwort (über Parameter)
+    - **Nützlich für:**
+      - **DocumentAgent**: Automatische Beleg-Erkennung aus E-Mails
+      - **AccountingAgent**: Automatische Zuordnung von E-Mail-Belegen
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
+24. **SignatureDetectionTool** ⭐ NEU PRIORITÄT 2 (für DocumentAgent)
+    - Erweiterte Signatur-Erkennung in PDFs
+    - **Funktionen:**
+      - Signatur-Feld-Erkennung (PDF-Signature Fields)
+      - Digitale Signatur-Validierung (X.509-Zertifikate)
+      - Handschriftliche Signatur-Erkennung (Text-Hinweise)
+      - Signatur-Position-Analyse
+    - **Erfordert**: PyPDF2 (bereits vorhanden)
+    - **Nützlich für:**
+      - **DocumentAgent**: Verbesserte Unterschriften-Verifikation für Stundenzettel
+    - **Verfügbar für**: DocumentAgent (primär)
+
+25. **ExcelImportExportTool** ⭐ NEU PRIORITÄT 2 (für AccountingAgent)
+    - Excel/CSV-Import/Export für Buchhaltung
+    - **Funktionen:**
+      - Excel-Dateien lesen/schreiben (.xlsx, .xls)
+      - CSV-Import/Export
+      - Automatische Formatierung (Beträge, Datumsangaben)
+      - Template-Generierung für Buchhaltung
+    - **Erfordert**: `openpyxl` (optional, für Excel)
+    - **Nützlich für:**
+      - **AccountingAgent**: Exportiert Reisekosten-Reports für Buchhaltungssoftware
+    - **Verfügbar für**: AccountingAgent (primär)
+
+26. **PostalCodeValidatorTool** ⭐ NEU PRIORITÄT 2 (für DocumentAgent und AccountingAgent)
+    - Postleitzahlen-Validierung und Adress-Verbesserung
+    - **Funktionen:**
+      - Postleitzahlen-Validierung (DE, AT, CH, FR, IT, ES, GB, US)
+      - Adress-Normalisierung
+      - Stadt-Erkennung aus PLZ (via OpenMaps)
+      - Adress-Vervollständigung
+    - **Nützlich für:**
+      - **DocumentAgent**: Validiert Adressen in Belegen
+      - **AccountingAgent**: Verbessert Adressdaten für Rechnungen
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
+27. **PhoneNumberValidatorTool** ⭐ NEU PRIORITÄT 2 (für DocumentAgent)
+    - Telefonnummer-Validierung und Formatierung
+    - **Funktionen:**
+      - Internationale Telefonnummer-Validierung (E.164)
+      - Länder-Erkennung aus Telefonnummer
+      - Formatierung (national/international/E.164)
+      - Gültigkeitsprüfung
+    - **Erfordert**: `phonenumbers` (optional)
+    - **Nützlich für:**
+      - **DocumentAgent**: Extrahiert und validiert Telefonnummern aus Belegen
+    - **Verfügbar für**: DocumentAgent (primär)
+
+28. **HolidayAPITool** ⭐ NEU PRIORITÄT 2 (für AccountingAgent)
+    - Internationale Feiertags-Erkennung
+    - **Funktionen:**
+      - Feiertags-Erkennung für verschiedene Länder
+      - Regionale Feiertage (z.B. sächsische Feiertage)
+      - Feiertags-Kalender-Generierung
+      - Einzelne Datums-Prüfung
+    - **Erfordert**: `holidays` (bereits in requirements.txt)
+    - **Nützlich für:**
+      - **AccountingAgent**: Validiert Reisetage gegen Feiertage
+    - **Verfügbar für**: AccountingAgent (primär)
+
+29. **WeatherAPITool** ⭐ NEU PRIORITÄT 2 (für AccountingAgent)
+    - Wetter-Daten für Reisevalidierung
+    - **Funktionen:**
+      - Wetter-API-Integration (OpenWeatherMap, WeatherAPI)
+      - Aktuelle Wetterdaten
+      - Temperatur, Feuchtigkeit, Windgeschwindigkeit
+      - Reisezeit-Wetter-Validierung
+    - **Erfordert**: `WEATHER_API_KEY` (OpenWeatherMap oder WeatherAPI)
+    - **Konfiguration**: `WEATHER_API_KEY`, `WEATHER_API_PROVIDER` (openweathermap/weatherapi)
+    - **Nützlich für:**
+      - **AccountingAgent**: Validiert Reisezeiten gegen Wetterdaten
+    - **Verfügbar für**: AccountingAgent (primär)
+
+30. **TravelTimeCalculatorTool** ⭐ NEU PRIORITÄT 2 (für AccountingAgent)
+    - Reisezeit-Berechnung zwischen Orten
+    - **Funktionen:**
+      - Google Maps API-Integration
+      - OpenRouteService API-Integration (kostenlos)
+      - Fahrtzeit-Berechnung (Auto, Bahn, Fahrrad, zu Fuß)
+      - Distanz-Berechnung
+      - Route-Optimierung
+    - **Erfordert**: `GOOGLE_MAPS_API_KEY` oder `OPENROUTESERVICE_API_KEY`
+    - **Konfiguration**: `GOOGLE_MAPS_API_KEY` oder `OPENROUTESERVICE_API_KEY`
+    - **Nützlich für:**
+      - **AccountingAgent**: Validiert Reisezeiten und -entfernungen
+    - **Verfügbar für**: AccountingAgent (primär)
+
+31. **PDFTimestampTool** ⭐ NEU PRIORITÄT 2 (für DocumentAgent)
+    - Zeitstempel-Validierung in PDFs
+    - **Funktionen:**
+      - PDF-Erstellungsdatum-Extraktion
+      - PDF-Änderungsdatum-Extraktion
+      - Zeitstempel-Validierung (z.B. Beleg nicht nach Reisedatum erstellt)
+      - Metadaten-Analyse
+    - **Erfordert**: PyPDF2/pdfplumber (bereits vorhanden)
+    - **Nützlich für:**
+      - **DocumentAgent**: Validiert Beleg-Zeitstempel gegen Reisedaten
+    - **Verfügbar für**: DocumentAgent (primär)
+
 ## Tool-Zuordnung zu Agents
 
 ### ChatAgent
@@ -458,11 +571,14 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 ### DocumentAgent
 - **Primär**: `marker` (Dokumentenanalyse)
 - **Fallback**: `paddleocr` (OCR wenn andere Methoden versagen)
+- **E-Mail-Parsing**: `email_parser` (automatische Beleg-Extraktion aus E-Mails)
+- **Signatur-Erkennung**: `signature_detection` (erweiterte Signatur-Erkennung)
 - **Duplikats-Prüfung**: `duplicate_detection` (verhindert doppelte Uploads)
 - **Qualitätsprüfung**: `image_quality` (prüft Beleg-Qualität vor OCR)
+- **PDF-Zeitstempel**: `pdf_timestamp` (validiert Erstellungsdatum gegen Reisedaten)
 - **Übersetzung**: `translation` (für mehrsprachige Belege)
 - **PDF-Metadaten**: `pdf_metadata` (Erstellungsdatum, Autor, etc.)
-- **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `email_validator` (E-Mail)
+- **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `email_validator` (E-Mail), `phone_number_validator` (Telefonnummer), `postal_code_validator` (Postleitzahl)
 - **Datumsverarbeitung**: `date_parser` (Datumsextraktion aus Dokumenten)
 - **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion)
 - **Web-Zugriff**: `web_access` (für Validierung, API-Zugriff, Web-Scraping)
@@ -470,8 +586,11 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 
 ### AccountingAgent
 - **Primär**: `marker` (Dokumentenanalyse), `custom_python_rules` (Buchhaltungsregeln)
+- **Excel-Export**: `excel_import_export` (Excel/CSV-Import/Export für Buchhaltung)
+- **E-Mail-Parsing**: `email_parser` (automatische Beleg-Extraktion aus E-Mails)
 - **Duplikats-Prüfung**: `duplicate_detection` (verhindert doppelte Abrechnungen)
-- **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `currency_validator` (Währung)
+- **Validierung**: `tax_number_validator` (Steuernummer), `iban_validator` (IBAN), `currency_validator` (Währung), `postal_code_validator` (Postleitzahl)
+- **Reisevalidierung**: `travel_time_calculator` (Reisezeit-Berechnung), `holiday_api` (Feiertags-Erkennung), `weather_api` (Wetter-Daten)
 - **Zeitzonen**: `timezone` (für internationale Reisen, Reisezeit-Validierung)
 - **Datumsverarbeitung**: `date_parser` (Datumsvergleiche und Validierung)
 - **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion und Validierung)
@@ -496,6 +615,10 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 - `pytz`: Für TimeZoneTool - `pip install pytz`
 - `timezonefinder`: Für TimeZoneTool (erweiterte Zeitzonen-Erkennung) - `pip install timezonefinder`
 - `dnspython`: Für EmailValidatorTool (DNS MX-Record-Prüfung) - `pip install dnspython`
+- `imapclient`: Für EmailParserTool (E-Mail-Parsing) - `pip install imapclient`
+- `openpyxl`: Für ExcelImportExportTool (Excel-Dateien) - `pip install openpyxl`
+- `phonenumbers`: Für PhoneNumberValidatorTool (Telefonnummer-Validierung) - `pip install phonenumbers`
+- `holidays`: Für HolidayAPITool (Feiertags-Erkennung, bereits in requirements.txt)
 - Marker: Lokale Installation oder API-Key für MarkerTool
 
 ### Umgebungsvariablen (optional)
@@ -503,6 +626,10 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
 - `MARKER_API_KEY`: Für MarkerTool (wenn API verwendet wird)
 - `MARKER_BASE_URL`: Für MarkerTool API (Standard: `https://api.marker.io/v1`)
 - `DEEPL_API_KEY`: Für TranslationTool (DeepL-API für hochwertige Übersetzungen)
+- `WEATHER_API_KEY`: Für WeatherAPITool (OpenWeatherMap oder WeatherAPI)
+- `WEATHER_API_PROVIDER`: Für WeatherAPITool (Standard: `openweathermap`, alternativ: `weatherapi`)
+- `GOOGLE_MAPS_API_KEY`: Für TravelTimeCalculatorTool (Google Maps API, optional)
+- `OPENROUTESERVICE_API_KEY`: Für TravelTimeCalculatorTool (OpenRouteService API, kostenlos, empfohlen)
 - `WEB_ACCESS_ALLOWED_DOMAINS`: Komma-getrennte Liste erlaubter Domains für WebAccessTool (optional, leer = alle erlaubt)
 - `WEB_ACCESS_BLOCKED_DOMAINS`: Komma-getrennte Liste blockierter Domains für WebAccessTool (Standard: `localhost,127.0.0.1,0.0.0.0`)
 

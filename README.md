@@ -70,6 +70,15 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
     - **Image Quality** (Priorität 1): Qualitätsprüfung von gescannten Belegen (DPI, Schärfe, Kontrast)
     - **Timezone** (Priorität 1): Zeitzonen-Handling für internationale Reisen
     - **Email Validator** (Priorität 1): E-Mail-Validierung (RFC 5322) und DNS-Prüfung
+    - **Email Parser** (Priorität 2): Automatische Beleg-Extraktion aus E-Mails (IMAP/POP3)
+    - **Signature Detection** (Priorität 2): Erweiterte Signatur-Erkennung in PDFs
+    - **Excel Import/Export** (Priorität 2): Excel/CSV-Import/Export für Buchhaltung
+    - **Postal Code Validator** (Priorität 2): Postleitzahlen-Validierung (8 Länder)
+    - **Phone Number Validator** (Priorität 2): Telefonnummer-Validierung (E.164)
+    - **Holiday API** (Priorität 2): Internationale Feiertags-Erkennung
+    - **Weather API** (Priorität 2): Wetter-Daten für Reisevalidierung
+    - **Travel Time Calculator** (Priorität 2): Reisezeit-Berechnung zwischen Orten
+    - **PDF Timestamp** (Priorität 2): Zeitstempel-Validierung in PDFs
   - **Web-Tools**: Zugriff auf aktuelle Daten
     - Aktuelle Spesensätze aus dem Internet
     - Währungswechselkurse in Echtzeit

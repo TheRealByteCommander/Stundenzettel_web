@@ -53,3 +53,9 @@ slowapi>=0.1.9
 # pytz>=2023.3  # Für TimeZoneTool
 # timezonefinder>=6.2.0  # Für TimeZoneTool (erweiterte Zeitzonen-Erkennung)
 # dnspython>=2.4.0  # Für EmailValidatorTool (DNS MX-Record-Prüfung)
+
+# Priorität 2 Tools (optional)
+# imapclient>=2.3.1  # Für EmailParserTool (E-Mail-Parsing)
+# openpyxl>=3.1.0  # Für ExcelImportExportTool (Excel-Dateien)
+# phonenumbers>=8.13.0  # Für PhoneNumberValidatorTool (Telefonnummer-Validierung)
+# holidays>=0.36  # Für HolidayAPITool (Feiertags-Erkennung, bereits in requirements.txt)
