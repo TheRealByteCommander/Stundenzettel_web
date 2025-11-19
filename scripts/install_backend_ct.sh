@@ -129,6 +129,41 @@ pip install -r requirements.txt
 
 # Optionale erweiterte Tools installieren (falls gewünscht)
 log "Optionale erweiterte Agent-Tools prüfen…"
+
+# Priorität 1 Tools
+if [[ "${INSTALL_PRIO1_TOOLS:-false}" == "true" ]]; then
+  log "Installiere Priorität 1 Tools…"
+  pip install imagehash>=4.3.1 || warn "imagehash konnte nicht installiert werden (optional)"
+  pip install opencv-python>=4.8.0 || warn "opencv-python konnte nicht installiert werden (optional)"
+  pip install pytz>=2023.3 || warn "pytz konnte nicht installiert werden (optional)"
+  pip install timezonefinder>=6.2.0 || warn "timezonefinder konnte nicht installiert werden (optional)"
+  pip install dnspython>=2.4.0 || warn "dnspython konnte nicht installiert werden (optional)"
+fi
+
+# Priorität 2 Tools
+if [[ "${INSTALL_PRIO2_TOOLS:-false}" == "true" ]]; then
+  log "Installiere Priorität 2 Tools…"
+  pip install imapclient>=2.3.1 || warn "imapclient konnte nicht installiert werden (optional)"
+  pip install openpyxl>=3.1.0 || warn "openpyxl konnte nicht installiert werden (optional)"
+  pip install phonenumbers>=8.13.0 || warn "phonenumbers konnte nicht installiert werden (optional)"
+  # holidays ist bereits in requirements.txt
+fi
+
+# Priorität 3 Tools
+if [[ "${INSTALL_PRIO3_TOOLS:-false}" == "true" ]]; then
+  log "Installiere Priorität 3 Tools…"
+  # pyzbar benötigt zbar (System-Paket)
+  if ! command -v zbarimg >/dev/null 2>&1; then
+    log "Installiere zbar (System-Paket für pyzbar)…"
+    apt-get install -y libzbar0 zbar-tools || warn "zbar konnte nicht installiert werden (optional)"
+  fi
+  pip install pyzbar>=0.1.9 || warn "pyzbar konnte nicht installiert werden (optional)"
+  # pillow für QR-Code/Barcode-Erkennung (falls nicht bereits installiert)
+  pip install pillow>=10.0.0 || warn "pillow konnte nicht installiert werden (optional)"
+  # opencv-python sollte bereits für Priorität 1 Tools installiert sein
+fi
+
+# Einzelne Tools (für gezielte Installation)
 if [[ "${INSTALL_EXA_TOOL:-false}" == "true" ]]; then
   log "Installiere Exa/XNG Search Tool (exa-py)…"
   pip install exa-py || warn "Exa-Tool konnte nicht installiert werden (optional)"
@@ -274,9 +309,17 @@ Nächste Schritte:
   - Frontend-Container konfigurieren (install_frontend_ct.sh).
   
 Optionale erweiterte Agent-Tools:
+  - Priorität 1 Tools: INSTALL_PRIO1_TOOLS=true (imagehash, opencv-python, pytz, timezonefinder, dnspython)
+  - Priorität 2 Tools: INSTALL_PRIO2_TOOLS=true (imapclient, openpyxl, phonenumbers)
+  - Priorität 3 Tools: INSTALL_PRIO3_TOOLS=true (pyzbar, benötigt zbar System-Paket)
   - Exa/XNG Search: INSTALL_EXA_TOOL=true und EXA_API_KEY in .env setzen
   - PaddleOCR: INSTALL_PADDLEOCR=true (für OCR-Fallback)
   - LangChain: INSTALL_LANGCHAIN=true (für erweiterte Workflows)
+  
+  Beispiel für vollständige Installation aller Tools:
+    INSTALL_PRIO1_TOOLS=true INSTALL_PRIO2_TOOLS=true INSTALL_PRIO3_TOOLS=true \\
+    INSTALL_EXA_TOOL=true INSTALL_PADDLEOCR=true INSTALL_LANGCHAIN=true \\
+    EXA_API_KEY=your_key ./install_backend_ct.sh
   - Marker: MARKER_API_KEY in .env setzen (für erweiterte Dokumentenanalyse)
   
 Update-Script:
