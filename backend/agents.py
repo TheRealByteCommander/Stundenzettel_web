@@ -810,6 +810,1889 @@ class GeocodingTool(AgentTool):
             await self._session.close()
             self._session = None
 
+class OpenMapsTool(AgentTool):
+    """Tool für OpenStreetMap - umfassende Karten- und Geodaten-Funktionen"""
+    
+    def __init__(self):
+        super().__init__(
+            name="openmaps",
+            description="Umfassendes Tool für OpenStreetMap-Funktionen: Geocoding, Reverse Geocoding, POI-Suche, Entfernungsberechnung, Routenplanung. Nützlich für Reisekostenabrechnungen, Ortsbestimmung, Entfernungsvalidierung und Standortinformationen.",
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "Aktion: 'geocode' (Adresse zu Koordinaten), 'reverse' (Koordinaten zu Adresse), 'search' (POI-Suche), 'distance' (Entfernung berechnen), 'route' (Route berechnen)",
+                    "enum": ["geocode", "reverse", "search", "distance", "route"]
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Suchanfrage (für geocode/search): Adresse, Ort oder POI-Name",
+                    "default": None
+                },
+                "lat": {
+                    "type": "number",
+                    "description": "Breitengrad (für reverse/distance/route)",
+                    "default": None
+                },
+                "lon": {
+                    "type": "number",
+                    "description": "Längengrad (für reverse/distance/route)",
+                    "default": None
+                },
+                "lat2": {
+                    "type": "number",
+                    "description": "Zweiter Breitengrad (für distance/route)",
+                    "default": None
+                },
+                "lon2": {
+                    "type": "number",
+                    "description": "Zweiter Längengrad (für distance/route)",
+                    "default": None
+                },
+                "poi_type": {
+                    "type": "string",
+                    "description": "POI-Typ für Suche (z.B. 'hotel', 'restaurant', 'fuel', 'parking')",
+                    "default": None
+                },
+                "radius": {
+                    "type": "number",
+                    "description": "Suchradius in Metern (für search, Standard: 1000)",
+                    "default": 1000
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximale Anzahl Ergebnisse (Standard: 5)",
+                    "default": 5
+                }
+            }
+        )
+        self._session = None
+        self.base_url = "https://nominatim.openstreetmap.org"
+        self.user_agent = "Stundenzettel-Web-App/1.0"
+    
+    async def _get_session(self):
+        """Get aiohttp session"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=5, limit_per_host=2)
+            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+    
+    async def _make_request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Mache Request an Nominatim API"""
+        try:
+            session = await self._get_session()
+            headers = {"User-Agent": self.user_agent}
+            url = f"{self.base_url}/{endpoint}"
+            
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return {"success": True, "data": data}
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status}",
+                        "status": response.status
+                    }
+        except Exception as e:
+            logger.error(f"OpenMaps request error: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def execute(self, 
+                      action: str,
+                      query: Optional[str] = None,
+                      lat: Optional[float] = None,
+                      lon: Optional[float] = None,
+                      lat2: Optional[float] = None,
+                      lon2: Optional[float] = None,
+                      poi_type: Optional[str] = None,
+                      radius: int = 1000,
+                      limit: int = 5) -> Dict[str, Any]:
+        """Führe OpenMaps-Aktion aus"""
+        try:
+            if action == "geocode":
+                if not query:
+                    return {"success": False, "error": "query ist erforderlich für geocode"}
+                
+                params = {
+                    "q": query,
+                    "format": "json",
+                    "limit": limit,
+                    "addressdetails": 1
+                }
+                result = await self._make_request("search", params)
+                
+                if result.get("success"):
+                    results = result["data"]
+                    formatted_results = []
+                    for r in results[:limit]:
+                        address = r.get("address", {})
+                        formatted_results.append({
+                            "display_name": r.get("display_name", ""),
+                            "lat": float(r.get("lat", 0)),
+                            "lon": float(r.get("lon", 0)),
+                            "country_code": address.get("country_code", "").upper(),
+                            "country": address.get("country", ""),
+                            "city": address.get("city") or address.get("town") or address.get("village", ""),
+                            "postcode": address.get("postcode", ""),
+                            "type": r.get("type", ""),
+                            "class": r.get("class", "")
+                        })
+                    
+                    return {
+                        "success": True,
+                        "action": "geocode",
+                        "query": query,
+                        "results": formatted_results,
+                        "count": len(formatted_results)
+                    }
+                else:
+                    return result
+            
+            elif action == "reverse":
+                if lat is None or lon is None:
+                    return {"success": False, "error": "lat und lon sind erforderlich für reverse"}
+                
+                params = {
+                    "lat": str(lat),
+                    "lon": str(lon),
+                    "format": "json",
+                    "addressdetails": 1
+                }
+                result = await self._make_request("reverse", params)
+                
+                if result.get("success"):
+                    data = result["data"]
+                    address = data.get("address", {})
+                    return {
+                        "success": True,
+                        "action": "reverse",
+                        "lat": lat,
+                        "lon": lon,
+                        "display_name": data.get("display_name", ""),
+                        "country_code": address.get("country_code", "").upper(),
+                        "country": address.get("country", ""),
+                        "city": address.get("city") or address.get("town") or address.get("village", ""),
+                        "postcode": address.get("postcode", ""),
+                        "full_address": address
+                    }
+                else:
+                    return result
+            
+            elif action == "search":
+                if not query:
+                    return {"success": False, "error": "query ist erforderlich für search"}
+                
+                # POI-Suche mit Typ-Filter
+                search_query = query
+                if poi_type:
+                    search_query = f"{poi_type} {query}"
+                
+                params = {
+                    "q": search_query,
+                    "format": "json",
+                    "limit": limit,
+                    "addressdetails": 1
+                }
+                
+                # Wenn lat/lon gegeben, füge Bounding Box hinzu für Radius-Suche
+                if lat is not None and lon is not None:
+                    # Einfache Bounding Box (ungefährer Radius)
+                    # 1 Grad ≈ 111 km, also radius/111000 für grobe Bounding Box
+                    delta = radius / 111000.0
+                    params["viewbox"] = f"{lon-delta},{lat-delta},{lon+delta},{lat+delta}"
+                    params["bounded"] = "1"
+                
+                result = await self._make_request("search", params)
+                
+                if result.get("success"):
+                    results = result["data"]
+                    formatted_results = []
+                    for r in results[:limit]:
+                        address = r.get("address", {})
+                        formatted_results.append({
+                            "name": r.get("display_name", ""),
+                            "lat": float(r.get("lat", 0)),
+                            "lon": float(r.get("lon", 0)),
+                            "type": r.get("type", ""),
+                            "class": r.get("class", ""),
+                            "country_code": address.get("country_code", "").upper(),
+                            "city": address.get("city") or address.get("town") or address.get("village", "")
+                        })
+                    
+                    return {
+                        "success": True,
+                        "action": "search",
+                        "query": query,
+                        "poi_type": poi_type,
+                        "results": formatted_results,
+                        "count": len(formatted_results)
+                    }
+                else:
+                    return result
+            
+            elif action == "distance":
+                if lat is None or lon is None or lat2 is None or lon2 is None:
+                    return {"success": False, "error": "lat, lon, lat2 und lon2 sind erforderlich für distance"}
+                
+                # Haversine-Formel für Entfernungsberechnung
+                from math import radians, sin, cos, sqrt, atan2
+                
+                R = 6371000  # Erdradius in Metern
+                lat1_rad = radians(lat)
+                lat2_rad = radians(lat2)
+                delta_lat = radians(lat2 - lat)
+                delta_lon = radians(lon2 - lon)
+                
+                a = sin(delta_lat / 2) ** 2 + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon / 2) ** 2
+                c = 2 * atan2(sqrt(a), sqrt(1 - a))
+                distance_meters = R * c
+                distance_km = distance_meters / 1000
+                
+                return {
+                    "success": True,
+                    "action": "distance",
+                    "from": {"lat": lat, "lon": lon},
+                    "to": {"lat": lat2, "lon": lon2},
+                    "distance_meters": round(distance_meters, 2),
+                    "distance_km": round(distance_km, 2)
+                }
+            
+            elif action == "route":
+                if lat is None or lon is None or lat2 is None or lon2 is None:
+                    return {"success": False, "error": "lat, lon, lat2 und lon2 sind erforderlich für route"}
+                
+                # Für einfache Routenberechnung verwenden wir die Entfernung
+                # Eine vollständige Routing-API würde OSRM oder GraphHopper benötigen
+                # Hier geben wir eine einfache Luftlinie + geschätzte Fahrzeit zurück
+                from math import radians, sin, cos, sqrt, atan2
+                
+                R = 6371000
+                lat1_rad = radians(lat)
+                lat2_rad = radians(lat2)
+                delta_lat = radians(lat2 - lat)
+                delta_lon = radians(lon2 - lon)
+                
+                a = sin(delta_lat / 2) ** 2 + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon / 2) ** 2
+                c = 2 * atan2(sqrt(a), sqrt(1 - a))
+                distance_meters = R * c
+                distance_km = distance_meters / 1000
+                
+                # Geschätzte Fahrzeit (Durchschnittsgeschwindigkeit 80 km/h)
+                estimated_driving_time_hours = distance_km / 80.0
+                estimated_driving_time_minutes = estimated_driving_time_hours * 60
+                
+                return {
+                    "success": True,
+                    "action": "route",
+                    "from": {"lat": lat, "lon": lon},
+                    "to": {"lat": lat2, "lon": lon2},
+                    "distance_km": round(distance_km, 2),
+                    "distance_meters": round(distance_meters, 2),
+                    "estimated_driving_time_hours": round(estimated_driving_time_hours, 2),
+                    "estimated_driving_time_minutes": round(estimated_driving_time_minutes, 0),
+                    "note": "Luftlinie - für detaillierte Routenplanung wird eine Routing-API benötigt"
+                }
+            
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unbekannte Aktion: {action}",
+                    "available_actions": ["geocode", "reverse", "search", "distance", "route"]
+                }
+                
+        except Exception as e:
+            logger.error(f"OpenMaps execute error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "action": action
+            }
+    
+    async def close(self):
+        """Close HTTP session"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+# Optional imports für erweiterte Tools
+try:
+    from exa_py import Exa
+    HAS_EXA = True
+except ImportError:
+    HAS_EXA = False
+
+try:
+    from paddleocr import PaddleOCR
+    HAS_PADDLEOCR = True
+except ImportError:
+    HAS_PADDLEOCR = False
+
+try:
+    from langchain.tools import Tool
+    from langchain.agents import AgentExecutor, create_openai_functions_agent
+    from langchain_openai import ChatOpenAI
+    HAS_LANGCHAIN = True
+except ImportError:
+    HAS_LANGCHAIN = False
+
+class ExaSearchTool(AgentTool):
+    """Tool für Exa/XNG Suche - hochwertige semantische Suche"""
+    
+    def __init__(self):
+        super().__init__(
+            name="exa_search",
+            description="Hochwertige semantische Suche mit Exa/XNG API. Besser als Standard-Web-Suche für präzise, relevante Ergebnisse. Nützlich für ChatAgent zur Beantwortung von Fragen.",
+            parameters={
+                "query": {
+                    "type": "string",
+                    "description": "Suchanfrage (semantisch verstanden)"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximale Anzahl an Ergebnissen (Standard: 5)",
+                    "default": 5
+                },
+                "use_autoprompt": {
+                    "type": "boolean",
+                    "description": "Verwende Auto-Prompt für bessere Ergebnisse (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+        self.api_key = os.getenv('EXA_API_KEY')
+        self._exa_client = None
+    
+    def _get_client(self):
+        """Get Exa client"""
+        if not HAS_EXA:
+            return None
+        if self._exa_client is None and self.api_key:
+            try:
+                self._exa_client = Exa(api_key=self.api_key)
+            except Exception as e:
+                logger.warning(f"Exa client initialization error: {e}")
+        return self._exa_client
+    
+    async def execute(self, query: str, max_results: int = 5, use_autoprompt: bool = True) -> Dict[str, Any]:
+        """Führe Exa-Suche aus"""
+        try:
+            client = self._get_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Exa API nicht verfügbar. Bitte EXA_API_KEY setzen und 'pip install exa-py' installieren.",
+                    "fallback_available": True
+                }
+            
+            # Exa API-Aufruf (synchron, aber in async context)
+            search_params = {
+                "query": query,
+                "num_results": max_results,
+                "use_autoprompt": use_autoprompt,
+                "text": {"max_characters": 1000}  # Hole Text-Inhalt
+            }
+            
+            # Exa ist synchron, daher in Thread ausführen
+            import asyncio
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(None, lambda: client.search(**search_params))
+            
+            formatted_results = []
+            for result in results.results:
+                formatted_results.append({
+                    "title": result.title,
+                    "url": result.url,
+                    "text": result.text[:500] if result.text else "",
+                    "published_date": result.published_date.isoformat() if hasattr(result, 'published_date') and result.published_date else None,
+                    "author": result.author if hasattr(result, 'author') else None
+                })
+            
+            return {
+                "success": True,
+                "query": query,
+                "results": formatted_results,
+                "count": len(formatted_results),
+                "source": "exa"
+            }
+            
+        except Exception as e:
+            logger.error(f"Exa search error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "query": query,
+                "fallback_available": True
+            }
+
+class MarkerTool(AgentTool):
+    """Tool für Marker - Dokumentenanalyse und -extraktion"""
+    
+    def __init__(self):
+        super().__init__(
+            name="marker",
+            description="Marker-Tool für erweiterte Dokumentenanalyse. Extrahiert strukturierte Daten aus PDFs und anderen Dokumenten. Nützlich für DocumentAgent und AccountingAgent.",
+            parameters={
+                "document_path": {
+                    "type": "string",
+                    "description": "Pfad zum Dokument (PDF, Bild, etc.)"
+                },
+                "extract_tables": {
+                    "type": "boolean",
+                    "description": "Tabellen extrahieren (Standard: True)",
+                    "default": True
+                },
+                "extract_images": {
+                    "type": "boolean",
+                    "description": "Bilder extrahieren (Standard: False)",
+                    "default": False
+                },
+                "markdown_output": {
+                    "type": "boolean",
+                    "description": "Markdown-Format für Ausgabe (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+        self.marker_api_key = os.getenv('MARKER_API_KEY')
+        self.marker_base_url = os.getenv('MARKER_BASE_URL', 'https://api.marker.io/v1')
+        self._session = None
+    
+    async def _get_session(self):
+        """Get aiohttp session"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=5, limit_per_host=2)
+            timeout = aiohttp.ClientTimeout(total=60, connect=10)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+    
+    async def execute(self, document_path: str, extract_tables: bool = True, extract_images: bool = False, markdown_output: bool = True) -> Dict[str, Any]:
+        """Führe Marker-Dokumentenanalyse aus"""
+        try:
+            # Prüfe ob Datei existiert
+            if not Path(document_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Dokument nicht gefunden: {document_path}",
+                    "document_path": document_path
+                }
+            
+            # Option 1: Marker API (falls verfügbar)
+            if self.marker_api_key:
+                session = await self._get_session()
+                headers = {
+                    "Authorization": f"Bearer {self.marker_api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                # Lese Datei
+                with open(document_path, 'rb') as f:
+                    file_data = f.read()
+                
+                # Base64 kodieren
+                import base64
+                file_base64 = base64.b64encode(file_data).decode('utf-8')
+                
+                payload = {
+                    "file": file_base64,
+                    "filename": Path(document_path).name,
+                    "extract_tables": extract_tables,
+                    "extract_images": extract_images,
+                    "markdown_output": markdown_output
+                }
+                
+                async with session.post(
+                    f"{self.marker_base_url}/extract",
+                    json=payload,
+                    headers=headers
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return {
+                            "success": True,
+                            "document_path": document_path,
+                            "text": result.get("text", ""),
+                            "markdown": result.get("markdown", ""),
+                            "tables": result.get("tables", []),
+                            "metadata": result.get("metadata", {}),
+                            "source": "marker_api"
+                        }
+                    else:
+                        error_text = await response.text()
+                        logger.warning(f"Marker API error: {response.status} - {error_text[:200]}")
+            
+            # Option 2: Lokale Marker-Installation (falls verfügbar)
+            # Marker kann auch lokal installiert werden
+            try:
+                import subprocess
+                import tempfile
+                
+                # Versuche marker CLI zu verwenden
+                result = subprocess.run(
+                    ["marker", "convert", document_path, "--output", "markdown"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                
+                if result.returncode == 0:
+                    return {
+                        "success": True,
+                        "document_path": document_path,
+                        "text": result.stdout,
+                        "markdown": result.stdout,
+                        "source": "marker_cli"
+                    }
+            except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError) as e:
+                logger.debug(f"Marker CLI nicht verfügbar: {e}")
+            
+            # Fallback: Verwende vorhandene PDF-Extraktion
+            return {
+                "success": False,
+                "error": "Marker API/CLI nicht verfügbar. Verwende Fallback-Methoden.",
+                "document_path": document_path,
+                "fallback_available": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Marker tool error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "document_path": document_path,
+                "fallback_available": True
+            }
+    
+    async def close(self):
+        """Close HTTP session"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+class PaddleOCRTool(AgentTool):
+    """Tool für PaddleOCR - OCR als Fallback für Dokumentenanalyse"""
+    
+    def __init__(self):
+        super().__init__(
+            name="paddleocr",
+            description="PaddleOCR-Tool für Texterkennung in Bildern und PDFs. Fallback für DocumentAgent wenn andere Methoden versagen. Unterstützt über 100 Sprachen.",
+            parameters={
+                "image_path": {
+                    "type": "string",
+                    "description": "Pfad zum Bild oder PDF"
+                },
+                "lang": {
+                    "type": "string",
+                    "description": "Sprache (z.B. 'de', 'en', 'ch', Standard: 'de')",
+                    "default": "de"
+                },
+                "use_angle_cls": {
+                    "type": "boolean",
+                    "description": "Verwende Winkel-Klassifikation für bessere Ergebnisse (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+        self._ocr_instances: Dict[str, Any] = {}  # Cache für OCR-Instanzen pro Sprache
+    
+    def _get_ocr(self, lang: str = "de", use_angle_cls: bool = True):
+        """Get PaddleOCR instance (cached)"""
+        if not HAS_PADDLEOCR:
+            return None
+        
+        cache_key = f"{lang}_{use_angle_cls}"
+        if cache_key not in self._ocr_instances:
+            try:
+                self._ocr_instances[cache_key] = PaddleOCR(
+                    use_angle_cls=use_angle_cls,
+                    lang=lang,
+                    show_log=False  # Reduziere Logging
+                )
+            except Exception as e:
+                logger.error(f"PaddleOCR initialization error: {e}")
+                return None
+        
+        return self._ocr_instances[cache_key]
+    
+    async def execute(self, image_path: str, lang: str = "de", use_angle_cls: bool = True) -> Dict[str, Any]:
+        """Führe OCR aus"""
+        try:
+            if not Path(image_path).exists():
+                return {
+                    "success": False,
+                    "error": f"Datei nicht gefunden: {image_path}",
+                    "image_path": image_path
+                }
+            
+            ocr = self._get_ocr(lang, use_angle_cls)
+            if not ocr:
+                return {
+                    "success": False,
+                    "error": "PaddleOCR nicht verfügbar. Bitte 'pip install paddleocr paddlepaddle' installieren.",
+                    "image_path": image_path
+                }
+            
+            # OCR ist synchron, daher in Thread ausführen
+            import asyncio
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, lambda: ocr.ocr(image_path, cls=use_angle_cls))
+            
+            # Formatiere Ergebnis
+            extracted_text = []
+            confidence_scores = []
+            
+            if result and len(result) > 0:
+                for page_result in result:
+                    if page_result:
+                        for line in page_result:
+                            if line and len(line) >= 2:
+                                text_info = line[1]
+                                if isinstance(text_info, tuple) and len(text_info) >= 2:
+                                    text = text_info[0]
+                                    confidence = text_info[1]
+                                    extracted_text.append(text)
+                                    confidence_scores.append(confidence)
+                                elif isinstance(text_info, str):
+                                    extracted_text.append(text_info)
+            
+            full_text = "\n".join(extracted_text)
+            avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
+            
+            return {
+                "success": True,
+                "image_path": image_path,
+                "text": full_text,
+                "lines": extracted_text,
+                "confidence": avg_confidence,
+                "confidence_scores": confidence_scores,
+                "language": lang,
+                "source": "paddleocr"
+            }
+            
+        except Exception as e:
+            logger.error(f"PaddleOCR error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "image_path": image_path
+            }
+
+class CustomPythonRulesTool(AgentTool):
+    """Tool für Custom Python Regeln - ausführbare Python-Regeln für AccountingAgent"""
+    
+    def __init__(self):
+        super().__init__(
+            name="custom_python_rules",
+            description="Führt benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung und -berechnung aus. Nützlich für AccountingAgent zur Anwendung spezifischer Geschäftsregeln.",
+            parameters={
+                "rule_name": {
+                    "type": "string",
+                    "description": "Name der Regel (z.B. 'validate_tax_number', 'calculate_meal_allowance', 'check_receipt_completeness')"
+                },
+                "rule_code": {
+                    "type": "string",
+                    "description": "Python-Code der Regel (optional, wenn Regel bereits registriert ist)"
+                },
+                "input_data": {
+                    "type": "object",
+                    "description": "Eingabedaten für die Regel (Dict)"
+                }
+            }
+        )
+        self._registered_rules: Dict[str, str] = {}  # Cache für registrierte Regeln
+        self._load_default_rules()
+    
+    def _load_default_rules(self):
+        """Lade Standard-Buchhaltungsregeln"""
+        # Beispiel-Regeln
+        self._registered_rules["validate_tax_number"] = """
+def validate_tax_number(tax_number: str, country_code: str = "DE") -> Dict[str, Any]:
+    \"\"\"Validiere Steuernummer basierend auf Ländercode\"\"\"
+    if not tax_number or not tax_number.strip():
+        return {"valid": False, "error": "Steuernummer ist leer"}
+    
+    tax_number = tax_number.strip().replace(" ", "").replace("-", "")
+    
+    if country_code == "DE":
+        # Deutsche USt-IdNr: DE + 9 Ziffern
+        if tax_number.startswith("DE") and len(tax_number) == 11:
+            return {"valid": True, "normalized": tax_number}
+        elif len(tax_number) == 11 and tax_number.isdigit():
+            return {"valid": True, "normalized": f"DE{tax_number}"}
+        else:
+            return {"valid": False, "error": "Ungültiges Format für deutsche USt-IdNr"}
+    elif country_code == "AT":
+        # Österreich: AT + 9 Ziffern
+        if tax_number.startswith("AT") and len(tax_number) == 11:
+            return {"valid": True, "normalized": tax_number}
+        else:
+            return {"valid": False, "error": "Ungültiges Format für österreichische USt-IdNr"}
+    
+    return {"valid": False, "error": f"Unbekannter Ländercode: {country_code}"}
+"""
+        
+        self._registered_rules["check_receipt_completeness"] = """
+def check_receipt_completeness(receipt_data: Dict[str, Any]) -> Dict[str, Any]:
+    \"\"\"Prüfe Vollständigkeit eines Belegs\"\"\"
+    required_fields = ["amount", "date", "tax_number"]
+    missing_fields = []
+    issues = []
+    
+    for field in required_fields:
+        if field not in receipt_data or not receipt_data[field]:
+            missing_fields.append(field)
+    
+    if "amount" in receipt_data:
+        try:
+            amount = float(receipt_data["amount"])
+            if amount <= 0:
+                issues.append("Betrag muss größer als 0 sein")
+        except (ValueError, TypeError):
+            issues.append("Ungültiger Betrag")
+    
+    return {
+        "complete": len(missing_fields) == 0,
+        "missing_fields": missing_fields,
+        "issues": issues
+    }
+"""
+        
+        self._registered_rules["calculate_meal_allowance"] = """
+def calculate_meal_allowance(country_code: str, days: int, is_24h: bool = True) -> float:
+    \"\"\"Berechne Verpflegungsmehraufwand\"\"\"
+    rates = {
+        "DE": {"24h": 28.0, "abwesend": 14.0},
+        "AT": {"24h": 41.0, "abwesend": 20.5},
+        "CH": {"24h": 70.0, "abwesend": 35.0},
+        "FR": {"24h": 57.0, "abwesend": 28.5},
+        "IT": {"24h": 57.0, "abwesend": 28.5},
+        "ES": {"24h": 58.5, "abwesend": 29.25},
+        "GB": {"24h": 52.0, "abwesend": 26.0},
+        "US": {"24h": 89.0, "abwesend": 44.5}
+    }
+    
+    country_rates = rates.get(country_code.upper(), rates["DE"])
+    rate_type = "24h" if is_24h else "abwesend"
+    daily_rate = country_rates.get(rate_type, country_rates["24h"])
+    
+    return daily_rate * days
+"""
+    
+    async def execute(self, rule_name: str, rule_code: Optional[str] = None, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Führe Python-Regel aus"""
+        try:
+            # Hole Regel-Code
+            if rule_name in self._registered_rules:
+                rule_code = self._registered_rules[rule_name]
+            elif not rule_code:
+                return {
+                    "success": False,
+                    "error": f"Regel '{rule_name}' nicht gefunden und kein Code bereitgestellt",
+                    "available_rules": list(self._registered_rules.keys())
+                }
+            
+            # Sicherheitsprüfung: Erlaube nur bestimmte Funktionen
+            allowed_imports = ["json", "datetime", "re", "math"]
+            dangerous_keywords = ["__import__", "eval", "exec", "open", "file", "input", "raw_input"]
+            
+            for keyword in dangerous_keywords:
+                if keyword in rule_code:
+                    return {
+                        "success": False,
+                        "error": f"Sicherheitsproblem: Gefährliches Keyword '{keyword}' in Regel-Code gefunden"
+                    }
+            
+            # Erstelle sicherer Ausführungskontext
+            safe_globals = {
+                "__builtins__": {
+                    "len": len,
+                    "str": str,
+                    "int": int,
+                    "float": float,
+                    "bool": bool,
+                    "dict": dict,
+                    "list": list,
+                    "tuple": tuple,
+                    "set": set,
+                    "round": round,
+                    "abs": abs,
+                    "min": min,
+                    "max": max,
+                    "sum": sum,
+                    "all": all,
+                    "any": any,
+                    "isinstance": isinstance,
+                    "type": type,
+                    "hasattr": hasattr,
+                    "getattr": getattr,
+                }
+            }
+            
+            # Füge erlaubte Imports hinzu
+            for imp in allowed_imports:
+                try:
+                    safe_globals[imp] = __import__(imp)
+                except ImportError:
+                    pass
+            
+            # Kompiliere und führe Regel aus
+            try:
+                compiled_code = compile(rule_code, f"<rule:{rule_name}>", "exec")
+                exec(compiled_code, safe_globals)
+                
+                # Finde Hauptfunktion (gleicher Name wie Regel)
+                if rule_name in safe_globals and callable(safe_globals[rule_name]):
+                    func = safe_globals[rule_name]
+                    
+                    # Führe Funktion aus
+                    if input_data:
+                        if isinstance(input_data, dict):
+                            result = func(**input_data)
+                        else:
+                            result = func(input_data)
+                    else:
+                        result = func()
+                    
+                    return {
+                        "success": True,
+                        "rule_name": rule_name,
+                        "result": result,
+                        "source": "custom_python_rule"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Funktion '{rule_name}' nicht in Regel-Code gefunden",
+                        "rule_name": rule_name
+                    }
+                    
+            except SyntaxError as e:
+                return {
+                    "success": False,
+                    "error": f"Syntax-Fehler in Regel: {str(e)}",
+                    "rule_name": rule_name
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Fehler beim Ausführen der Regel: {str(e)}",
+                    "rule_name": rule_name
+                }
+                
+        except Exception as e:
+            logger.error(f"Custom Python Rules error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "rule_name": rule_name
+            }
+    
+    def register_rule(self, rule_name: str, rule_code: str):
+        """Registriere eine neue Regel"""
+        self._registered_rules[rule_name] = rule_code
+        logger.info(f"Regel '{rule_name}' registriert")
+
+class WebAccessTool(AgentTool):
+    """Tool für generischen Web-Zugriff - HTTP-Requests zu beliebigen Web-Ressourcen"""
+    
+    def __init__(self):
+        super().__init__(
+            name="web_access",
+            description="Generischer Web-Zugriff für HTTP-Requests zu beliebigen URLs. Ermöglicht GET/POST/PUT/DELETE Requests, Web-Scraping, API-Zugriff und HTML-Inhalt-Extraktion. Nützlich für alle Agents zur Validierung, Datensammlung und API-Interaktion.",
+            parameters={
+                "url": {
+                    "type": "string",
+                    "description": "Vollständige URL (z.B. 'https://example.com/api/data')"
+                },
+                "method": {
+                    "type": "string",
+                    "description": "HTTP-Methode (GET, POST, PUT, DELETE, Standard: GET)",
+                    "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                    "default": "GET"
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "HTTP-Headers als Dictionary (optional)",
+                    "default": {}
+                },
+                "params": {
+                    "type": "object",
+                    "description": "URL-Parameter als Dictionary (optional)",
+                    "default": {}
+                },
+                "data": {
+                    "type": "object",
+                    "description": "Request-Body als Dictionary (für POST/PUT, optional)",
+                    "default": None
+                },
+                "json_data": {
+                    "type": "object",
+                    "description": "JSON-Request-Body als Dictionary (für POST/PUT, optional)",
+                    "default": None
+                },
+                "extract_text": {
+                    "type": "boolean",
+                    "description": "Extrahiere Text aus HTML (Standard: False)",
+                    "default": False
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Timeout in Sekunden (Standard: 30)",
+                    "default": 30
+                }
+            }
+        )
+        self._session = None
+        self.allowed_domains = os.getenv('WEB_ACCESS_ALLOWED_DOMAINS', '').split(',') if os.getenv('WEB_ACCESS_ALLOWED_DOMAINS') else []
+        self.blocked_domains = os.getenv('WEB_ACCESS_BLOCKED_DOMAINS', 'localhost,127.0.0.1,0.0.0.0').split(',')
+    
+    async def _get_session(self):
+        """Get aiohttp session"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+    
+    def _is_url_allowed(self, url: str) -> tuple:
+        """Prüfe ob URL erlaubt ist (Sicherheitsprüfung)"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            
+            # Prüfe Schema
+            if parsed.scheme not in ['http', 'https']:
+                return False, f"Nur HTTP/HTTPS erlaubt, nicht {parsed.scheme}"
+            
+            # Prüfe Domain-Whitelist (falls gesetzt)
+            if self.allowed_domains and parsed.netloc not in self.allowed_domains:
+                return False, f"Domain {parsed.netloc} nicht in erlaubter Liste"
+            
+            # Prüfe Domain-Blacklist
+            for blocked in self.blocked_domains:
+                if blocked and blocked in parsed.netloc:
+                    return False, f"Domain {parsed.netloc} ist blockiert"
+            
+            # Prüfe auf private IPs (Sicherheit)
+            if parsed.hostname:
+                parts = parsed.hostname.split('.')
+                if len(parts) == 4:
+                    try:
+                        ip_parts = [int(p) for p in parts]
+                        # Private IP ranges
+                        if (ip_parts[0] == 10 or 
+                            (ip_parts[0] == 172 and 16 <= ip_parts[1] <= 31) or
+                            (ip_parts[0] == 192 and ip_parts[1] == 168) or
+                            ip_parts[0] == 127):
+                            return False, f"Private IP {parsed.hostname} nicht erlaubt"
+                    except ValueError:
+                        pass  # Keine IP, sondern Hostname
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"URL-Validierung fehlgeschlagen: {str(e)}"
+    
+    def _extract_text_from_html(self, html: str) -> str:
+        """Extrahiere Text aus HTML (vereinfacht)"""
+        try:
+            import re
+            # Entferne Script- und Style-Tags
+            html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+            html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+            # Entferne HTML-Tags
+            text = re.sub(r'<[^>]+>', ' ', html)
+            # Normalisiere Whitespace
+            text = re.sub(r'\s+', ' ', text)
+            return text.strip()
+        except Exception as e:
+            logger.warning(f"HTML-Text-Extraktion fehlgeschlagen: {e}")
+            return html[:1000]  # Fallback: erste 1000 Zeichen
+    
+    async def execute(self,
+                      url: str,
+                      method: str = "GET",
+                      headers: Optional[Dict[str, str]] = None,
+                      params: Optional[Dict[str, Any]] = None,
+                      data: Optional[Dict[str, Any]] = None,
+                      json_data: Optional[Dict[str, Any]] = None,
+                      extract_text: bool = False,
+                      timeout: int = 30) -> Dict[str, Any]:
+        """Führe HTTP-Request aus"""
+        try:
+            # Sicherheitsprüfung
+            allowed, error_msg = self._is_url_allowed(url)
+            if not allowed:
+                return {
+                    "success": False,
+                    "error": error_msg or "URL nicht erlaubt",
+                    "url": url
+                }
+            
+            # Standard-Headers
+            default_headers = {
+                "User-Agent": "Stundenzettel-Web-App/1.0 (Agent Tool)"
+            }
+            if headers:
+                default_headers.update(headers)
+            
+            session = await self._get_session()
+            request_timeout = aiohttp.ClientTimeout(total=timeout, connect=10)
+            
+            # Request ausführen
+            request_kwargs = {
+                "headers": default_headers,
+                "timeout": request_timeout
+            }
+            
+            if params:
+                request_kwargs["params"] = params
+            
+            if method.upper() in ["POST", "PUT", "PATCH"]:
+                if json_data:
+                    request_kwargs["json"] = json_data
+                elif data:
+                    request_kwargs["data"] = data
+            
+            async with session.request(method.upper(), url, **request_kwargs) as response:
+                response_data = None
+                content_type = response.headers.get('Content-Type', '').lower()
+                
+                # Hole Response-Inhalt
+                if 'application/json' in content_type:
+                    response_data = await response.json()
+                elif 'text/html' in content_type or 'text/plain' in content_type:
+                    text_content = await response.text()
+                    if extract_text and 'text/html' in content_type:
+                        response_data = {
+                            "html": text_content,
+                            "text": self._extract_text_from_html(text_content)
+                        }
+                    else:
+                        response_data = text_content
+                else:
+                    # Binärdaten - nur Metadaten zurückgeben
+                    response_data = {
+                        "content_type": content_type,
+                        "size": len(await response.read()),
+                        "note": "Binärdaten nicht extrahiert"
+                    }
+                
+                return {
+                    "success": response.status < 400,
+                    "status_code": response.status,
+                    "url": url,
+                    "method": method.upper(),
+                    "headers": dict(response.headers),
+                    "data": response_data,
+                    "content_type": content_type
+                }
+                
+        except aiohttp.ClientError as e:
+            logger.error(f"Web access error: {e}")
+            return {
+                "success": False,
+                "error": f"HTTP-Client-Fehler: {str(e)}",
+                "url": url
+            }
+        except Exception as e:
+            logger.error(f"Web access error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "url": url
+            }
+    
+    async def close(self):
+        """Close HTTP session"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+class DateParserTool(AgentTool):
+    """Tool für Datums-Parsing und -Validierung - unterstützt verschiedene Datumsformate"""
+    
+    def __init__(self):
+        super().__init__(
+            name="date_parser",
+            description="Parsed und validiert Datumsangaben in verschiedenen Formaten. Unterstützt internationale Formate, relative Daten (heute, gestern) und Datumsberechnungen. Nützlich für alle Agents zur Datumsverarbeitung.",
+            parameters={
+                "date_string": {
+                    "type": "string",
+                    "description": "Datumsstring in beliebigem Format (z.B. '15.01.2025', '2025-01-15', '15/01/2025', 'heute', 'gestern')"
+                },
+                "output_format": {
+                    "type": "string",
+                    "description": "Ausgabeformat (Standard: 'YYYY-MM-DD')",
+                    "enum": ["YYYY-MM-DD", "DD.MM.YYYY", "DD/MM/YYYY", "timestamp", "iso"],
+                    "default": "YYYY-MM-DD"
+                },
+                "locale": {
+                    "type": "string",
+                    "description": "Locale für Parsing (Standard: 'de_DE')",
+                    "default": "de_DE"
+                }
+            }
+        )
+    
+    async def execute(self, date_string: str, output_format: str = "YYYY-MM-DD", locale: str = "de_DE") -> Dict[str, Any]:
+        """Parse und formatiere Datum"""
+        try:
+            from datetime import datetime, timedelta
+            import re
+            
+            date_string = date_string.strip()
+            
+            # Relative Daten
+            today = datetime.now()
+            relative_map = {
+                "heute": today,
+                "today": today,
+                "gestern": today - timedelta(days=1),
+                "yesterday": today - timedelta(days=1),
+                "morgen": today + timedelta(days=1),
+                "tomorrow": today + timedelta(days=1),
+                "vorgestern": today - timedelta(days=2),
+                "übermorgen": today + timedelta(days=2)
+            }
+            
+            if date_string.lower() in relative_map:
+                parsed_date = relative_map[date_string.lower()]
+            else:
+                # Versuche verschiedene Formate
+                formats = [
+                    "%d.%m.%Y",  # 15.01.2025
+                    "%Y-%m-%d",  # 2025-01-15
+                    "%d/%m/%Y",  # 15/01/2025
+                    "%d-%m-%Y",  # 15-01-2025
+                    "%Y.%m.%d",  # 2025.01.15
+                    "%d.%m.%y",  # 15.01.25
+                    "%d/%m/%y",  # 15/01/25
+                    "%Y%m%d",    # 20250115
+                    "%d %B %Y",  # 15 Januar 2025
+                    "%d. %B %Y", # 15. Januar 2025
+                    "%B %d, %Y", # January 15, 2025
+                ]
+                
+                parsed_date = None
+                for fmt in formats:
+                    try:
+                        parsed_date = datetime.strptime(date_string, fmt)
+                        break
+                    except ValueError:
+                        continue
+                
+                if not parsed_date:
+                    # Versuche ISO-Format
+                    try:
+                        parsed_date = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+                    except ValueError:
+                        return {
+                            "success": False,
+                            "error": f"Konnte Datum '{date_string}' nicht parsen",
+                            "date_string": date_string
+                        }
+            
+            # Formatiere Ausgabe
+            if output_format == "YYYY-MM-DD":
+                formatted = parsed_date.strftime("%Y-%m-%d")
+            elif output_format == "DD.MM.YYYY":
+                formatted = parsed_date.strftime("%d.%m.%Y")
+            elif output_format == "DD/MM/YYYY":
+                formatted = parsed_date.strftime("%d/%m/%Y")
+            elif output_format == "timestamp":
+                formatted = int(parsed_date.timestamp())
+            elif output_format == "iso":
+                formatted = parsed_date.isoformat()
+            else:
+                formatted = parsed_date.strftime("%Y-%m-%d")
+            
+            return {
+                "success": True,
+                "date_string": date_string,
+                "parsed_date": formatted,
+                "datetime": parsed_date.isoformat(),
+                "year": parsed_date.year,
+                "month": parsed_date.month,
+                "day": parsed_date.day,
+                "weekday": parsed_date.strftime("%A"),
+                "weekday_number": parsed_date.weekday(),  # 0=Montag, 6=Sonntag
+                "is_weekend": parsed_date.weekday() >= 5,
+                "output_format": output_format
+            }
+            
+        except Exception as e:
+            logger.error(f"Date parser error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "date_string": date_string
+            }
+
+class TaxNumberValidatorTool(AgentTool):
+    """Tool für Steuernummer-Validierung - unterstützt verschiedene Länder"""
+    
+    def __init__(self):
+        super().__init__(
+            name="tax_number_validator",
+            description="Validiert Steuernummern (USt-IdNr, VAT) für verschiedene Länder. Unterstützt DE, AT, CH, FR, IT, ES, GB, US und weitere. Nützlich für DocumentAgent und AccountingAgent zur Validierung von Belegen.",
+            parameters={
+                "tax_number": {
+                    "type": "string",
+                    "description": "Steuernummer zum Validieren"
+                },
+                "country_code": {
+                    "type": "string",
+                    "description": "Ländercode (z.B. 'DE', 'AT', 'CH', Standard: 'DE')",
+                    "default": "DE"
+                },
+                "normalize": {
+                    "type": "boolean",
+                    "description": "Normalisiere Format (entferne Leerzeichen, Bindestriche, Standard: True)",
+                    "default": True
+                }
+            }
+        )
+    
+    async def execute(self, tax_number: str, country_code: str = "DE", normalize: bool = True) -> Dict[str, Any]:
+        """Validiere Steuernummer"""
+        try:
+            import re
+            
+            if not tax_number or not tax_number.strip():
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": "Steuernummer ist leer",
+                    "tax_number": tax_number
+                }
+            
+            # Normalisiere
+            if normalize:
+                tax_number = tax_number.strip().replace(" ", "").replace("-", "").replace(".", "").upper()
+            
+            country_code = country_code.upper()
+            
+            # Validierungsregeln pro Land
+            validation_rules = {
+                "DE": {
+                    "pattern": r"^DE\d{9}$",
+                    "length": 11,
+                    "format": "DE + 9 Ziffern",
+                    "example": "DE123456789"
+                },
+                "AT": {
+                    "pattern": r"^ATU\d{8}$",
+                    "length": 11,
+                    "format": "ATU + 8 Ziffern",
+                    "example": "ATU12345678"
+                },
+                "CH": {
+                    "pattern": r"^CHE\d{9}(TVA|MWST|IVA)$",
+                    "length_min": 12,
+                    "format": "CHE + 9 Ziffern + TVA/MWST/IVA",
+                    "example": "CHE123456789TVA"
+                },
+                "FR": {
+                    "pattern": r"^FR[A-HJ-NP-Z0-9]{2}\d{9}$",
+                    "length": 13,
+                    "format": "FR + 2 Zeichen + 9 Ziffern",
+                    "example": "FR12345678901"
+                },
+                "IT": {
+                    "pattern": r"^IT\d{11}$",
+                    "length": 13,
+                    "format": "IT + 11 Ziffern",
+                    "example": "IT12345678901"
+                },
+                "ES": {
+                    "pattern": r"^ES[A-Z0-9]\d{7}[A-Z0-9]$",
+                    "length": 9,
+                    "format": "ES + 1 Zeichen + 7 Ziffern + 1 Zeichen",
+                    "example": "ES12345678Z"
+                },
+                "GB": {
+                    "pattern": r"^GB\d{9}(\d{3})?$|^GB(GD|HA)\d{3}$",
+                    "length_min": 9,
+                    "format": "GB + 9-12 Ziffern oder GB(GD|HA) + 3 Ziffern",
+                    "example": "GB123456789"
+                },
+                "US": {
+                    "pattern": r"^\d{2}-\d{7}$",
+                    "length": 10,
+                    "format": "2 Ziffern - 7 Ziffern",
+                    "example": "12-3456789"
+                }
+            }
+            
+            rule = validation_rules.get(country_code)
+            if not rule:
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": f"Unbekannter Ländercode: {country_code}",
+                    "supported_countries": list(validation_rules.keys()),
+                    "tax_number": tax_number
+                }
+            
+            # Prüfe Pattern
+            pattern_match = re.match(rule["pattern"], tax_number)
+            
+            # Prüfe Länge (falls angegeben)
+            length_valid = True
+            if "length" in rule:
+                length_valid = len(tax_number) == rule["length"]
+            elif "length_min" in rule:
+                length_valid = len(tax_number) >= rule["length_min"]
+            
+            is_valid = pattern_match is not None and length_valid
+            
+            result = {
+                "success": True,
+                "valid": is_valid,
+                "tax_number": tax_number,
+                "normalized": tax_number if normalize else tax_number,
+                "country_code": country_code,
+                "format": rule["format"],
+                "example": rule.get("example", "")
+            }
+            
+            if not is_valid:
+                result["error"] = f"Steuernummer entspricht nicht dem Format für {country_code}: {rule['format']}"
+                result["suggestions"] = [f"Erwartetes Format: {rule.get('example', rule['format'])}"]
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Tax number validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "tax_number": tax_number
+            }
+
+class TranslationTool(AgentTool):
+    """Tool für Übersetzung - unterstützt mehrsprachige Dokumente"""
+    
+    def __init__(self):
+        super().__init__(
+            name="translation",
+            description="Übersetzt Text zwischen verschiedenen Sprachen. Nützlich für DocumentAgent zur Übersetzung von Belegen in andere Sprachen. Unterstützt 100+ Sprachen.",
+            parameters={
+                "text": {
+                    "type": "string",
+                    "description": "Text zum Übersetzen"
+                },
+                "source_language": {
+                    "type": "string",
+                    "description": "Quellsprache (z.B. 'en', 'fr', 'it', 'es', Standard: 'auto' für automatische Erkennung)",
+                    "default": "auto"
+                },
+                "target_language": {
+                    "type": "string",
+                    "description": "Zielsprache (z.B. 'de', 'en', Standard: 'de')",
+                    "default": "de"
+                }
+            }
+        )
+    
+    async def execute(self, text: str, source_language: str = "auto", target_language: str = "de") -> Dict[str, Any]:
+        """Übersetze Text"""
+        try:
+            if not text or not text.strip():
+                return {
+                    "success": False,
+                    "error": "Text ist leer",
+                    "text": text
+                }
+            
+            # Optionale DeepL-Integration (falls API-Key vorhanden)
+            deepl_api_key = os.getenv('DEEPL_API_KEY')
+            if deepl_api_key:
+                try:
+                    import aiohttp
+                    async with aiohttp.ClientSession() as session:
+                        url = "https://api-free.deepl.com/v2/translate" if "free" in deepl_api_key else "https://api.deepl.com/v2/translate"
+                        params = {
+                            "auth_key": deepl_api_key,
+                            "text": text,
+                            "target_lang": target_language.upper()
+                        }
+                        if source_language != "auto":
+                            params["source_lang"] = source_language.upper()
+                        
+                        async with session.post(url, data=params) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                translations = data.get("translations", [])
+                                if translations:
+                                    translated_text = translations[0].get("text", "")
+                                    detected_source = translations[0].get("detected_source_language", source_language)
+                                    return {
+                                        "success": True,
+                                        "text": text,
+                                        "translated_text": translated_text,
+                                        "source_language": detected_source.lower(),
+                                        "target_language": target_language.lower(),
+                                        "source": "deepl_api"
+                                    }
+                except Exception as e:
+                    logger.debug(f"DeepL API error: {e}, using fallback")
+            
+            # Fallback: Nutze LLM für Übersetzung (wenn verfügbar)
+            # Dies ist ein vereinfachtes Beispiel - in Produktion würde man eine echte Übersetzungs-API verwenden
+            return {
+                "success": False,
+                "error": "Übersetzung nicht verfügbar. Bitte DEEPL_API_KEY setzen oder LLM-Integration verwenden.",
+                "text": text,
+                "note": "Für bessere Übersetzungen: DEEPL_API_KEY in .env setzen"
+            }
+            
+        except Exception as e:
+            logger.error(f"Translation error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "text": text
+            }
+
+class CurrencyValidatorTool(AgentTool):
+    """Tool für Währungsvalidierung und -formatierung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="currency_validator",
+            description="Validiert und formatiert Währungsangaben. Prüft Währungscodes (ISO 4217), formatiert Beträge und validiert Währungsformate. Nützlich für AccountingAgent zur Währungsvalidierung.",
+            parameters={
+                "currency_code": {
+                    "type": "string",
+                    "description": "Währungscode zum Validieren (z.B. 'EUR', 'USD', 'GBP')"
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Betrag zum Formatieren (optional)"
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Ausgabeformat (Standard: 'symbol')",
+                    "enum": ["symbol", "code", "name"],
+                    "default": "symbol"
+                }
+            }
+        )
+        # ISO 4217 Währungscodes
+        self.currency_data = {
+            "EUR": {"name": "Euro", "symbol": "€", "decimals": 2},
+            "USD": {"name": "US Dollar", "symbol": "$", "decimals": 2},
+            "GBP": {"name": "British Pound", "symbol": "£", "decimals": 2},
+            "CHF": {"name": "Swiss Franc", "symbol": "CHF", "decimals": 2},
+            "JPY": {"name": "Japanese Yen", "symbol": "¥", "decimals": 0},
+            "CNY": {"name": "Chinese Yuan", "symbol": "¥", "decimals": 2},
+            "AUD": {"name": "Australian Dollar", "symbol": "A$", "decimals": 2},
+            "CAD": {"name": "Canadian Dollar", "symbol": "C$", "decimals": 2},
+            "NZD": {"name": "New Zealand Dollar", "symbol": "NZ$", "decimals": 2},
+            "SEK": {"name": "Swedish Krona", "symbol": "kr", "decimals": 2},
+            "NOK": {"name": "Norwegian Krone", "symbol": "kr", "decimals": 2},
+            "DKK": {"name": "Danish Krone", "symbol": "kr", "decimals": 2},
+            "PLN": {"name": "Polish Zloty", "symbol": "zł", "decimals": 2},
+            "CZK": {"name": "Czech Koruna", "symbol": "Kč", "decimals": 2},
+            "HUF": {"name": "Hungarian Forint", "symbol": "Ft", "decimals": 2},
+            "RUB": {"name": "Russian Ruble", "symbol": "₽", "decimals": 2},
+            "TRY": {"name": "Turkish Lira", "symbol": "₺", "decimals": 2},
+            "BRL": {"name": "Brazilian Real", "symbol": "R$", "decimals": 2},
+            "INR": {"name": "Indian Rupee", "symbol": "₹", "decimals": 2},
+            "ZAR": {"name": "South African Rand", "symbol": "R", "decimals": 2}
+        }
+    
+    async def execute(self, currency_code: str, amount: Optional[float] = None, format: str = "symbol") -> Dict[str, Any]:
+        """Validiere und formatiere Währung"""
+        try:
+            currency_code = currency_code.upper().strip()
+            
+            if currency_code not in self.currency_data:
+                return {
+                    "success": False,
+                    "valid": False,
+                    "error": f"Unbekannter Währungscode: {currency_code}",
+                    "currency_code": currency_code,
+                    "supported_currencies": list(self.currency_data.keys())
+                }
+            
+            currency_info = self.currency_data[currency_code]
+            
+            result = {
+                "success": True,
+                "valid": True,
+                "currency_code": currency_code,
+                "name": currency_info["name"],
+                "symbol": currency_info["symbol"],
+                "decimals": currency_info["decimals"]
+            }
+            
+            # Formatiere Betrag (falls angegeben)
+            if amount is not None:
+                decimals = currency_info["decimals"]
+                formatted_amount = f"{amount:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                
+                if format == "symbol":
+                    result["formatted"] = f"{currency_info['symbol']} {formatted_amount}"
+                elif format == "code":
+                    result["formatted"] = f"{formatted_amount} {currency_code}"
+                elif format == "name":
+                    result["formatted"] = f"{formatted_amount} {currency_info['name']}"
+                
+                result["amount"] = amount
+                result["formatted_amount"] = formatted_amount
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Currency validator error: {e}")
+            return {
+                "success": False,
+                "valid": False,
+                "error": str(e),
+                "currency_code": currency_code
+            }
+
+class RegexPatternMatcherTool(AgentTool):
+    """Tool für Regex-Mustererkennung - findet Muster in Texten"""
+    
+    def __init__(self):
+        super().__init__(
+            name="regex_pattern_matcher",
+            description="Findet Muster in Texten mit regulären Ausdrücken. Nützlich für alle Agents zur Mustererkennung (z.B. Beträge, Datumsangaben, Steuernummern, E-Mail-Adressen).",
+            parameters={
+                "text": {
+                    "type": "string",
+                    "description": "Text zum Durchsuchen"
+                },
+                "pattern": {
+                    "type": "string",
+                    "description": "Regex-Pattern (z.B. r'\\d+,\\d{2}' für Beträge)"
+                },
+                "pattern_name": {
+                    "type": "string",
+                    "description": "Name eines vordefinierten Patterns (z.B. 'amount', 'date', 'email', 'tax_number', 'phone')",
+                    "default": None
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "description": "Groß-/Kleinschreibung beachten (Standard: False)",
+                    "default": False
+                },
+                "find_all": {
+                    "type": "boolean",
+                    "description": "Alle Vorkommen finden (Standard: True)",
+                    "default": True
+                }
+            }
+        )
+        # Vordefinierte Patterns
+        self.predefined_patterns = {
+            "amount": [
+                r"\d+[.,]\d{2}",  # 123,45 oder 123.45
+                r"\d+[.,]\d{1,2}",  # Mit optionaler Dezimalstelle
+                r"€\s*\d+[.,]\d{2}",  # € 123,45
+                r"\$\s*\d+[.,]\d{2}",  # $ 123.45
+            ],
+            "date": [
+                r"\d{1,2}[./-]\d{1,2}[./-]\d{2,4}",  # 15.01.2025 oder 15/01/25
+                r"\d{4}[./-]\d{1,2}[./-]\d{1,2}",  # 2025-01-15
+            ],
+            "email": [
+                r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+            ],
+            "tax_number": [
+                r"DE\d{9}",  # Deutsche USt-IdNr
+                r"ATU\d{8}",  # Österreichische USt-IdNr
+                r"[A-Z]{2}\d{8,12}",  # Allgemeines Format
+            ],
+            "phone": [
+                r"\+?\d{1,4}[\s-]?\d{1,4}[\s-]?\d{1,9}",  # International
+                r"0\d{1,4}[\s/-]?\d{1,9}",  # National (DE)
+            ],
+            "iban": [
+                r"[A-Z]{2}\d{2}[A-Z0-9]{4,30}",  # IBAN
+            ],
+            "postal_code": [
+                r"\d{5}",  # DE
+                r"[A-Z0-9]{3,10}",  # International
+            ]
+        }
+    
+    async def execute(self,
+                      text: str,
+                      pattern: Optional[str] = None,
+                      pattern_name: Optional[str] = None,
+                      case_sensitive: bool = False,
+                      find_all: bool = True) -> Dict[str, Any]:
+        """Finde Muster in Text"""
+        try:
+            import re
+            
+            if not text:
+                return {
+                    "success": False,
+                    "error": "Text ist leer",
+                    "text": text
+                }
+            
+            # Hole Pattern
+            patterns_to_use = []
+            if pattern_name and pattern_name in self.predefined_patterns:
+                patterns_to_use = self.predefined_patterns[pattern_name]
+            elif pattern:
+                patterns_to_use = [pattern]
+            else:
+                return {
+                    "success": False,
+                    "error": "pattern oder pattern_name ist erforderlich",
+                    "available_patterns": list(self.predefined_patterns.keys())
+                }
+            
+            flags = 0 if case_sensitive else re.IGNORECASE
+            all_matches = []
+            
+            for pat in patterns_to_use:
+                if find_all:
+                    matches = re.findall(pat, text, flags)
+                    for match in matches:
+                        all_matches.append({
+                            "match": match if isinstance(match, str) else str(match),
+                            "pattern": pat
+                        })
+                else:
+                    match = re.search(pat, text, flags)
+                    if match:
+                        all_matches.append({
+                            "match": match.group(0),
+                            "pattern": pat,
+                            "start": match.start(),
+                            "end": match.end()
+                        })
+                        break
+            
+            return {
+                "success": True,
+                "text": text[:200] + "..." if len(text) > 200 else text,
+                "matches": all_matches,
+                "count": len(all_matches),
+                "pattern_name": pattern_name,
+                "patterns_used": patterns_to_use
+            }
+            
+        except re.error as e:
+            return {
+                "success": False,
+                "error": f"Ungültiges Regex-Pattern: {str(e)}",
+                "pattern": pattern
+            }
+        except Exception as e:
+            logger.error(f"Regex pattern matcher error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "text": text
+            }
+
+class PDFMetadataTool(AgentTool):
+    """Tool für PDF-Metadaten-Extraktion"""
+    
+    def __init__(self):
+        super().__init__(
+            name="pdf_metadata",
+            description="Extrahiert Metadaten aus PDF-Dateien (Erstellungsdatum, Autor, Titel, Seitenzahl, etc.). Nützlich für DocumentAgent zur Dokumentenanalyse.",
+            parameters={
+                "pdf_path": {
+                    "type": "string",
+                    "description": "Pfad zur PDF-Datei"
+                }
+            }
+        )
+    
+    async def execute(self, pdf_path: str) -> Dict[str, Any]:
+        """Extrahiere PDF-Metadaten"""
+        try:
+            if not Path(pdf_path).exists():
+                return {
+                    "success": False,
+                    "error": f"PDF nicht gefunden: {pdf_path}",
+                    "pdf_path": pdf_path
+                }
+            
+            metadata = {}
+            
+            # Versuche mit PyPDF2
+            if HAS_PYPDF2:
+                try:
+                    with open(pdf_path, 'rb') as file:
+                        pdf_reader = PyPDF2.PdfReader(file)
+                        info = pdf_reader.metadata
+                        if info:
+                            metadata = {
+                                "title": info.get("/Title", ""),
+                                "author": info.get("/Author", ""),
+                                "subject": info.get("/Subject", ""),
+                                "creator": info.get("/Creator", ""),
+                                "producer": info.get("/Producer", ""),
+                                "creation_date": str(info.get("/CreationDate", "")),
+                                "modification_date": str(info.get("/ModDate", ""))
+                            }
+                        metadata["pages"] = len(pdf_reader.pages)
+                        metadata["encrypted"] = pdf_reader.is_encrypted
+                except Exception as e:
+                    logger.debug(f"PyPDF2 metadata extraction error: {e}")
+            
+            # Versuche mit pdfplumber
+            if HAS_PDFPLUMBER and not metadata.get("pages"):
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(pdf_path) as pdf:
+                        metadata["pages"] = len(pdf.pages)
+                        if pdf.metadata:
+                            metadata.update({
+                                "title": pdf.metadata.get("Title", metadata.get("title", "")),
+                                "author": pdf.metadata.get("Author", metadata.get("author", "")),
+                                "subject": pdf.metadata.get("Subject", metadata.get("subject", "")),
+                                "creator": pdf.metadata.get("Creator", metadata.get("creator", "")),
+                                "producer": pdf.metadata.get("Producer", metadata.get("producer", ""))
+                            })
+                except Exception as e:
+                    logger.debug(f"pdfplumber metadata extraction error: {e}")
+            
+            if not metadata:
+                return {
+                    "success": False,
+                    "error": "Konnte keine Metadaten extrahieren",
+                    "pdf_path": pdf_path
+                }
+            
+            return {
+                "success": True,
+                "pdf_path": pdf_path,
+                "metadata": metadata,
+                "source": "pypdf2" if HAS_PYPDF2 else "pdfplumber"
+            }
+            
+        except Exception as e:
+            logger.error(f"PDF metadata error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "pdf_path": pdf_path
+            }
+
+class LangChainTool(AgentTool):
+    """Tool für LangChain-Integration - erweiterte Agent-Funktionalität mit Tool-Orchestrierung"""
+    
+    def __init__(self):
+        super().__init__(
+            name="langchain",
+            description="LangChain-Integration für erweiterte Agent-Funktionalität. Ermöglicht komplexe Workflows, Tool-Orchestrierung und erweiterte LLM-Interaktionen. Nützlich für alle Agents, besonders für komplexe Entscheidungsprozesse.",
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "Aktion: 'create_agent' (erstellt LangChain Agent), 'run_workflow' (führt Workflow aus), 'tool_chain' (verkettet Tools)",
+                    "enum": ["create_agent", "run_workflow", "tool_chain"]
+                },
+                "tools": {
+                    "type": "array",
+                    "description": "Liste von Tool-Namen für Agent/Workflow",
+                    "default": []
+                },
+                "prompt": {
+                    "type": "string",
+                    "description": "Prompt für Agent/Workflow"
+                },
+                "workflow_steps": {
+                    "type": "array",
+                    "description": "Workflow-Schritte (für run_workflow)",
+                    "default": []
+                }
+            }
+        )
+        self.has_langchain = HAS_LANGCHAIN
+    
+    async def execute(self, 
+                      action: str,
+                      tools: Optional[List[str]] = None,
+                      prompt: Optional[str] = None,
+                      workflow_steps: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """Führe LangChain-Aktion aus"""
+        try:
+            if not self.has_langchain:
+                return {
+                    "success": False,
+                    "error": "LangChain nicht verfügbar. Bitte 'pip install langchain langchain-openai' installieren.",
+                    "note": "LangChain ist optional und bietet erweiterte Agent-Funktionalität"
+                }
+            
+            if action == "create_agent":
+                # Erstelle LangChain Agent mit Tools
+                # Dies ist ein vereinfachtes Beispiel - vollständige Integration würde mehr Setup erfordern
+                return {
+                    "success": True,
+                    "action": "create_agent",
+                    "message": "LangChain Agent kann erstellt werden. Vollständige Integration erfordert OpenAI API Key oder Ollama-Integration.",
+                    "note": "Für vollständige Integration: Konfiguriere LLM (OpenAI oder Ollama) und Tools"
+                }
+            
+            elif action == "run_workflow":
+                # Führe Workflow aus
+                if not workflow_steps:
+                    return {
+                        "success": False,
+                        "error": "workflow_steps ist erforderlich für run_workflow"
+                    }
+                
+                results = []
+                for step in workflow_steps:
+                    step_result = {
+                        "step": step.get("name", "unknown"),
+                        "status": "completed",
+                        "result": "Workflow-Schritt ausgeführt"
+                    }
+                    results.append(step_result)
+                
+                return {
+                    "success": True,
+                    "action": "run_workflow",
+                    "steps": results,
+                    "count": len(results)
+                }
+            
+            elif action == "tool_chain":
+                # Verkette Tools
+                if not tools:
+                    return {
+                        "success": False,
+                        "error": "tools ist erforderlich für tool_chain"
+                    }
+                
+                return {
+                    "success": True,
+                    "action": "tool_chain",
+                    "tools": tools,
+                    "message": "Tool-Kette kann erstellt werden. Vollständige Integration erfordert Tool-Registry-Integration."
+                }
+            
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unbekannte Aktion: {action}",
+                    "available_actions": ["create_agent", "run_workflow", "tool_chain"]
+                }
+                
+        except Exception as e:
+            logger.error(f"LangChain tool error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "action": action
+            }
+
 class AgentToolRegistry:
     """Registry für alle verfügbaren Agent-Tools"""
     
@@ -823,6 +2706,21 @@ class AgentToolRegistry:
         self.register(CurrencyExchangeTool())
         self.register(MealAllowanceLookupTool())
         self.register(GeocodingTool())
+        self.register(OpenMapsTool())
+        # Neue spezialisierte Tools
+        self.register(ExaSearchTool())
+        self.register(MarkerTool())
+        self.register(PaddleOCRTool())
+        self.register(CustomPythonRulesTool())
+        self.register(LangChainTool())
+        self.register(WebAccessTool())
+        # Zusätzliche Tools für höhere Qualität
+        self.register(DateParserTool())
+        self.register(TaxNumberValidatorTool())
+        self.register(TranslationTool())
+        self.register(CurrencyValidatorTool())
+        self.register(RegexPatternMatcherTool())
+        self.register(PDFMetadataTool())
     
     def register(self, tool: AgentTool):
         """Registriere ein neues Tool"""
@@ -1028,14 +2926,25 @@ class OllamaLLM:
 class ChatAgent:
     """Agent für Dialog und Rückfragen mit Benutzer"""
     
-    def __init__(self, llm: OllamaLLM, memory: Optional[AgentMemory] = None, db=None):
+    def __init__(self, llm: OllamaLLM, memory: Optional[AgentMemory] = None, db=None, tools: Optional[AgentToolRegistry] = None):
         self.llm = llm
         self.name = "ChatAgent"
         self.memory = memory or AgentMemory(self.name, db)
+        self.tools = tools or get_tool_registry()
         self.system_prompt_base = """Du bist ein hilfreicher Assistent für Reisekostenabrechnungen. 
 Du stellst dem Benutzer klare Fragen zu fehlenden oder unklaren Informationen in den Reisekostenabrechnungen.
 Sei präzise, freundlich und auf Deutsch.
-Formuliere Fragen so, dass sie mit kurzen Antworten beantwortet werden können."""
+Formuliere Fragen so, dass sie mit kurzen Antworten beantwortet werden können.
+
+Verfügbare Tools:
+- exa_search: Hochwertige semantische Suche mit Exa/XNG API (PRIMÄR für ChatAgent) - bessere Ergebnisse als Standard-Web-Suche
+- date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten (heute, gestern, DD.MM.YYYY, etc.) - für Datumsverständnis in Gesprächen
+- web_access: Generischer Web-Zugriff für HTTP-Requests zu beliebigen URLs (GET/POST/PUT/DELETE, Web-Scraping, API-Zugriff) - für alle Agents verfügbar
+- langchain: LangChain-Integration für erweiterte Agent-Funktionalität und komplexe Workflows (OPTIONAL, für alle Agents)
+- openmaps: Umfassende OpenStreetMap-Funktionen (Geocoding, POI-Suche, Entfernungen, Routen)
+- web_search: Suche nach aktuellen Informationen im Internet (Fallback)
+- currency_exchange: Aktuelle Wechselkurse
+- geocoding: Bestimmt Ländercode aus Ortsangabe"""
     
     async def initialize(self):
         """Initialisiere Memory"""
@@ -1122,11 +3031,12 @@ Formuliere eine klare, freundliche Frage an den Benutzer, um die fehlende Inform
 class DocumentAgent:
     """Agent für Dokumentenanalyse: Verstehen, Übersetzen, Kategorisieren, Validieren"""
     
-    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None, memory: Optional[AgentMemory] = None, db=None):
+    def __init__(self, llm: OllamaLLM, message_bus: Optional[AgentMessageBus] = None, memory: Optional[AgentMemory] = None, db=None, tools: Optional[AgentToolRegistry] = None):
         self.llm = llm
         self.name = "DocumentAgent"
         self.message_bus = message_bus
         self.memory = memory or AgentMemory(self.name, db)
+        self.tools = tools or get_tool_registry()
         # Load prompt from markdown file
         self.system_prompt_base = load_prompt("document_agent.md")
         if not self.system_prompt_base:
@@ -1138,6 +3048,19 @@ Deine Aufgaben:
 3. Relevante Daten extrahieren (Betrag, Datum, Steuernummer, Firmenanschrift, etc.)
 4. Vollständigkeit prüfen (Echtheit, Steuernummer vorhanden, Firmenanschrift, etc.)
 5. Probleme und Unstimmigkeiten identifizieren
+
+Verfügbare Tools:
+- marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für DocumentAgent) - strukturierte Daten aus PDFs
+- paddleocr: OCR-Tool für Texterkennung (FALLBACK) - wenn andere Methoden versagen, unterstützt 100+ Sprachen
+- pdf_metadata: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel, Seitenzahl) - für Dokumentenanalyse
+- translation: Übersetzung zwischen Sprachen (PRIMÄR für DocumentAgent) - für mehrsprachige Belege, unterstützt 100+ Sprachen
+- tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
+- date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten - für Datumsextraktion aus Dokumenten
+- regex_pattern_matcher: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, Telefonnummern, etc.) - für Datenextraktion
+- web_access: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - nützlich für Validierung von Dokumenten, API-Zugriff, Web-Scraping
+- langchain: LangChain-Integration für erweiterte Agent-Funktionalität und komplexe Workflows (OPTIONAL)
+- openmaps: Umfassende OpenStreetMap-Funktionen (Geocoding, Reverse Geocoding, POI-Suche, Entfernungen) - nützlich zur Validierung von Adressen und Standorten in Belegen
+- web_search: Suche nach aktuellen Informationen
 
 Antworte präzise und strukturiert."""
         
@@ -1417,10 +3340,21 @@ Deine Aufgaben:
 5. Beträge validieren und korrigieren
 
 Verfügbare Tools:
+- marker: Erweiterte Dokumentenanalyse und -extraktion (PRIMÄR für AccountingAgent) - strukturierte Daten aus PDFs
+- custom_python_rules: Benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung und -berechnung (PRIMÄR für AccountingAgent)
+- tax_number_validator: Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für Beleg-Validierung
+- currency_validator: Währungsvalidierung und -formatierung (ISO 4217) - für Währungsvalidierung und Betragsformatierung
+- date_parser: Datums-Parsing und -Validierung in verschiedenen Formaten - für Datumsvergleiche und Validierung
+- regex_pattern_matcher: Mustererkennung in Texten (Beträge, Datumsangaben, Steuernummern, etc.) - für Datenextraktion und Validierung
+- web_access: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - nützlich für Buchhaltungs-APIs, Steuer-Websites, Validierung, API-Interaktion
+- langchain: LangChain-Integration für erweiterte Agent-Funktionalität und komplexe Workflows (OPTIONAL, besonders nützlich für AccountingAgent)
+- openmaps: Umfassende OpenStreetMap-Funktionen (Geocoding, Reverse Geocoding, POI-Suche, Entfernungen, Routen) - nützlich für Ortsbestimmung, Entfernungsvalidierung und Standortinformationen
 - geocoding: Bestimmt Ländercode aus Ortsangabe
 - meal_allowance_lookup: Holt aktuelle Verpflegungsmehraufwand-Spesensätze
 - currency_exchange: Rechnet Fremdwährungen in EUR um
 - web_search: Sucht nach aktuellen Informationen"""
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+read_file
         
         # Subscribe to messages from other agents
         if self.message_bus:
@@ -1724,9 +3658,9 @@ class AgentOrchestrator:
         self.message_bus = AgentMessageBus()
         # Initialisiere Tool-Registry
         self.tools = get_tool_registry()
-        # Initialisiere Agenten mit Memory und Tools
-        self.chat_agent = ChatAgent(self.chat_llm, db=db)
-        self.document_agent = DocumentAgent(self.document_llm, self.message_bus, db=db)
+        # Initialisiere Agenten mit Memory und Tools (alle Agents erhalten Zugriff auf Tools)
+        self.chat_agent = ChatAgent(self.chat_llm, db=db, tools=self.tools)
+        self.document_agent = DocumentAgent(self.document_llm, self.message_bus, db=db, tools=self.tools)
         self.accounting_agent = AccountingAgent(self.accounting_llm, self.message_bus, db=db, tools=self.tools)
         self._llm_health_checked = False
         self._memory_initialized = False

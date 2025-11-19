@@ -17,6 +17,21 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
   - ✅ Performance-Optimierungen: Lazy Loading für alle Routen, Code-Splitting, Bundle-Optimierung
   - ✅ Barrierefreiheit: ARIA-Labels für alle Navigationselemente, semantisches HTML (role-Attribute)
 
+- **Agent-Tools erweitert - Neue spezialisierte Tools für alle Agents**:
+  - ✅ **OpenMapsTool**: Umfassende OpenStreetMap-Funktionen (Geocoding, Reverse Geocoding, POI-Suche, Entfernungen, Routen) - für alle Agents verfügbar
+  - ✅ **ExaSearchTool**: Hochwertige semantische Suche mit Exa/XNG API - primär für ChatAgent
+  - ✅ **MarkerTool**: Erweiterte Dokumentenanalyse und -extraktion - primär für DocumentAgent und AccountingAgent
+  - ✅ **PaddleOCRTool**: OCR-Tool für Texterkennung (Fallback) - unterstützt 100+ Sprachen, primär für DocumentAgent
+  - ✅ **CustomPythonRulesTool**: Benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung - primär für AccountingAgent
+  - ✅ **LangChainTool**: LangChain-Integration für erweiterte Agent-Funktionalität - optional für alle Agents, besonders empfohlen für AccountingAgent
+  - ✅ **WebAccessTool**: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE) - für alle Agents verfügbar, mit Sicherheitsprüfungen (Domain-Whitelist/Blacklist, private IP-Blockierung)
+  - ✅ **DateParserTool**: Datums-Parsing und -Validierung in verschiedenen Formaten (für alle Agents)
+  - ✅ **TaxNumberValidatorTool**: Steuernummer-Validierung für verschiedene Länder (DE, AT, CH, FR, IT, ES, GB, US) - für DocumentAgent und AccountingAgent
+  - ✅ **TranslationTool**: Übersetzung zwischen Sprachen (100+ Sprachen, DeepL-Integration) - primär für DocumentAgent
+  - ✅ **CurrencyValidatorTool**: Währungsvalidierung und -formatierung (ISO 4217) - primär für AccountingAgent
+  - ✅ **RegexPatternMatcherTool**: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, etc.) - für alle Agents
+  - ✅ **PDFMetadataTool**: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel, Seitenzahl) - primär für DocumentAgent
+
 ### Geändert
 - **Daten aktualisiert**: Alle Dokumente auf Stand 2025 aktualisiert (BENUTZERANLEITUNG.md, SICHERHEIT.md, CYBER_SECURITY.md, README.md)
 - **Fahrzeit-Regelung präzisiert**:

@@ -34,3 +34,15 @@ mysql-connector-python>=8.0.33
 holidays>=0.36
 pywebpush>=1.14.0
 slowapi>=0.1.9
+
+# Optional: Erweiterte Agent-Tools
+# Exa/XNG Search (für ChatAgent)
+# exa-py>=1.0.0
+
+# PaddleOCR (Fallback für DocumentAgent)
+# paddleocr>=2.7.0
+# paddlepaddle>=2.5.0
+
+# LangChain (optional, für alle Agents)
+# langchain>=0.1.0
+# langchain-openai>=0.0.5

@@ -126,6 +126,24 @@ fi
 source venv/bin/activate
 pip install --upgrade pip wheel
 pip install -r requirements.txt
+
+# Optionale erweiterte Tools installieren (falls gewünscht)
+log "Optionale erweiterte Agent-Tools prüfen…"
+if [[ "${INSTALL_EXA_TOOL:-false}" == "true" ]]; then
+  log "Installiere Exa/XNG Search Tool (exa-py)…"
+  pip install exa-py || warn "Exa-Tool konnte nicht installiert werden (optional)"
+fi
+
+if [[ "${INSTALL_PADDLEOCR:-false}" == "true" ]]; then
+  log "Installiere PaddleOCR (paddleocr, paddlepaddle)…"
+  pip install paddleocr paddlepaddle || warn "PaddleOCR konnte nicht installiert werden (optional)"
+fi
+
+if [[ "${INSTALL_LANGCHAIN:-false}" == "true" ]]; then
+  log "Installiere LangChain (langchain, langchain-openai)…"
+  pip install langchain langchain-openai || warn "LangChain konnte nicht installiert werden (optional)"
+fi
+
 deactivate
 
 log "Dateispeicher unter $RECEIPTS_PATH vorbereiten…"
@@ -151,6 +169,13 @@ CORS_ORIGINS=$CORS_ORIGINS
 VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
 VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
 VAPID_CLAIM_EMAIL=$VAPID_CLAIM_EMAIL
+# Optionale Agent-Tools (falls installiert)
+# EXA_API_KEY=your_exa_api_key_here
+# MARKER_API_KEY=your_marker_api_key_here
+# MARKER_BASE_URL=https://api.marker.io/v1
+# DEEPL_API_KEY=your_deepl_api_key_here (für TranslationTool - optional)
+# WEB_ACCESS_ALLOWED_DOMAINS=example.com,api.example.com (optional, leer = alle erlaubt)
+# WEB_ACCESS_BLOCKED_DOMAINS=localhost,127.0.0.1,0.0.0.0 (Standard)
 EOF
 chown "$SERVICE_USER":"$SERVICE_USER" "$ENV_FILE"
 
@@ -243,6 +268,12 @@ Nächste Schritte:
   - Stelle sicher, dass Ollama unter http://$OLLAMA_IP:11434 erreichbar ist.
   - Prüfe die Modelle auf dem Ollama-Server: ollama list
   - Frontend-Container konfigurieren (install_frontend_ct.sh).
+  
+Optionale erweiterte Agent-Tools:
+  - Exa/XNG Search: INSTALL_EXA_TOOL=true und EXA_API_KEY in .env setzen
+  - PaddleOCR: INSTALL_PADDLEOCR=true (für OCR-Fallback)
+  - LangChain: INSTALL_LANGCHAIN=true (für erweiterte Workflows)
+  - Marker: MARKER_API_KEY in .env setzen (für erweiterte Dokumentenanalyse)
   
 Update-Script:
   - Für zukünftige Updates: sudo scripts/update_backend.sh

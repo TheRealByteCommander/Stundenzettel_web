@@ -51,6 +51,20 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
   - Buchhaltungszuordnung (Verpflegungsmehraufwand, Spesensätze, **Machbarkeitsprüfung**)
   - Chat-Agent für Rückfragen und Klärung
   - **Memory-System**: Agenten lernen aus früheren Erfahrungen (bis zu 10.000 Einträge pro Agent)
+  - **Erweiterte Agent-Tools**:
+    - **OpenMaps**: Umfassende OpenStreetMap-Funktionen (Geocoding, POI-Suche, Entfernungen, Routen)
+    - **Exa/XNG Search**: Hochwertige semantische Suche (ChatAgent)
+    - **Marker**: Erweiterte Dokumentenanalyse (DocumentAgent, AccountingAgent)
+    - **PaddleOCR**: OCR-Fallback für 100+ Sprachen (DocumentAgent)
+    - **Custom Python Rules**: Buchhaltungsvalidierung mit benutzerdefinierten Regeln (AccountingAgent)
+    - **LangChain**: Erweiterte Agent-Funktionalität und Workflows (optional, alle Agents)
+    - **Web Access**: Generischer Web-Zugriff für HTTP-Requests (GET/POST/PUT/DELETE, Web-Scraping, API-Zugriff) - für alle Agents mit Sicherheitsprüfungen
+    - **Date Parser**: Datums-Parsing und -Validierung in verschiedenen Formaten (für alle Agents)
+    - **Tax Number Validator**: Steuernummer-Validierung für verschiedene Länder (DocumentAgent, AccountingAgent)
+    - **Translation**: Übersetzung zwischen Sprachen (100+ Sprachen, DeepL-Integration) - primär für DocumentAgent
+    - **Currency Validator**: Währungsvalidierung und -formatierung (ISO 4217) - primär für AccountingAgent
+    - **Regex Pattern Matcher**: Mustererkennung in Texten (Beträge, Datumsangaben, E-Mails, etc.) - für alle Agents
+    - **PDF Metadata**: PDF-Metadaten-Extraktion (Erstellungsdatum, Autor, Titel) - primär für DocumentAgent
   - **Web-Tools**: Zugriff auf aktuelle Daten
     - Aktuelle Spesensätze aus dem Internet
     - Währungswechselkurse in Echtzeit

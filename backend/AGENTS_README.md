@@ -222,15 +222,212 @@ Agenten haben Zugriff auf **Web-Tools** für aktuelle Daten:
    - Fallback auf String-Erkennung
    - Für automatische Länderbestimmung
 
+5. **OpenMapsTool** ⭐ NEU
+   - Umfassendes Tool für OpenStreetMap-Funktionen
+   - **Aktionen:**
+     - `geocode`: Adresse zu Koordinaten (mit vollständigen Adressdetails)
+     - `reverse`: Koordinaten zu Adresse (Reverse Geocoding)
+     - `search`: POI-Suche (Hotels, Restaurants, Tankstellen, etc.) mit optionalem Radius
+     - `distance`: Entfernungsberechnung zwischen zwei Koordinaten (Haversine-Formel)
+     - `route`: Routenberechnung mit geschätzter Fahrzeit (Luftlinie)
+   - Nutzt OpenStreetMap Nominatim API (kostenlos)
+   - Nützlich für:
+     - Ortsbestimmung und Validierung von Adressen in Reisekostenabrechnungen
+     - POI-Suche (z.B. Hotels, Restaurants in der Nähe)
+     - Entfernungsvalidierung zwischen Reisezielen
+     - Standortinformationen für Dokumentenanalyse
+   - **Verfügbar für alle Agents**: ChatAgent, DocumentAgent, AccountingAgent
+
 **Tool-Registry**: Zentrale Verwaltung aller Tools (Singleton-Pattern)
+
+**Wichtig**: Alle Agents (ChatAgent, DocumentAgent, AccountingAgent) haben jetzt Zugriff auf alle Tools, einschließlich des neuen OpenMapsTool.
+
+6. **ExaSearchTool** ⭐ NEU (für ChatAgent)
+   - Hochwertige semantische Suche mit Exa/XNG API
+   - Besser als Standard-Web-Suche für präzise, relevante Ergebnisse
+   - Nutzt Auto-Prompt für optimale Ergebnisse
+   - **Erfordert**: `EXA_API_KEY` Umgebungsvariable und `pip install exa-py`
+   - **Primär für**: ChatAgent zur Beantwortung von Fragen
+
+7. **MarkerTool** ⭐ NEU (für DocumentAgent & AccountingAgent)
+   - Erweiterte Dokumentenanalyse und -extraktion
+   - Extrahiert strukturierte Daten aus PDFs und anderen Dokumenten
+   - Unterstützt Tabellen- und Bild-Extraktion
+   - Markdown-Output verfügbar
+   - **Erfordert**: `MARKER_API_KEY` (optional) oder lokale Marker-Installation
+   - **Primär für**: DocumentAgent und AccountingAgent
+
+8. **PaddleOCRTool** ⭐ NEU (Fallback für DocumentAgent)
+   - OCR-Tool für Texterkennung in Bildern und PDFs
+   - Unterstützt über 100 Sprachen
+   - Winkel-Klassifikation für bessere Ergebnisse
+   - **Erfordert**: `pip install paddleocr paddlepaddle`
+   - **Fallback für**: DocumentAgent wenn andere Methoden versagen
+
+9. **CustomPythonRulesTool** ⭐ NEU (für AccountingAgent)
+   - Führt benutzerdefinierte Python-Regeln für Buchhaltungsvalidierung aus
+   - Vordefinierte Regeln: `validate_tax_number`, `check_receipt_completeness`, `calculate_meal_allowance`
+   - Sichere Code-Ausführung mit eingeschränktem Kontext
+   - Neue Regeln können zur Laufzeit registriert werden
+   - **Primär für**: AccountingAgent zur Anwendung spezifischer Geschäftsregeln
+
+10. **LangChainTool** ⭐ NEU (optional, für alle Agents)
+    - LangChain-Integration für erweiterte Agent-Funktionalität
+    - Ermöglicht komplexe Workflows, Tool-Orchestrierung
+    - Erweiterte LLM-Interaktionen
+    - **Erfordert**: `pip install langchain langchain-openai` (optional)
+    - **Nützlich für**: Alle Agents, besonders für komplexe Entscheidungsprozesse
+    - **Besonders empfohlen für**: AccountingAgent (komplexe Buchhaltungs-Workflows)
+
+11. **WebAccessTool** ⭐ NEU (für alle Agents)
+    - Generischer Web-Zugriff für HTTP-Requests zu beliebigen URLs
+    - **Funktionen:**
+      - GET/POST/PUT/DELETE/PATCH Requests
+      - Web-Scraping (HTML-Inhalt extrahieren)
+      - API-Zugriff (REST APIs)
+      - JSON- und Form-Data-Unterstützung
+      - HTML-Text-Extraktion
+    - **Sicherheitsfeatures:**
+      - URL-Validierung (nur HTTP/HTTPS)
+      - Domain-Whitelist/Blacklist (konfigurierbar)
+      - Blockierung privater IPs
+      - Timeout-Kontrolle
+    - **Konfiguration:**
+      - `WEB_ACCESS_ALLOWED_DOMAINS`: Komma-getrennte Liste erlaubter Domains (optional, leer = alle erlaubt)
+      - `WEB_ACCESS_BLOCKED_DOMAINS`: Komma-getrennte Liste blockierter Domains (Standard: localhost, 127.0.0.1)
+    - **Nützlich für:**
+      - **ChatAgent**: Aktuelle Informationen von spezifischen Websites abrufen
+      - **DocumentAgent**: Dokumentenvalidierung über Web-APIs, Web-Scraping für Referenzdaten
+      - **AccountingAgent**: Buchhaltungs-APIs, Steuer-Websites, Validierung über externe Services
+    - **Verfügbar für alle Agents**: ChatAgent, DocumentAgent, AccountingAgent
+
+12. **DateParserTool** ⭐ NEU (für alle Agents)
+    - Datums-Parsing und -Validierung in verschiedenen Formaten
+    - **Funktionen:**
+      - Unterstützt internationale Datumsformate (DD.MM.YYYY, YYYY-MM-DD, DD/MM/YYYY, etc.)
+      - Relative Daten (heute, gestern, morgen, vorgestern, übermorgen)
+      - Datumsberechnungen (Wochentag, Wochenende-Erkennung)
+      - Flexible Ausgabeformate (YYYY-MM-DD, DD.MM.YYYY, Timestamp, ISO)
+    - **Nützlich für:**
+      - **ChatAgent**: Datumsverständnis in Gesprächen
+      - **DocumentAgent**: Datumsextraktion aus Dokumenten
+      - **AccountingAgent**: Datumsvergleiche und Validierung
+    - **Verfügbar für alle Agents**: ChatAgent, DocumentAgent, AccountingAgent
+
+13. **TaxNumberValidatorTool** ⭐ NEU (für DocumentAgent und AccountingAgent)
+    - Steuernummer-Validierung (USt-IdNr, VAT) für verschiedene Länder
+    - **Unterstützte Länder:** DE, AT, CH, FR, IT, ES, GB, US
+    - **Funktionen:**
+      - Format-Validierung nach Ländercode
+      - Normalisierung (entfernt Leerzeichen, Bindestriche)
+      - Detaillierte Fehlermeldungen mit Format-Hinweisen
+    - **Nützlich für:**
+      - **DocumentAgent**: Beleg-Validierung
+      - **AccountingAgent**: Steuernummer-Validierung bei Zuordnung
+    - **Verfügbar für**: DocumentAgent, AccountingAgent
+
+14. **TranslationTool** ⭐ NEU (für DocumentAgent)
+    - Übersetzung zwischen Sprachen
+    - **Funktionen:**
+      - Unterstützt 100+ Sprachen
+      - Automatische Spracherkennung (optional)
+      - DeepL-API-Integration (falls `DEEPL_API_KEY` gesetzt)
+    - **Konfiguration:**
+      - `DEEPL_API_KEY`: DeepL API-Key für hochwertige Übersetzungen (optional)
+    - **Nützlich für:**
+      - **DocumentAgent**: Übersetzung mehrsprachiger Belege
+    - **Verfügbar für**: DocumentAgent (primär)
+
+15. **CurrencyValidatorTool** ⭐ NEU (für AccountingAgent)
+    - Währungsvalidierung und -formatierung
+    - **Funktionen:**
+      - ISO 4217 Währungscode-Validierung
+      - Betragsformatierung mit korrekten Dezimalstellen
+      - Unterstützt 20+ Währungen (EUR, USD, GBP, CHF, JPY, etc.)
+    - **Nützlich für:**
+      - **AccountingAgent**: Währungsvalidierung und Betragsformatierung
+    - **Verfügbar für**: AccountingAgent (primär)
+
+16. **RegexPatternMatcherTool** ⭐ NEU (für alle Agents)
+    - Mustererkennung in Texten mit regulären Ausdrücken
+    - **Vordefinierte Patterns:**
+      - `amount`: Beträge (123,45, € 123,45, $ 123.45)
+      - `date`: Datumsangaben (15.01.2025, 2025-01-15)
+      - `email`: E-Mail-Adressen
+      - `tax_number`: Steuernummern (DE123456789, ATU12345678)
+      - `phone`: Telefonnummern (international und national)
+      - `iban`: IBAN-Nummern
+      - `postal_code`: Postleitzahlen
+    - **Funktionen:**
+      - Eigene Regex-Patterns oder vordefinierte Patterns
+      - Groß-/Kleinschreibung konfigurierbar
+      - Finde alle Vorkommen oder nur das erste
+    - **Nützlich für:**
+      - **Alle Agents**: Datenextraktion und Mustererkennung
+    - **Verfügbar für alle Agents**: ChatAgent, DocumentAgent, AccountingAgent
+
+17. **PDFMetadataTool** ⭐ NEU (für DocumentAgent)
+    - PDF-Metadaten-Extraktion
+    - **Funktionen:**
+      - Titel, Autor, Betreff
+      - Erstellungs- und Änderungsdatum
+      - Creator, Producer
+      - Seitenzahl
+      - Verschlüsselungsstatus
+    - **Nützlich für:**
+      - **DocumentAgent**: Dokumentenanalyse und Validierung
+    - **Verfügbar für**: DocumentAgent (primär)
+
+## Tool-Zuordnung zu Agents
+
+### ChatAgent
+- **Primär**: `exa_search` (Exa/XNG Suche)
+- **Datumsverarbeitung**: `date_parser` (Datumsverständnis in Gesprächen)
+- **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion)
+- **Web-Zugriff**: `web_access` (HTTP-Requests zu beliebigen URLs)
+- **Optional**: `langchain`, `openmaps`, `web_search`, `currency_exchange`, `geocoding`
+
+### DocumentAgent
+- **Primär**: `marker` (Dokumentenanalyse)
+- **Fallback**: `paddleocr` (OCR wenn andere Methoden versagen)
+- **Übersetzung**: `translation` (für mehrsprachige Belege)
+- **PDF-Metadaten**: `pdf_metadata` (Erstellungsdatum, Autor, etc.)
+- **Validierung**: `tax_number_validator` (Steuernummer-Validierung)
+- **Datumsverarbeitung**: `date_parser` (Datumsextraktion aus Dokumenten)
+- **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion)
+- **Web-Zugriff**: `web_access` (für Validierung, API-Zugriff, Web-Scraping)
+- **Optional**: `langchain`, `openmaps`, `web_search`
+
+### AccountingAgent
+- **Primär**: `marker` (Dokumentenanalyse), `custom_python_rules` (Buchhaltungsregeln)
+- **Validierung**: `tax_number_validator` (Steuernummer-Validierung), `currency_validator` (Währungsvalidierung)
+- **Datumsverarbeitung**: `date_parser` (Datumsvergleiche und Validierung)
+- **Mustererkennung**: `regex_pattern_matcher` (für Datenextraktion und Validierung)
+- **Web-Zugriff**: `web_access` (für Buchhaltungs-APIs, Steuer-Websites, Validierung)
+- **Optional**: `langchain` (besonders empfohlen für komplexe Workflows), `openmaps`, `geocoding`, `meal_allowance_lookup`, `currency_exchange`, `web_search`
 
 ## Abhängigkeiten
 
+### Erforderlich
 - `aiohttp`: Für Ollama API-Kommunikation und Web-Tools (mit Connection Pooling)
 - `PyPDF2` oder `pdfplumber`: Für PDF-Text-Extraktion
 - `pydantic`: Für Datenmodelle
 - `cryptography`: Für DSGVO-konforme Verschlüsselung von PDFs
 - `motor` (async MongoDB): Für Memory-Speicherung
+
+### Optional (für erweiterte Tools)
+- `exa-py`: Für ExaSearchTool (ChatAgent) - `pip install exa-py`
+- `paddleocr` & `paddlepaddle`: Für PaddleOCRTool (DocumentAgent Fallback) - `pip install paddleocr paddlepaddle`
+- `langchain` & `langchain-openai`: Für LangChainTool (alle Agents) - `pip install langchain langchain-openai`
+- Marker: Lokale Installation oder API-Key für MarkerTool
+
+### Umgebungsvariablen (optional)
+- `EXA_API_KEY`: Für ExaSearchTool
+- `MARKER_API_KEY`: Für MarkerTool (wenn API verwendet wird)
+- `MARKER_BASE_URL`: Für MarkerTool API (Standard: `https://api.marker.io/v1`)
+- `DEEPL_API_KEY`: Für TranslationTool (DeepL-API für hochwertige Übersetzungen)
+- `WEB_ACCESS_ALLOWED_DOMAINS`: Komma-getrennte Liste erlaubter Domains für WebAccessTool (optional, leer = alle erlaubt)
+- `WEB_ACCESS_BLOCKED_DOMAINS`: Komma-getrennte Liste blockierter Domains für WebAccessTool (Standard: `localhost,127.0.0.1,0.0.0.0`)
 
 ## DSGVO & EU-AI-Act Compliance
 
