@@ -39,6 +39,14 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
   - `PUT /users/{user_id}` - User aktualisieren
   - `DELETE /users/{user_id}` - User löschen (Schutz: Letzter Admin nicht löschbar)
 
+- [x] **Kundenverwaltung**
+  - `GET /customers` - Alle aktiven Kunden (alle User)
+  - `GET /admin/customers` - Alle Kunden inkl. inaktive (Admin)
+  - `POST /admin/customers` - Neuen Kunden anlegen (Admin)
+  - `PUT /admin/customers/{customer_id}` - Kunden aktualisieren (Admin)
+  - `DELETE /admin/customers/{customer_id}` - Kunden deaktivieren (Admin, prüft Verwendung in Stundenzetteln)
+  - **Frontend**: Vollständig implementiert (Admin-Seite `/app/admin/customers`, Dropdown in Stundenzettel-Erstellung)
+
 ---
 
 ## 📊 Stundenzettel-App
@@ -53,7 +61,14 @@ Diese Checkliste dient zur Überprüfung, ob alle dokumentierten Features auch t
 
 - [x] **Wochenbasierte Zeiterfassung**
   - Wochenstart (Montag) als Basis
+  - **Standardmäßig nur Mo-Fr (5 Arbeitstage)**
+  - **Samstag/Sonntag optional hinzufügbar/entfernbar**
+  - **Keine vorausgefüllten Zeiten**: Start/Endzeit und Pause müssen manuell eingegeben werden
+  - **Quick-Time Presets**: Schnelle Auswahl häufiger Arbeitszeiten
+  - **Kopier-Funktionen**: Zeiten vom Vortag kopieren oder für alle Tage übernehmen
+  - **Arbeitszeit-Anzeige**: Automatische Berechnung und Anzeige
   - Tägliche Einträge: Start, Ende, Pause, Aufgaben, Ort, Kunde/Projekt
+  - **Kundenauswahl**: Dropdown-Liste aus Kundendatenbank (verwaltet durch Admin)
   - Fahrzeit-Erfassung mit optionaler Weiterberechnung
   - Urlaub/Krankheit/Feiertag-Tracking
 

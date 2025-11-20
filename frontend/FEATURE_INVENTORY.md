@@ -42,6 +42,12 @@ Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden Reac
 
 ### 1.3 Stundenzettel (Timesheets)
 - Wochenübersicht mit automatischer Wochendatums-Berechnung.
+- **Zeiterfassung ohne Vorausfüllung**: Keine Standardzeiten, User trägt alle Zeiten selbst ein.
+- **Flexible Wochenend-Erfassung**: Standardmäßig nur Mo-Fr, Samstag/Sonntag optional hinzufügbar.
+- **Quick-Time Presets**: Schnelle Auswahl häufiger Arbeitszeiten (8:00-17:00, 9:00-18:00, etc.).
+- **Kopier-Funktionen**: Zeiten vom Vortag kopieren oder für alle Tage übernehmen.
+- **Arbeitszeit-Anzeige**: Automatische Berechnung und Anzeige der Arbeitszeit.
+- **Kundenauswahl**: Dropdown-Liste aus Kundendatenbank (verwaltet durch Admin).
 - CRUD für Wochen-Stundenzettel (`/timesheets`, `/timesheets/{id}`).
 - E-Mail-Versand an Vorgesetzte (`/timesheets/{id}/send-email`).
 - Download/Versand von unterschriebenen PDF-Dateien (`/timesheets/{id}/download-and-email`).
@@ -77,6 +83,11 @@ Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden Reac
 - Nutzerverwaltung:
   - Liste, Erstellung, Bearbeitung, Löschung (`/users`, `/auth/register`, `/users/{id}`).
   - Rollen (user/admin/accounting), Wochenstunden.
+- **Kundenverwaltung**:
+  - Liste, Erstellung, Bearbeitung, Deaktivierung (`/customers`, `/admin/customers`).
+  - Kundenname, Projektname, Kontaktdaten, Notizen.
+  - Aktiv/Inaktiv-Status.
+  - Duplikatsprüfung und intelligentes Löschen.
 - SMTP-Konfiguration für E-Mails (`/admin/smtp-config` GET/POST).
 - Accounting-Statistik:
   - Monatsdaten für Buchhaltung (`/accounting/monthly-stats`).
@@ -148,6 +159,11 @@ Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden Reac
 | POST | `/travel-expense-reports/{id}/chat` | Nachricht senden | `{ message }` | `chat_message` |
 | GET | `/admin/smtp-config` | SMTP-Daten abrufen | – | `smtp_server`, `smtp_port`, … |
 | POST | `/admin/smtp-config` | SMTP speichern | `SMTPConfigCreate` | `message` |
+| GET | `/customers` | Aktive Kunden (alle User) | – | Liste `Customer` |
+| GET | `/admin/customers` | Alle Kunden (Admin) | – | Liste `Customer` |
+| POST | `/admin/customers` | Kunde anlegen (Admin) | `CustomerCreate` | `Customer` |
+| PUT | `/admin/customers/{id}` | Kunde aktualisieren (Admin) | `CustomerUpdate` | `Customer` |
+| DELETE | `/admin/customers/{id}` | Kunde deaktivieren (Admin) | – | `message` |
 
 > Hinweis: Die Tabelle konzentriert sich auf Endpunkte, die das aktuelle Frontend konsumiert. Die Backend-API bietet darüber hinaus Funktionen (Web Push an Rollen, Agents, etc.), die im Frontend (noch) nicht direkt aufgerufen werden.
 
@@ -186,6 +202,9 @@ Dieses Dokument katalogisiert den aktuellen Funktionsumfang der bestehenden Reac
 
 - **PushSubscription**
   - Felder: `endpoint`, `keys`, `user_id`, `role`.
+
+- **Customer**
+  - Felder: `id`, `name`, `project_name` (optional), `contact_email`, `contact_phone`, `notes`, `active`, `created_at`, `updated_at`.
 
 ---
 

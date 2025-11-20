@@ -61,20 +61,29 @@ Die Stundenzettel-App ermöglicht es Ihnen, Ihre Arbeitszeiten wöchentlich zu e
 
 1. Klicken Sie auf **"Neuer Stundenzettel"**
 2. Wählen Sie die **Woche** aus (Montag-Datum)
-3. Das System zeigt automatisch die Woche von Montag bis Sonntag an
+3. Das System zeigt automatisch die **Arbeitstage Montag bis Freitag** an
+4. **Samstag und Sonntag** können bei Bedarf manuell hinzugefügt werden (Button "+ Samstag hinzufügen" / "+ Sonntag hinzufügen")
 
 ### Zeiteinträge hinzufügen
+
+**Wichtig:** Alle Zeiten müssen **manuell eingegeben** werden - es gibt keine vorausgefüllten Standardzeiten.
 
 Für jeden Arbeitstag können Sie mehrere Einträge erfassen:
 
 **Pflichtfelder:**
-- **Datum**: Automatisch vorausgefüllt (kann geändert werden)
-- **Startzeit**: z.B. "08:00"
-- **Endzeit**: z.B. "17:00"
-- **Pause**: Pausenzeit in Minuten (z.B. "60" für 1 Stunde)
+- **Datum**: Automatisch gesetzt (kann geändert werden)
+- **Startzeit**: **Muss eingegeben werden** (z.B. "08:00")
+- **Endzeit**: **Muss eingegeben werden** (z.B. "17:00")
+- **Pause**: Pausenzeit in Minuten (z.B. "60" für 1 Stunde) - Standard: 0
 - **Aufgaben**: Beschreibung Ihrer Tätigkeiten
-- **Kunde/Projekt**: Name des Kunden oder Projekts
+- **Kunde/Projekt**: **Aus Dropdown-Liste auswählen** (verwaltet durch Admin)
 - **Ort**: Arbeitsort (z.B. "Büro", "Kunde vor Ort")
+
+**Hilfsfunktionen für schnelle Zeiterfassung:**
+- **Quick-Time Presets**: Buttons für häufige Arbeitszeiten (z.B. "8:00 - 17:00 (30min Pause)")
+- **"← Vom Vortag"**: Kopiert die Zeiten vom vorherigen Tag
+- **"Für alle Tage"**: Übernimmt die Zeiten des aktuellen Tages für alle Tage der Woche
+- **Arbeitszeit-Anzeige**: Zeigt automatisch die berechnete Arbeitszeit in Stunden an
 
 **Optionale Felder:**
 - **Fahrzeit**: Fahrzeit in Minuten (z.B. "30" für 30 Minuten)
@@ -446,6 +455,38 @@ Genehmigte Urlaubstage werden **automatisch** in Ihre Stundenzettel eingetragen:
 - Poolfahrzeuge stehen allen Mitarbeitenden zur Verfügung (keine Zuordnung)
 - Persönliche Fahrzeuge werden einer Person zugeordnet (z. B. Dienstwagen)
 - Änderungen sind sofort aktiv und wirken sich auf kommende Reisekostenabrechnungen aus
+
+### Kundenverwaltung
+
+**Kunden anlegen:**
+
+1. Gehen Sie zu **"Administration"** → **"Kunden"**
+2. Klicken Sie auf **"Neuer Kunde"**
+3. Tragen Sie ein:
+   - **Kundenname**: Name des Kunden (Pflichtfeld)
+   - **Projektname**: Optional, falls spezifisches Projekt
+   - **Kontakt-E-Mail**: Optional
+   - **Kontakt-Telefon**: Optional
+   - **Notizen**: Optional
+4. Klicken Sie auf **"Speichern"**
+
+**Kunden bearbeiten:**
+
+1. Öffnen Sie den Kunden aus der Liste
+2. Klicken Sie auf **"Bearbeiten"**
+3. Ändern Sie die gewünschten Felder
+4. Klicken Sie auf **"Speichern"**
+
+**Kunden deaktivieren:**
+
+1. Öffnen Sie den Kunden
+2. Klicken Sie auf **"Löschen"** (deaktiviert den Kunden)
+3. Bestätigen Sie die Deaktivierung
+
+**Wichtig:**
+- Deaktivierte Kunden erscheinen nicht mehr in der Auswahlliste für neue Stundenzettel
+- Kunden, die noch in Stundenzetteln verwendet werden, können nicht gelöscht werden (nur deaktiviert)
+- Alle Benutzer können aktive Kunden in Stundenzetteln auswählen
 
 ### SMTP-Konfiguration
 

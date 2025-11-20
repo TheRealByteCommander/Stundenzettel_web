@@ -5,6 +5,26 @@ Alle wichtigen Änderungen in diesem Projekt werden in dieser Datei dokumentiert
 ## [Unreleased]
 
 ### Hinzugefügt (Jan 2025)
+- **Kundendatenbank-Funktion**:
+  - ✅ Admin kann Kunden anlegen, bearbeiten und deaktivieren (CRUD)
+  - ✅ Kundenverwaltung über `/app/admin/customers`
+  - ✅ Kundenauswahl-Dropdown in Stundenzettel-Erstellung und -Bearbeitung
+  - ✅ Duplikatsprüfung für Kundenname
+  - ✅ Intelligentes Löschen (deaktiviert statt löschen, wenn noch in Stundenzetteln verwendet)
+  - ✅ API-Endpunkte: `GET /customers` (alle User), `GET/POST/PUT/DELETE /admin/customers` (nur Admin)
+
+- **Zeiterfassung ohne Vorausfüllung**:
+  - ✅ Keine vorausgefüllten Zeiten mehr (Start/Endzeit und Pause leer)
+  - ✅ Standardmäßig nur Montag-Freitag (5 Arbeitstage)
+  - ✅ Samstag und Sonntag können manuell hinzugefügt/entfernt werden
+  - ✅ Quick-Time Presets für häufige Arbeitszeiten (8:00-17:00, 9:00-18:00, etc.)
+  - ✅ Kopier-Funktionen: "Vom Vortag" und "Für alle Tage"
+  - ✅ Automatische Arbeitszeit-Berechnung und Anzeige
+  - ✅ Tagesnamen dynamisch aus Datum berechnet
+  - ✅ Wochenendtage werden mit "(Wochenende)" markiert
+  - ✅ Validierung: Mindestens 1 Eintrag erforderlich (statt 7)
+
+### Hinzugefügt (Jan 2025)
 - **Frontend Rebuild - Vollständige Umsetzung aller Features**:
   - ✅ Ankündigungen (Announcements): CRUD, Bild-Upload, Dashboard-Integration
   - ✅ Urlaubsverwaltung (Vacation): Anträge, Guthaben, Genehmigung, Anforderungen

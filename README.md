@@ -10,6 +10,12 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 
 ### Stundenzettel-App
 - ✅ Wochenbasierte Zeiterfassung
+- ✅ **Kundendatenbank**: Admin verwaltet Kunden, User wählt aus Dropdown-Liste
+- ✅ **Zeiterfassung ohne Vorausfüllung**: Keine Standardzeiten, User trägt alle Zeiten selbst ein
+- ✅ **Flexible Wochenend-Erfassung**: Standardmäßig nur Mo-Fr, Samstag/Sonntag optional hinzufügbar
+- ✅ **Quick-Time Presets**: Schnelle Auswahl häufiger Arbeitszeiten (8-17, 9-18, etc.)
+- ✅ **Kopier-Funktionen**: Zeiten vom Vortag kopieren oder für alle Tage übernehmen
+- ✅ **Arbeitszeit-Anzeige**: Automatische Berechnung und Anzeige der Arbeitszeit
 - ✅ PDF-Generierung für Stundenzettel
 - ✅ E-Mail-Versand mit PDF-Anhang
 - ✅ Urlaub, Krankheit, Feiertag-Tracking
@@ -117,6 +123,7 @@ Tick Guard - Professionelles Zeiterfassungs- und Reisekosten-Management-System v
 
 ### Weitere Features
 - ✅ Benutzer- und Adminverwaltung mit Rollen (User, Admin, Buchhaltung)
+- ✅ **Kundenverwaltung**: Admin kann Kunden anlegen, bearbeiten und deaktivieren (CRUD)
 - ✅ Obligatorische 2FA (Google Authenticator)
 - ✅ Ankündigungen/News-System mit Bildern (CRUD, Bild-Upload, Dashboard-Integration)
 - ✅ Urlaubsverwaltung (Anträge, Guthaben, Genehmigung, Anforderungen)
