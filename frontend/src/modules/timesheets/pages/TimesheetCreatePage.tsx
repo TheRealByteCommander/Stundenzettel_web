@@ -15,9 +15,9 @@ import type { TimeEntry } from "../../../services/api/types";
 
 const defaultEntry: TimeEntry = {
   date: new Date().toISOString().split("T")[0],
-  start_time: "08:00",
-  end_time: "17:00",
-  break_minutes: 30,
+  start_time: "",
+  end_time: "",
+  break_minutes: 0,
   tasks: "",
   customer_project: "",
   location: "",
@@ -35,12 +35,13 @@ const getMonday = (date: Date): Date => {
   return new Date(d.setDate(diff));
 };
 
-// Helper function to generate week entries (Monday to Sunday)
+// Helper function to generate week entries (Monday to Friday only)
 const generateWeekEntries = (weekStartDate: string, weekVehicleId: string | null): TimeEntry[] => {
   const start = new Date(weekStartDate);
   const entries: TimeEntry[] = [];
   
-  for (let i = 0; i < 7; i++) {
+  // Nur Montag bis Freitag (5 Tage)
+  for (let i = 0; i < 5; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
     entries.push({
@@ -51,6 +52,20 @@ const generateWeekEntries = (weekStartDate: string, weekVehicleId: string | null
   }
   
   return entries;
+};
+
+// Helper function to get Saturday date
+const getSaturday = (weekStartDate: string): string => {
+  const start = new Date(weekStartDate);
+  start.setDate(start.getDate() + 5); // Samstag ist 5 Tage nach Montag
+  return start.toISOString().split("T")[0];
+};
+
+// Helper function to get Sunday date
+const getSunday = (weekStartDate: string): string => {
+  const start = new Date(weekStartDate);
+  start.setDate(start.getDate() + 6); // Sonntag ist 6 Tage nach Montag
+  return start.toISOString().split("T")[0];
 };
 
 export const TimesheetCreatePage = () => {
@@ -80,22 +95,59 @@ export const TimesheetCreatePage = () => {
     [vehicles]
   );
 
+  // Check if Saturday is already in entries
+  const hasSaturday = useMemo(() => {
+    const saturdayDate = getSaturday(weekStart);
+    return entries.some(entry => entry.date === saturdayDate);
+  }, [entries, weekStart]);
+
+  // Check if Sunday is already in entries
+  const hasSunday = useMemo(() => {
+    const sundayDate = getSunday(weekStart);
+    return entries.some(entry => entry.date === sundayDate);
+  }, [entries, weekStart]);
+
   // Update entries when week start changes
   const handleWeekStartChange = (newWeekStart: string) => {
     setWeekStart(newWeekStart);
-    // Regenerate week entries for the new week
+    // Regenerate week entries for the new week (only Mo-Fr)
     const newEntries = generateWeekEntries(newWeekStart, weekVehicleId || null);
+    // Behalte Samstag/Sonntag falls vorhanden (mit neuem Datum)
+    const saturdayDate = getSaturday(newWeekStart);
+    const sundayDate = getSunday(newWeekStart);
+    const existingSaturday = entries.find(e => {
+      const oldSaturday = getSaturday(weekStart);
+      return e.date === oldSaturday;
+    });
+    const existingSunday = entries.find(e => {
+      const oldSunday = getSunday(weekStart);
+      return e.date === oldSunday;
+    });
+    
+    if (existingSaturday) {
+      newEntries.push({
+        ...existingSaturday,
+        date: saturdayDate,
+      });
+    }
+    if (existingSunday) {
+      newEntries.push({
+        ...existingSunday,
+        date: sundayDate,
+      });
+    }
+    
     setEntries(newEntries);
   };
 
   const handleEntryChange = (
-    index: number,
+    date: string,
     field: keyof TimeEntry,
     value: string | number | boolean | null
   ) => {
     setEntries((prev) =>
-      prev.map((entry, idx) =>
-        idx === index
+      prev.map((entry) =>
+        entry.date === date
           ? {
               ...entry,
               [field]: value,
@@ -103,6 +155,109 @@ export const TimesheetCreatePage = () => {
           : entry
       )
     );
+  };
+
+  // Helper: Berechne Arbeitszeit für einen Eintrag
+  const calculateWorkHours = (entry: TimeEntry): number => {
+    if (!entry.start_time || !entry.end_time) return 0;
+    try {
+      const start = new Date(`1970-01-01T${entry.start_time}:00`);
+      const end = new Date(`1970-01-01T${entry.end_time}:00`);
+      const diff = (end.getTime() - start.getTime()) / 1000 / 60 - (entry.break_minutes || 0);
+      return Math.max(diff, 0) / 60;
+    } catch {
+      return 0;
+    }
+  };
+
+  // Helper: Kopiere Zeiten vom vorherigen Tag
+  const copyFromPreviousDay = (currentDate: string) => {
+    const sortedEntries = [...entries].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateA - dateB;
+    });
+    const currentIndex = sortedEntries.findIndex(e => e.date === currentDate);
+    if (currentIndex === 0) return; // Erster Tag hat keinen Vorgänger
+    const previousEntry = sortedEntries[currentIndex - 1];
+    
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.date === currentDate
+          ? {
+              ...entry,
+              start_time: previousEntry.start_time || "",
+              end_time: previousEntry.end_time || "",
+              break_minutes: previousEntry.break_minutes || 0,
+            }
+          : entry
+      )
+    );
+  };
+
+  // Helper: Setze gleiche Zeiten für alle Tage
+  const applyToAllDays = (sourceDate: string) => {
+    const sourceEntry = entries.find(e => e.date === sourceDate);
+    if (!sourceEntry || !sourceEntry.start_time || !sourceEntry.end_time) return;
+    
+    setEntries((prev) =>
+      prev.map((entry) => ({
+        ...entry,
+        start_time: sourceEntry.start_time,
+        end_time: sourceEntry.end_time,
+        break_minutes: sourceEntry.break_minutes || 0,
+      }))
+    );
+  };
+
+  // Quick-Time Presets
+  const quickTimePresets = [
+    { label: "8:00 - 17:00 (30min Pause)", start: "08:00", end: "17:00", break: 30 },
+    { label: "9:00 - 18:00 (30min Pause)", start: "09:00", end: "18:00", break: 30 },
+    { label: "8:00 - 16:00 (30min Pause)", start: "08:00", end: "16:00", break: 30 },
+    { label: "7:00 - 16:00 (30min Pause)", start: "07:00", end: "16:00", break: 30 },
+  ];
+
+  const applyQuickTime = (date: string, preset: typeof quickTimePresets[0]) => {
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.date === date
+          ? {
+              ...entry,
+              start_time: preset.start,
+              end_time: preset.end,
+              break_minutes: preset.break,
+            }
+          : entry
+      )
+    );
+  };
+
+  // Add Saturday entry
+  const addSaturday = () => {
+    const saturdayDate = getSaturday(weekStart);
+    const newEntry: TimeEntry = {
+      ...defaultEntry,
+      date: saturdayDate,
+      vehicle_id: weekVehicleId || null,
+    };
+    setEntries((prev) => [...prev, newEntry]);
+  };
+
+  // Add Sunday entry
+  const addSunday = () => {
+    const sundayDate = getSunday(weekStart);
+    const newEntry: TimeEntry = {
+      ...defaultEntry,
+      date: sundayDate,
+      vehicle_id: weekVehicleId || null,
+    };
+    setEntries((prev) => [...prev, newEntry]);
+  };
+
+  // Remove entry by date
+  const removeEntry = (date: string) => {
+    setEntries((prev) => prev.filter(entry => entry.date !== date));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -203,18 +358,106 @@ export const TimesheetCreatePage = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-brand-gray">
-                  Wocheneinträge (Montag - Sonntag)
+                  Wocheneinträge (Montag - Freitag)
                 </h2>
               </div>
               <p className="text-sm text-gray-600">
-                Alle 7 Tage der Woche sind automatisch erstellt. Sie können jeden Tag individuell bearbeiten.
+                Die Arbeitstage Montag bis Freitag sind automatisch erstellt. Samstag und Sonntag können bei Bedarf manuell hinzugefügt werden.
               </p>
 
-              {entries.map((entry, index) => (
+              {/* Buttons zum Hinzufügen von Samstag/Sonntag */}
+              <div className="flex gap-2">
+                {!hasSaturday && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addSaturday}
+                  >
+                    + Samstag hinzufügen
+                  </Button>
+                )}
+                {!hasSunday && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addSunday}
+                  >
+                    + Sonntag hinzufügen
+                  </Button>
+                )}
+              </div>
+
+              {entries
+                .sort((a, b) => {
+                  // Sortiere nach Datum: Mo-Fr zuerst, dann Sa-So
+                  const dateA = new Date(a.date).getTime();
+                  const dateB = new Date(b.date).getTime();
+                  return dateA - dateB;
+                })
+                .map((entry, index) => {
+                const workHours = calculateWorkHours(entry);
+                const entryDate = new Date(entry.date);
+                const dayOfWeek = entryDate.getDay();
+                const dayNames = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+                const dayName = dayNames[dayOfWeek];
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sonntag oder Samstag
+                const sortedEntries = [...entries].sort((a, b) => {
+                  const dateA = new Date(a.date).getTime();
+                  const dateB = new Date(b.date).getTime();
+                  return dateA - dateB;
+                });
+                const currentIndex = sortedEntries.findIndex(e => e.date === entry.date);
+                const previousEntry = currentIndex > 0 ? sortedEntries[currentIndex - 1] : null;
+                
+                return (
                 <div
-                  key={index}
+                  key={entry.date}
                   className="rounded-lg border border-gray-200 p-4 shadow-sm"
                 >
+                  <div className="mb-4 flex items-center justify-between border-b pb-2">
+                    <h3 className="font-semibold text-brand-gray">
+                      {dayName}
+                      {isWeekend && <span className="ml-2 text-xs text-gray-500">(Wochenende)</span>}
+                    </h3>
+                    <div className="flex gap-2">
+                      {previousEntry && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyFromPreviousDay(entry.date)}
+                          title="Zeiten vom vorherigen Tag kopieren"
+                        >
+                          ← Vom Vortag
+                        </Button>
+                      )}
+                      {entry.start_time && entry.end_time && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => applyToAllDays(entry.date)}
+                          title="Diese Zeiten für alle Tage übernehmen"
+                        >
+                          Für alle Tage
+                        </Button>
+                      )}
+                      {isWeekend && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeEntry(entry.date)}
+                          title="Wochenendtag entfernen"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Entfernen
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2 md:col-span-2">
                         <Label>Fahrzeug</Label>
@@ -223,7 +466,7 @@ export const TimesheetCreatePage = () => {
                           value={entry.vehicle_id ?? ""}
                           onChange={(event) =>
                             handleEntryChange(
-                              index,
+                              entry.date,
                               "vehicle_id",
                               event.target.value
                             )
@@ -248,7 +491,7 @@ export const TimesheetCreatePage = () => {
                         type="date"
                         value={entry.date}
                         onChange={(event) =>
-                          handleEntryChange(index, "date", event.target.value)
+                          handleEntryChange(entry.date, "date", event.target.value)
                         }
                       />
                     </div>
@@ -257,48 +500,76 @@ export const TimesheetCreatePage = () => {
                       <Input
                         value={entry.location}
                         onChange={(event) =>
-                          handleEntryChange(index, "location", event.target.value)
+                          handleEntryChange(entry.date, "location", event.target.value)
                         }
+                        placeholder="z.B. Büro, Kunde vor Ort"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Startzeit</Label>
-                      <Input
-                        type="time"
-                        value={entry.start_time}
-                        onChange={(event) =>
-                          handleEntryChange(
-                            index,
-                            "start_time",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Endzeit</Label>
-                      <Input
-                        type="time"
-                        value={entry.end_time}
-                        onChange={(event) =>
-                          handleEntryChange(index, "end_time", event.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Pausen (Minuten)</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={entry.break_minutes}
-                        onChange={(event) =>
-                          handleEntryChange(
-                            index,
-                            "break_minutes",
-                            event.target.value
-                          )
-                        }
-                      />
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Zeiten</Label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {quickTimePresets.map((preset) => (
+                          <Button
+                            key={preset.label}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => applyQuickTime(entry.date, preset)}
+                            className="text-xs"
+                          >
+                            {preset.label}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Startzeit</Label>
+                          <Input
+                            type="time"
+                            value={entry.start_time}
+                            onChange={(event) =>
+                              handleEntryChange(
+                                entry.date,
+                                "start_time",
+                                event.target.value
+                              )
+                            }
+                            placeholder="08:00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Endzeit</Label>
+                          <Input
+                            type="time"
+                            value={entry.end_time}
+                            onChange={(event) =>
+                              handleEntryChange(entry.date, "end_time", event.target.value)
+                            }
+                            placeholder="17:00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Pause (Min)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={entry.break_minutes || ""}
+                            onChange={(event) =>
+                              handleEntryChange(
+                                entry.date,
+                                "break_minutes",
+                                parseInt(event.target.value) || 0
+                              )
+                            }
+                            placeholder="30"
+                          />
+                        </div>
+                      </div>
+                      {workHours > 0 && (
+                        <p className="text-sm text-green-600 font-semibold mt-1">
+                          Arbeitszeit: {workHours.toFixed(2)} Stunden
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Projekt / Kunde</Label>
@@ -307,7 +578,7 @@ export const TimesheetCreatePage = () => {
                         value={entry.customer_project || ""}
                         onChange={(event) =>
                           handleEntryChange(
-                            index,
+                            entry.date,
                             "customer_project",
                             event.target.value
                           )
@@ -330,7 +601,7 @@ export const TimesheetCreatePage = () => {
                       <Input
                         value={entry.tasks}
                         onChange={(event) =>
-                          handleEntryChange(index, "tasks", event.target.value)
+                          handleEntryChange(entry.date, "tasks", event.target.value)
                         }
                       />
                     </div>
@@ -342,7 +613,7 @@ export const TimesheetCreatePage = () => {
             <div className="flex justify-end gap-3">
               <Button
                 type="submit"
-                disabled={createMutation.isPending || entries.length !== 7}
+                disabled={createMutation.isPending || entries.length === 0}
               >
                 {createMutation.isPending
                   ? "Speichere..."
