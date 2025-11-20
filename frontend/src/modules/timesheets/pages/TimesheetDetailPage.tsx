@@ -13,6 +13,7 @@ import {
 } from "../hooks/useTimesheets";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
 import { useAvailableVehiclesQuery } from "../hooks/useAvailableVehicles";
+import { useCustomersQuery } from "../hooks/useCustomers";
 import type { TimeEntry } from "../../../services/api/types";
 
 const statusLabels: Record<string, string> = {
@@ -51,6 +52,7 @@ export const TimesheetDetailPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const { data: currentUser } = useCurrentUserQuery();
   const { data: vehicles } = useAvailableVehiclesQuery();
+  const { data: customers } = useCustomersQuery();
   const isAccounting =
     currentUser?.role === "admin" || currentUser?.role === "accounting";
   const canEdit = data?.status === "draft" && (currentUser?.id === data?.user_id || isAccounting);
@@ -527,13 +529,21 @@ export const TimesheetDetailPage = () => {
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
-                      <Input
-                        value={entry.customer_project}
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={entry.customer_project || ""}
                         onChange={(event) =>
                           handleEntryChange(index, "customer_project", event.target.value)
                         }
-                        className="w-full"
-                      />
+                      >
+                        <option value="">-- Kunde auswählen --</option>
+                        {customers?.map((customer) => (
+                          <option key={customer.id} value={customer.name}>
+                            {customer.name}
+                            {customer.project_name ? ` - ${customer.project_name}` : ""}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       entry.customer_project || "-"
                     )}

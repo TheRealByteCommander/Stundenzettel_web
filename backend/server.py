@@ -493,6 +493,40 @@ class AnnouncementUpdate(BaseModel):
     image_filename: Optional[str] = None
     active: Optional[bool] = None
 
+class Customer(BaseModel):
+    """Kundendatenbank-Eintrag"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    project_name: Optional[str] = None  # Optionales Projekt innerhalb des Kunden
+    contact_person: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CustomerCreate(BaseModel):
+    name: str
+    project_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    active: bool = True
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    project_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    active: Optional[bool] = None
+
 # Utility functions
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -1567,6 +1601,109 @@ async def get_available_vehicles(current_user: User = Depends(get_current_user))
         vehicle.pop("_id", None)
         sanitized.append(Vehicle(**vehicle))
     return sanitized
+
+# Customer Management Endpoints
+@api_router.get("/customers", response_model=List[Customer])
+async def get_customers(current_user: User = Depends(get_current_user)):
+    """Gibt alle aktiven Kunden zurück (für alle User)"""
+    customers = await db.customers.find({"active": True}).sort("name", 1).to_list(1000)
+    sanitized: List[Customer] = []
+    for customer in customers:
+        customer.pop("_id", None)
+        sanitized.append(Customer(**customer))
+    return sanitized
+
+@api_router.get("/admin/customers", response_model=List[Customer])
+async def get_all_customers_admin(current_user: User = Depends(get_admin_user)):
+    """Gibt alle Kunden zurück (auch inaktive) - nur für Admin"""
+    customers = await db.customers.find().sort("name", 1).to_list(1000)
+    sanitized: List[Customer] = []
+    for customer in customers:
+        customer.pop("_id", None)
+        sanitized.append(Customer(**customer))
+    return sanitized
+
+@api_router.post("/admin/customers", response_model=Customer)
+async def create_customer(customer_create: CustomerCreate, current_user: User = Depends(get_admin_user)):
+    """Erstellt einen neuen Kunden - nur für Admin"""
+    name = customer_create.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Kundenname ist erforderlich")
+    
+    # Prüfe auf Duplikate (Name muss eindeutig sein, Projektname ist optional)
+    existing = await db.customers.find_one({"name": name})
+    if existing:
+        raise HTTPException(status_code=400, detail="Kunde mit diesem Namen existiert bereits")
+    
+    customer = Customer(
+        name=name,
+        project_name=customer_create.project_name,
+        contact_person=customer_create.contact_person,
+        email=customer_create.email,
+        phone=customer_create.phone,
+        address=customer_create.address,
+        notes=customer_create.notes,
+        active=customer_create.active
+    )
+    customer_dict = customer.model_dump()
+    customer_dict["created_at"] = datetime.utcnow()
+    customer_dict["updated_at"] = datetime.utcnow()
+    await db.customers.insert_one(customer_dict)
+    
+    customer_dict.pop("_id", None)
+    return Customer(**customer_dict)
+
+@api_router.put("/admin/customers/{customer_id}", response_model=Customer)
+async def update_customer(customer_id: str, customer_update: CustomerUpdate, current_user: User = Depends(get_admin_user)):
+    """Aktualisiert einen Kunden - nur für Admin"""
+    existing = await db.customers.find_one({"id": customer_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Kunde nicht gefunden")
+    
+    update_data = customer_update.model_dump(exclude_unset=True)
+    
+    # Name validieren falls geändert
+    if "name" in update_data:
+        name = update_data["name"].strip() if update_data["name"] else existing.get("name", "")
+        if not name:
+            raise HTTPException(status_code=400, detail="Kundenname darf nicht leer sein")
+        update_data["name"] = name
+        
+        # Prüfe auf Duplikate (außer aktueller Kunde)
+        duplicate = await db.customers.find_one({
+            "name": name,
+            "id": {"$ne": customer_id}
+        })
+        if duplicate:
+            raise HTTPException(status_code=400, detail="Kunde mit diesem Namen existiert bereits")
+    
+    update_data["updated_at"] = datetime.utcnow()
+    await db.customers.update_one({"id": customer_id}, {"$set": update_data})
+    
+    updated = await db.customers.find_one({"id": customer_id})
+    updated.pop("_id", None)
+    return Customer(**updated)
+
+@api_router.delete("/admin/customers/{customer_id}")
+async def delete_customer(customer_id: str, current_user: User = Depends(get_admin_user)):
+    """Löscht einen Kunden - nur für Admin"""
+    # Prüfe ob Kunde in Stundenzetteln verwendet wird
+    timesheet_count = await db.timesheets.count_documents({
+        "entries.customer_project": {"$regex": customer_id}
+    })
+    
+    if timesheet_count > 0:
+        # Deaktiviere statt zu löschen
+        await db.customers.update_one(
+            {"id": customer_id},
+            {"$set": {"active": False, "updated_at": datetime.utcnow()}}
+        )
+        return {"message": "Kunde wurde deaktiviert (wird noch in Stundenzetteln verwendet)"}
+    
+    result = await db.customers.delete_one({"id": customer_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Kunde nicht gefunden")
+    return {"message": "Kunde wurde gelöscht"}
 
 @api_router.post("/auth/change-password")
 async def change_password(password_change: PasswordChange, current_user: User = Depends(get_current_user)):

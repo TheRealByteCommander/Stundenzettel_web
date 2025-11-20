@@ -71,6 +71,11 @@ const AccountingPage = lazy(() =>
     default: m.AccountingPage,
   }))
 );
+const CustomerManagementPage = lazy(() =>
+  import("../modules/admin/pages/CustomerManagementPage").then((m) => ({
+    default: m.CustomerManagementPage,
+  }))
+);
 const AnnouncementsPage = lazy(() =>
   import("../modules/announcements/pages/AnnouncementsPage").then((m) => ({
     default: m.AnnouncementsPage,
@@ -189,6 +194,14 @@ const router = createBrowserRouter([
             element: (
               <LazySuspense>
                 <UserManagementPage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "customers",
+            element: (
+              <LazySuspense>
+                <CustomerManagementPage />
               </LazySuspense>
             ),
           },

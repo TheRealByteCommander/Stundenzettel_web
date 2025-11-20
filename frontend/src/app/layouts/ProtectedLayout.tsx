@@ -129,6 +129,13 @@ export const ProtectedLayout = () => {
                 >
                   SMTP
                 </button>
+                <button
+                  className="text-brand-gray hover:text-brand-primary"
+                  onClick={() => navigate("/app/admin/customers")}
+                  aria-label="Zur Kundenverwaltung navigieren"
+                >
+                  Kunden
+                </button>
               </>
             )}
           </nav>

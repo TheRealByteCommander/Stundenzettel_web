@@ -10,6 +10,7 @@ import {
   useTimesheetsQuery,
 } from "../hooks/useTimesheets";
 import { useAvailableVehiclesQuery } from "../hooks/useAvailableVehicles";
+import { useCustomersQuery } from "../hooks/useCustomers";
 import type { TimeEntry } from "../../../services/api/types";
 
 const defaultEntry: TimeEntry = {
@@ -58,6 +59,7 @@ export const TimesheetCreatePage = () => {
   const createMutation = useCreateTimesheetMutation();
   const { data: vehicles, isLoading: vehiclesLoading, error: vehiclesError } =
     useAvailableVehiclesQuery();
+  const { data: customers, isLoading: customersLoading } = useCustomersQuery();
   
   // Initialize with Monday of current week
   const initialMonday = getMonday(new Date()).toISOString().split("T")[0];
@@ -300,8 +302,9 @@ export const TimesheetCreatePage = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Projekt / Kunde</Label>
-                      <Input
-                        value={entry.customer_project}
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={entry.customer_project || ""}
                         onChange={(event) =>
                           handleEntryChange(
                             index,
@@ -309,7 +312,18 @@ export const TimesheetCreatePage = () => {
                             event.target.value
                           )
                         }
-                      />
+                      >
+                        <option value="">-- Kunde auswählen --</option>
+                        {customers?.map((customer) => (
+                          <option key={customer.id} value={customer.name}>
+                            {customer.name}
+                            {customer.project_name ? ` - ${customer.project_name}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {customersLoading && (
+                        <p className="text-xs text-gray-500">Lade Kunden...</p>
+                      )}
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <Label>Aufgaben</Label>
