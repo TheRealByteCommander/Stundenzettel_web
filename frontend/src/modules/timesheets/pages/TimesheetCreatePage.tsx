@@ -412,11 +412,11 @@ export const TimesheetCreatePage = () => {
                 const previousEntry = currentIndex > 0 ? sortedEntries[currentIndex - 1] : null;
                 
                 return (
-                <div
-                  key={entry.date}
-                  className="rounded-lg border border-gray-200 p-4 shadow-sm"
-                >
-                  <div className="mb-4 flex items-center justify-between border-b pb-2">
+                  <div
+                    key={entry.date}
+                    className="rounded-lg border border-gray-200 p-4 shadow-sm"
+                  >
+                    <div className="mb-4 flex items-center justify-between border-b pb-2">
                     <h3 className="font-semibold text-brand-gray">
                       {dayName}
                       {isWeekend && <span className="ml-2 text-xs text-gray-500">(Wochenende)</span>}
@@ -457,8 +457,8 @@ export const TimesheetCreatePage = () => {
                         </Button>
                       )}
                     </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2 md:col-span-2">
                         <Label>Fahrzeug</Label>
                         <select
@@ -485,27 +485,27 @@ export const TimesheetCreatePage = () => {
                           ))}
                         </select>
                       </div>
-                    <div className="space-y-2">
-                      <Label>Datum</Label>
-                      <Input
-                        type="date"
-                        value={entry.date}
-                        onChange={(event) =>
-                          handleEntryChange(entry.date, "date", event.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Ort</Label>
-                      <Input
-                        value={entry.location}
-                        onChange={(event) =>
-                          handleEntryChange(entry.date, "location", event.target.value)
-                        }
-                        placeholder="z.B. Büro, Kunde vor Ort"
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
+                      <div className="space-y-2">
+                        <Label>Datum</Label>
+                        <Input
+                          type="date"
+                          value={entry.date}
+                          onChange={(event) =>
+                            handleEntryChange(entry.date, "date", event.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Ort</Label>
+                        <Input
+                          value={entry.location}
+                          onChange={(event) =>
+                            handleEntryChange(entry.date, "location", event.target.value)
+                          }
+                          placeholder="z.B. Büro, Kunde vor Ort"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
                       <Label>Zeiten</Label>
                       <div className="flex flex-wrap gap-2 mb-2">
                         {quickTimePresets.map((preset) => (
@@ -570,44 +570,45 @@ export const TimesheetCreatePage = () => {
                           Arbeitszeit: {workHours.toFixed(2)} Stunden
                         </p>
                       )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Projekt / Kunde</Label>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                        value={entry.customer_project || ""}
-                        onChange={(event) =>
-                          handleEntryChange(
-                            entry.date,
-                            "customer_project",
-                            event.target.value
-                          )
-                        }
-                      >
-                        <option value="">-- Kunde auswählen --</option>
-                        {customers?.map((customer) => (
-                          <option key={customer.id} value={customer.name}>
-                            {customer.name}
-                            {customer.project_name ? ` - ${customer.project_name}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                      {customersLoading && (
-                        <p className="text-xs text-gray-500">Lade Kunden...</p>
-                      )}
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <Label>Aufgaben</Label>
-                      <Input
-                        value={entry.tasks}
-                        onChange={(event) =>
-                          handleEntryChange(entry.date, "tasks", event.target.value)
-                        }
-                      />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Projekt / Kunde</Label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          value={entry.customer_project || ""}
+                          onChange={(event) =>
+                            handleEntryChange(
+                              entry.date,
+                              "customer_project",
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="">-- Kunde auswählen --</option>
+                          {customers?.map((customer) => (
+                            <option key={customer.id} value={customer.name}>
+                              {customer.name}
+                              {customer.project_name ? ` - ${customer.project_name}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {customersLoading && (
+                          <p className="text-xs text-gray-500">Lade Kunden...</p>
+                        )}
+                      </div>
+                      <div className="md:col-span-2 space-y-2">
+                        <Label>Aufgaben</Label>
+                        <Input
+                          value={entry.tasks}
+                          onChange={(event) =>
+                            handleEntryChange(entry.date, "tasks", event.target.value)
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex justify-end gap-3">
