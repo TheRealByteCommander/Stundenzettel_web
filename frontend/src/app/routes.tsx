@@ -76,6 +76,16 @@ const CustomerManagementPage = lazy(() =>
     default: m.CustomerManagementPage,
   }))
 );
+const VacationBalancePage = lazy(() =>
+  import("../modules/admin/pages/VacationBalancePage").then((m) => ({
+    default: m.VacationBalancePage,
+  }))
+);
+const AuditLogsPage = lazy(() =>
+  import("../modules/admin/pages/AuditLogsPage").then((m) => ({
+    default: m.AuditLogsPage,
+  }))
+);
 const AnnouncementsPage = lazy(() =>
   import("../modules/announcements/pages/AnnouncementsPage").then((m) => ({
     default: m.AnnouncementsPage,
@@ -218,6 +228,22 @@ const router = createBrowserRouter([
             element: (
               <LazySuspense>
                 <AccountingPage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "vacation-balance",
+            element: (
+              <LazySuspense>
+                <VacationBalancePage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "audit-logs",
+            element: (
+              <LazySuspense>
+                <AuditLogsPage />
               </LazySuspense>
             ),
           },

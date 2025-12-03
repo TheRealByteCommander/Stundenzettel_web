@@ -33,6 +33,8 @@ export const MobileNav = ({ user, onLogout, onPasswordChange }: MobileNavProps) 
     { label: "Fahrzeuge", path: "/app/admin/vehicles", roles: ["admin"] },
     { label: "SMTP", path: "/app/admin/smtp", roles: ["admin"] },
     { label: "Kunden", path: "/app/admin/customers", roles: ["admin"] },
+    { label: "Urlaubsguthaben", path: "/app/admin/vacation-balance", roles: ["admin"] },
+    { label: "Audit-Logs", path: "/app/admin/audit-logs", roles: ["admin"] },
   ];
 
   const handleNavClick = (path: string) => {

@@ -9,6 +9,7 @@ import {
   rejectVacationRequest,
   updateVacationBalance,
   adminDeleteVacationRequest,
+  sendVacationReminders,
   type VacationRequestCreate,
   type VacationBalanceUpdate,
 } from "../../../services/api/vacation";
@@ -100,6 +101,12 @@ export const useUpdateVacationBalanceMutation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacation"] });
     },
+  });
+};
+
+export const useSendVacationRemindersMutation = () => {
+  return useMutation({
+    mutationFn: () => sendVacationReminders(),
   });
 };
 

@@ -102,3 +102,10 @@ export const fetchVacationRequirements = async (
   return data;
 };
 
+export const sendVacationReminders = async (): Promise<{ message: string }> => {
+  const { data } = await apiClient.post<{ message: string }>(
+    "/vacation/send-reminders"
+  );
+  return data;
+};
+

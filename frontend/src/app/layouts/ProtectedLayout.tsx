@@ -140,6 +140,20 @@ export const ProtectedLayout = () => {
                 >
                   Kunden
                 </button>
+                <button
+                  className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
+                  onClick={() => navigate("/app/admin/vacation-balance")}
+                  aria-label="Zur Urlaubsguthaben-Verwaltung navigieren"
+                >
+                  Urlaubsguthaben
+                </button>
+                <button
+                  className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
+                  onClick={() => navigate("/app/admin/audit-logs")}
+                  aria-label="Zu Audit-Logs navigieren"
+                >
+                  Audit-Logs
+                </button>
               </>
             )}
           </nav>

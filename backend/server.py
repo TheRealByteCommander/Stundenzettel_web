@@ -3131,6 +3131,24 @@ async def health_check():
         logging.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
 
+# Audit Log endpoint (admin only)
+@api_router.get("/admin/audit-logs")
+async def get_audit_logs(
+    limit: int = 1000,
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    current_user: User = Depends(get_admin_user)
+):
+    """Get audit logs (admin only)"""
+    logs = audit_logger.get_logs(
+        limit=limit,
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type
+    )
+    return {"logs": logs, "count": len(logs)}
+
 # Include router
 app.include_router(api_router)
 

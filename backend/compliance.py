@@ -119,6 +119,42 @@ class AuditLogger:
                 f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
         except Exception as e:
             logger.error(f"Error writing to audit log: {e}")
+    
+    def get_logs(self, limit: int = 1000, user_id: Optional[str] = None, 
+                  action: Optional[str] = None, resource_type: Optional[str] = None) -> List[Dict]:
+        """Read audit logs with optional filtering"""
+        logs = []
+        try:
+            if not self.log_file.exists():
+                return logs
+            
+            with open(self.log_file, 'r', encoding='utf-8') as f:
+                import json
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        log_entry = json.loads(line)
+                        # Apply filters
+                        if user_id and log_entry.get("user_id") != user_id:
+                            continue
+                        if action and log_entry.get("action") != action:
+                            continue
+                        if resource_type and log_entry.get("resource_type") != resource_type:
+                            continue
+                        logs.append(log_entry)
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Sort by timestamp descending (newest first)
+            logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            
+            # Limit results
+            return logs[:limit]
+        except Exception as e:
+            logger.error(f"Error reading audit log: {e}")
+            return logs
 
 class RetentionManager:
     """Verwaltung von Aufbewahrungsfristen (DSGVO Art. 5 Abs. 1 e)"""

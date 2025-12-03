@@ -17,6 +17,7 @@ import {
   useApproveVacationRequestMutation,
   useRejectVacationRequestMutation,
   useAdminDeleteVacationRequestMutation,
+  useSendVacationRemindersMutation,
 } from "../hooks/useVacation";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
 
@@ -42,7 +43,7 @@ export const VacationPage = () => {
   const deleteMutation = useDeleteVacationRequestMutation();
   const approveMutation = useApproveVacationRequestMutation();
   const rejectMutation = useRejectVacationRequestMutation();
-  // const updateBalanceMutation = useUpdateVacationBalanceMutation();
+  const sendRemindersMutation = useSendVacationRemindersMutation();
   const adminDeleteMutation = useAdminDeleteVacationRequestMutation();
 
   const [message, setMessage] = useState<string | null>(null);
@@ -137,6 +138,44 @@ export const VacationPage = () => {
 
       {message && <Alert variant="success">{message}</Alert>}
       {formError && <Alert variant="destructive">{formError}</Alert>}
+
+      {isAdmin && (
+        <Card>
+          <CardContent className="space-y-3 sm:space-y-4 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <CardTitle className="text-sm sm:text-base text-brand-gray">
+                Admin-Funktionen
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const result = await sendRemindersMutation.mutateAsync();
+                    setMessage(result.message || "Erinnerungsmails wurden versendet");
+                    setFormError(null);
+                  } catch (err) {
+                    setFormError(
+                      (err as { response?: { data?: { detail?: string } } }).response?.data
+                        ?.detail ?? "Fehler beim Versenden der Erinnerungsmails"
+                    );
+                    setMessage(null);
+                  }
+                }}
+                disabled={sendRemindersMutation.isPending}
+                className="w-full sm:w-auto"
+              >
+                {sendRemindersMutation.isPending
+                  ? "Versende..."
+                  : "Urlaubs-Erinnerungen senden"}
+              </Button>
+            </div>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Sendet Erinnerungsmails an alle Mitarbeiter, die ihre Urlaubsanforderungen noch nicht erfüllt haben.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {userBalance && (
         <Card>
