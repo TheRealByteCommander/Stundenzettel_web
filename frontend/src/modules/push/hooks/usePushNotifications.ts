@@ -56,9 +56,10 @@ export const usePushNotifications = () => {
       await subscribePush(subscriptionData);
       setSubscription(subscription);
       setIsSubscribed(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Fehler beim Abonnieren:", error);
-      alert("Fehler beim Abonnieren von Push-Benachrichtigungen: " + error.message);
+      const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";
+      alert("Fehler beim Abonnieren von Push-Benachrichtigungen: " + errorMessage);
     }
   };
 
@@ -70,9 +71,10 @@ export const usePushNotifications = () => {
       await unsubscribePush({ endpoint: subscription.endpoint });
       setSubscription(null);
       setIsSubscribed(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Fehler beim Abmelden:", error);
-      alert("Fehler beim Abmelden von Push-Benachrichtigungen: " + error.message);
+      const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";
+      alert("Fehler beim Abmelden von Push-Benachrichtigungen: " + errorMessage);
     }
   };
 

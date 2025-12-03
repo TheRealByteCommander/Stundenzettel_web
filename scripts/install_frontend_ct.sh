@@ -20,10 +20,10 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/tick-guard}"
 PROJECT_DIR="${PROJECT_DIR:-$INSTALL_DIR/Stundenzettel_web}"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
 WEB_ROOT="${WEB_ROOT:-/var/www/tick-guard}"
-FRONTEND_IP="${FRONTEND_IP:-192.168.178.150}"
+FRONTEND_IP="${FRONTEND_IP:-192.168.178.156}"
 DDNS_DOMAIN="${DDNS_DOMAIN:-$FRONTEND_IP}"
 PUBLIC_HOST="${PUBLIC_HOST:-$DDNS_DOMAIN}"
-BACKEND_HOST="${BACKEND_HOST:-192.168.178.151}"
+BACKEND_HOST="${BACKEND_HOST:-192.168.178.157}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 BACKEND_SCHEME="${BACKEND_SCHEME:-http}"
 RUN_CERTBOT="${RUN_CERTBOT:-false}"
@@ -40,9 +40,18 @@ if [[ "$DDNS_DOMAIN" == "$FRONTEND_IP" ]]; then
 fi
 
 export DEBIAN_FRONTEND=noninteractive
-log "Pakete aktualisieren…"
+log "System aktualisieren und Basis-Konfiguration durchführen…"
 apt-get update -y
-apt-get install -y curl git rsync ufw nginx
+apt-get upgrade -y
+
+# Zeitzone auf Europe/Berlin setzen (falls nicht bereits gesetzt)
+if [[ -f /etc/timezone ]] && [[ "$(cat /etc/timezone)" != "Europe/Berlin" ]]; then
+  log "Zeitzone auf Europe/Berlin setzen…"
+  timedatectl set-timezone Europe/Berlin || warn "Zeitzone konnte nicht gesetzt werden."
+fi
+
+log "Basis-Pakete installieren…"
+apt-get install -y curl git rsync ufw nginx ca-certificates gnupg lsb-release
 
 install_node() {
   log "Node.js >= 18 installieren (NodeSource 20.x)…"

@@ -26,8 +26,8 @@ RECEIPTS_PATH="${LOCAL_RECEIPTS_PATH:-/var/tick-guard/receipts}"
 if [[ ! "$RECEIPTS_PATH" = /* ]]; then
   RECEIPTS_PATH="$(realpath -m "$RECEIPTS_PATH" 2>/dev/null || echo "/var/tick-guard/receipts")"
 fi
-FRONTEND_IP="${FRONTEND_IP:-192.168.178.150}"
-BACKEND_IP="${BACKEND_IP:-192.168.178.151}"
+FRONTEND_IP="${FRONTEND_IP:-192.168.178.156}"
+BACKEND_IP="${BACKEND_IP:-192.168.178.157}"
 OLLAMA_IP="${OLLAMA_IP:-192.168.178.155}"
 DDNS_DOMAIN="${DDNS_DOMAIN:-${FRONTEND_IP}}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-Qwen2.5:32B}"
@@ -54,9 +54,18 @@ if [[ "$DDNS_DOMAIN" == "ddns.example.tld" ]]; then
   warn "DDNS_DOMAIN ist nicht gesetzt – Standardwert 'ddns.example.tld' wird verwendet."
 fi
 
-log "Pakete aktualisieren und Basis-Abhängigkeiten installieren…"
+log "System aktualisieren und Basis-Konfiguration durchführen…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
+apt-get upgrade -y
+
+# Zeitzone auf Europe/Berlin setzen (falls nicht bereits gesetzt)
+if [[ -f /etc/timezone ]] && [[ "$(cat /etc/timezone)" != "Europe/Berlin" ]]; then
+  log "Zeitzone auf Europe/Berlin setzen…"
+  timedatectl set-timezone Europe/Berlin || warn "Zeitzone konnte nicht gesetzt werden."
+fi
+
+log "Pakete aktualisieren und Basis-Abhängigkeiten installieren…"
 
 APT_BASE_PACKAGES=(
   python3
@@ -68,12 +77,29 @@ APT_BASE_PACKAGES=(
   ufw
   openssl
   jq
+  gnupg
+  ca-certificates
 )
 log "Installiere Basis-Pakete: ${APT_BASE_PACKAGES[*]}"
 apt-get install -y "${APT_BASE_PACKAGES[@]}"
 
-if ! apt-get install -y mongodb; then
-  warn "Paket 'mongodb' konnte nicht installiert werden. Bitte MongoDB manuell bereitstellen."
+# MongoDB installieren (Ubuntu 22.04)
+log "MongoDB Repository hinzufügen und installieren…"
+if ! command -v mongod >/dev/null 2>&1; then
+  # MongoDB GPG Key hinzufügen
+  curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg || \
+    curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg || \
+    abort "MongoDB GPG Key konnte nicht heruntergeladen werden."
+  
+  # MongoDB Repository hinzufügen (Ubuntu 22.04 = jammy)
+  echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | \
+    tee /etc/apt/sources.list.d/mongodb-org-7.0.list || \
+    abort "MongoDB Repository konnte nicht hinzugefügt werden."
+  
+  apt-get update -y
+  apt-get install -y mongodb-org || warn "MongoDB konnte nicht installiert werden. Bitte manuell prüfen."
+else
+  log "MongoDB ist bereits installiert."
 fi
 
 if ! command -v openssl >/dev/null 2>&1; then

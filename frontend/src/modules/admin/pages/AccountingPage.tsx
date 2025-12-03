@@ -34,7 +34,7 @@ export const AccountingPage = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Fehler beim Download:", err);
     }
   };
