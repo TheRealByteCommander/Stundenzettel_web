@@ -60,14 +60,24 @@ db = client[os.getenv('DB_NAME', 'stundenzettel')]
 
 # Local storage path for receipts (on office computer, not webserver)
 # DSGVO-Compliance: Dokumente werden nur lokal auf Office-Rechner gespeichert
-LOCAL_RECEIPTS_PATH = os.getenv('LOCAL_RECEIPTS_PATH', 'C:/Reisekosten_Belege')
+# Default: /var/tick-guard/receipts (Linux) or C:/Reisekosten_Belege (Windows)
+_default_path = '/var/tick-guard/receipts' if os.name != 'nt' else 'C:/Reisekosten_Belege'
+LOCAL_RECEIPTS_PATH = os.getenv('LOCAL_RECEIPTS_PATH', _default_path)
+
+# Ensure path is absolute (convert relative to absolute if needed)
+if LOCAL_RECEIPTS_PATH and not os.path.isabs(LOCAL_RECEIPTS_PATH):
+    # Convert relative path to absolute based on current working directory
+    LOCAL_RECEIPTS_PATH = os.path.abspath(LOCAL_RECEIPTS_PATH)
+    logging.warning(f"LOCAL_RECEIPTS_PATH was relative, converted to absolute: {LOCAL_RECEIPTS_PATH}")
 
 # Validate that storage path is local (not on webserver)
 from compliance import validate_local_storage_path, DataEncryption, AuditLogger, RetentionManager, AITransparency
 is_valid, error_msg = validate_local_storage_path(LOCAL_RECEIPTS_PATH)
 if not is_valid:
     logging.error(f"INVALID STORAGE PATH: {error_msg}")
+    logging.error(f"LOCAL_RECEIPTS_PATH value: '{LOCAL_RECEIPTS_PATH}'")
     logging.error("LOCAL_RECEIPTS_PATH must point to a local office computer, not a webserver!")
+    logging.error("Please set LOCAL_RECEIPTS_PATH in .env file to an absolute path (e.g., /var/tick-guard/receipts)")
     raise ValueError(f"Invalid storage path: {error_msg}")
 
 # Ensure directory exists
