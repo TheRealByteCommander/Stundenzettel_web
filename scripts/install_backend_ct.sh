@@ -129,10 +129,14 @@ fi
 log "Repository vorbereiten…"
 mkdir -p "$INSTALL_DIR"
 if [[ -d "$PROJECT_DIR/.git" ]]; then
+  # Sicherheitsprüfung für dieses Verzeichnis deaktivieren (wird als root ausgeführt)
+  git config --global --add safe.directory "$PROJECT_DIR" || true
   git -C "$PROJECT_DIR" fetch --all --prune
   git -C "$PROJECT_DIR" reset --hard "origin/$REPO_BRANCH"
 else
   git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$PROJECT_DIR"
+  # Sicherheitsprüfung für das neu geklonte Verzeichnis deaktivieren
+  git config --global --add safe.directory "$PROJECT_DIR" || true
 fi
 
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"

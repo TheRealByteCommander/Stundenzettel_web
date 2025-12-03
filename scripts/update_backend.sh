@@ -82,6 +82,8 @@ fi
 
 # Fetch und Pull
 log "Änderungen werden geholt..."
+# Sicherheitsprüfung für dieses Verzeichnis deaktivieren (wird als root ausgeführt)
+git config --global --add safe.directory "$PROJECT_DIR" || true
 git fetch origin "$REPO_BRANCH"
 git checkout "$REPO_BRANCH"
 git pull origin "$REPO_BRANCH"
