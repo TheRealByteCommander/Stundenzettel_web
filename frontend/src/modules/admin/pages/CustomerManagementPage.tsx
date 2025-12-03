@@ -168,10 +168,10 @@ export const CustomerManagementPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <Card>
-        <CardContent className="p-6">
-          <CardTitle className="mb-4">Kundenverwaltung</CardTitle>
+        <CardContent className="p-4 sm:p-6">
+          <CardTitle className="mb-4 text-base sm:text-lg">Kundenverwaltung</CardTitle>
 
           {message && (
             <Alert className="mb-4 bg-green-50 text-green-800 border-green-200">
@@ -186,9 +186,9 @@ export const CustomerManagementPage = () => {
           )}
 
           {/* Erstellen */}
-          <form onSubmit={handleCreateSubmit} className="space-y-4 mb-6">
-            <h3 className="text-lg font-semibold">Neuen Kunden erstellen</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleCreateSubmit} className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold">Neuen Kunden erstellen</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="create-name">Kundenname *</Label>
                 <Input

@@ -285,13 +285,13 @@ export const TimesheetCreatePage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <Button variant="outline" onClick={() => navigate(-1)}>
+    <div className="mx-auto max-w-4xl px-3 sm:px-4 py-4 sm:py-8">
+      <Button variant="outline" onClick={() => navigate(-1)} className="mb-4">
         Zurück
       </Button>
 
-      <Card className="mt-6">
-        <CardContent className="space-y-6 py-6">
+      <Card className="mt-4 sm:mt-6">
+        <CardContent className="space-y-4 sm:space-y-6 py-4 sm:py-6">
           <CardTitle className="text-xl text-brand-gray">
             Stundenzettel anlegen
           </CardTitle>
@@ -356,17 +356,17 @@ export const TimesheetCreatePage = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-brand-gray">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-semibold text-brand-gray">
                   Wocheneinträge (Montag - Freitag)
                 </h2>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-xs sm:text-sm text-gray-600">
                 Die Arbeitstage Montag bis Freitag sind automatisch erstellt. Samstag und Sonntag können bei Bedarf manuell hinzugefügt werden.
               </p>
 
               {/* Buttons zum Hinzufügen von Samstag/Sonntag */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {!hasSaturday && (
                   <Button
                     type="button"
@@ -414,14 +414,14 @@ export const TimesheetCreatePage = () => {
                 return (
                   <div
                     key={entry.date}
-                    className="rounded-lg border border-gray-200 p-4 shadow-sm"
+                    className="rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm"
                   >
-                    <div className="mb-4 flex items-center justify-between border-b pb-2">
-                    <h3 className="font-semibold text-brand-gray">
+                    <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2">
+                    <h3 className="font-semibold text-sm sm:text-base text-brand-gray">
                       {dayName}
                       {isWeekend && <span className="ml-2 text-xs text-gray-500">(Wochenende)</span>}
                     </h3>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {previousEntry && (
                         <Button
                           type="button"
@@ -429,6 +429,7 @@ export const TimesheetCreatePage = () => {
                           size="sm"
                           onClick={() => copyFromPreviousDay(entry.date)}
                           title="Zeiten vom vorherigen Tag kopieren"
+                          className="text-xs"
                         >
                           ← Vom Vortag
                         </Button>
@@ -440,6 +441,7 @@ export const TimesheetCreatePage = () => {
                           size="sm"
                           onClick={() => applyToAllDays(entry.date)}
                           title="Diese Zeiten für alle Tage übernehmen"
+                          className="text-xs"
                         >
                           Für alle Tage
                         </Button>
@@ -451,18 +453,18 @@ export const TimesheetCreatePage = () => {
                           size="sm"
                           onClick={() => removeEntry(entry.date)}
                           title="Wochenendtag entfernen"
-                          className="text-red-600 hover:text-red-700"
+                          className="text-xs text-red-600 hover:text-red-700"
                         >
                           Entfernen
                         </Button>
                       )}
                     </div>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
                       <div className="space-y-2 md:col-span-2">
-                        <Label>Fahrzeug</Label>
+                        <Label className="text-sm">Fahrzeug</Label>
                         <select
-                          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 min-h-[44px] sm:min-h-[40px]"
                           value={entry.vehicle_id ?? ""}
                           onChange={(event) =>
                             handleEntryChange(
@@ -486,7 +488,7 @@ export const TimesheetCreatePage = () => {
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Datum</Label>
+                        <Label className="text-sm">Datum</Label>
                         <Input
                           type="date"
                           value={entry.date}
@@ -496,7 +498,7 @@ export const TimesheetCreatePage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Ort</Label>
+                        <Label className="text-sm">Ort</Label>
                         <Input
                           value={entry.location}
                           onChange={(event) =>
@@ -506,7 +508,7 @@ export const TimesheetCreatePage = () => {
                         />
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                      <Label>Zeiten</Label>
+                      <Label className="text-sm">Zeiten</Label>
                       <div className="flex flex-wrap gap-2 mb-2">
                         {quickTimePresets.map((preset) => (
                           <Button
@@ -515,7 +517,7 @@ export const TimesheetCreatePage = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => applyQuickTime(entry.date, preset)}
-                            className="text-xs"
+                            className="text-xs whitespace-nowrap"
                           >
                             {preset.label}
                           </Button>
@@ -572,9 +574,9 @@ export const TimesheetCreatePage = () => {
                       )}
                       </div>
                       <div className="space-y-2">
-                        <Label>Projekt / Kunde</Label>
+                        <Label className="text-sm">Projekt / Kunde</Label>
                         <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 min-h-[44px] sm:min-h-[40px]"
                           value={entry.customer_project || ""}
                           onChange={(event) =>
                             handleEntryChange(
@@ -597,7 +599,7 @@ export const TimesheetCreatePage = () => {
                         )}
                       </div>
                       <div className="md:col-span-2 space-y-2">
-                        <Label>Aufgaben</Label>
+                        <Label className="text-sm">Aufgaben</Label>
                         <Input
                           value={entry.tasks}
                           onChange={(event) =>
@@ -611,10 +613,11 @@ export const TimesheetCreatePage = () => {
               })}
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200">
               <Button
                 type="submit"
                 disabled={createMutation.isPending || entries.length === 0}
+                className="w-full sm:w-auto"
               >
                 {createMutation.isPending
                   ? "Speichere..."

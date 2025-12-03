@@ -111,18 +111,18 @@ export const VacationPage = () => {
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:gap-6 px-3 sm:px-4 py-4 sm:py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-brand-gray">Urlaubsverwaltung</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-xl sm:text-2xl font-semibold text-brand-gray">Urlaubsverwaltung</h1>
+          <p className="text-xs sm:text-sm text-gray-600">
             {isAdmin
               ? "Verwalten Sie Urlaubsanträge und Guthaben."
               : "Stellen Sie Urlaubsanträge und sehen Sie Ihr Guthaben."}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Label htmlFor="year-select">Jahr:</Label>
+          <Label htmlFor="year-select" className="text-sm">Jahr:</Label>
           <Input
             id="year-select"
             type="number"
@@ -140,8 +140,8 @@ export const VacationPage = () => {
 
       {userBalance && (
         <Card>
-          <CardContent className="space-y-2 py-6">
-            <CardTitle className="text-base text-brand-gray">
+          <CardContent className="space-y-2 py-4 sm:py-6">
+            <CardTitle className="text-sm sm:text-base text-brand-gray">
               Urlaubsguthaben {year}
             </CardTitle>
             <div className="text-sm text-gray-600">
@@ -180,21 +180,21 @@ export const VacationPage = () => {
       )}
 
       {!isAdmin && !showCreateForm && (
-        <Button onClick={() => setShowCreateForm(true)}>
+        <Button onClick={() => setShowCreateForm(true)} className="w-full sm:w-auto">
           Neuer Urlaubsantrag
         </Button>
       )}
 
       {!isAdmin && showCreateForm && (
         <Card>
-          <CardContent className="space-y-4 py-6">
-            <CardTitle className="text-lg text-brand-gray">
+          <CardContent className="space-y-3 sm:space-y-4 py-4 sm:py-6">
+            <CardTitle className="text-base sm:text-lg text-brand-gray">
               Neuer Urlaubsantrag
             </CardTitle>
-            <form className="space-y-4" onSubmit={handleCreateRequest}>
-              <div className="grid gap-4 md:grid-cols-2">
+            <form className="space-y-3 sm:space-y-4" onSubmit={handleCreateRequest}>
+              <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="start_date">Startdatum *</Label>
+                  <Label htmlFor="start_date" className="text-sm">Startdatum *</Label>
                   <Input
                     id="start_date"
                     type="date"
@@ -206,7 +206,7 @@ export const VacationPage = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="end_date">Enddatum *</Label>
+                  <Label htmlFor="end_date" className="text-sm">Enddatum *</Label>
                   <Input
                     id="end_date"
                     type="date"
@@ -219,32 +219,31 @@ export const VacationPage = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="notes">Notizen (optional)</Label>
+                <Label htmlFor="notes" className="text-sm">Notizen (optional)</Label>
                 <textarea
                   id="notes"
-                  className="min-h-[100px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                  className="min-h-[100px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 min-h-[44px] sm:min-h-[100px]"
                   value={formData.notes}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, notes: e.target.value }))
                   }
                 />
               </div>
-              <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                >
-                  {createMutation.isPending ? "Erstelle…" : "Antrag stellen"}
-                </Button>
+              <div className="flex flex-col-reverse sm:flex-row gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setFormData({ start_date: "", end_date: "", notes: "" });
-                  }}
+                  onClick={() => setShowCreateForm(false)}
+                  className="w-full sm:w-auto"
                 >
                   Abbrechen
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  {createMutation.isPending ? "Erstelle…" : "Antrag stellen"}
                 </Button>
               </div>
             </form>
@@ -253,41 +252,24 @@ export const VacationPage = () => {
       )}
 
       <Card>
-        <CardContent className="space-y-4 py-6">
-          <CardTitle className="text-lg text-brand-gray">
+        <CardContent className="space-y-3 sm:space-y-4 py-4 sm:py-6">
+          <CardTitle className="text-base sm:text-lg text-brand-gray">
             Urlaubsanträge {year}
           </CardTitle>
           {requestsLoading ? (
             <p className="text-center text-gray-500">Lade Anträge…</p>
           ) : requests && requests.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
-                  <tr>
-                    <th className="px-4 py-3">Mitarbeiter</th>
-                    <th className="px-4 py-3">Von</th>
-                    <th className="px-4 py-3">Bis</th>
-                    <th className="px-4 py-3">Tage</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {requests.map((request) => (
-                    <tr key={request.id}>
-                      <td className="px-4 py-3 text-gray-600">
-                        {request.user_name}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {new Date(request.start_date).toLocaleDateString("de-DE")}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {new Date(request.end_date).toLocaleDateString("de-DE")}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {request.working_days}
-                      </td>
-                      <td className="px-4 py-3">
+            <>
+              {/* Mobile: Card-Layout */}
+              <div className="block sm:hidden space-y-3">
+                {requests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="rounded-lg border border-gray-200 bg-white p-4"
+                  >
+                    <div className="mb-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-brand-gray">{request.user_name}</p>
                         <span
                           className={`rounded-full px-2 py-1 text-xs ${
                             request.status === "approved"
@@ -299,55 +281,155 @@ export const VacationPage = () => {
                         >
                           {statusLabels[request.status]}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          {request.status === "pending" && !isAdmin && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDelete(request.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              Löschen
-                            </Button>
-                          )}
-                          {isAdmin && request.status === "pending" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleApprove(request.id)}
-                                disabled={approveMutation.isPending}
-                              >
-                                Genehmigen
-                              </Button>
+                      </div>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <p>
+                          Von: {new Date(request.start_date).toLocaleDateString("de-DE")}
+                        </p>
+                        <p>
+                          Bis: {new Date(request.end_date).toLocaleDateString("de-DE")}
+                        </p>
+                        <p>Tage: {request.working_days}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {request.status === "pending" && !isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDelete(request.id)}
+                          disabled={deleteMutation.isPending}
+                          className="flex-1 sm:flex-none"
+                        >
+                          Löschen
+                        </Button>
+                      )}
+                      {isAdmin && request.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleApprove(request.id)}
+                            disabled={approveMutation.isPending}
+                            className="flex-1 sm:flex-none"
+                          >
+                            Genehmigen
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleReject(request.id)}
+                            disabled={rejectMutation.isPending}
+                            className="flex-1 sm:flex-none"
+                          >
+                            Ablehnen
+                          </Button>
+                        </>
+                      )}
+                      {isAdmin && request.status !== "pending" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => adminDeleteMutation.mutateAsync(request.id)}
+                          disabled={adminDeleteMutation.isPending}
+                          className="flex-1 sm:flex-none"
+                        >
+                          Löschen
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop: Tabelle */}
+              <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3">Mitarbeiter</th>
+                      <th className="px-4 py-3">Von</th>
+                      <th className="px-4 py-3">Bis</th>
+                      <th className="px-4 py-3">Tage</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {requests.map((request) => (
+                      <tr key={request.id}>
+                        <td className="px-4 py-3 text-gray-600">
+                          {request.user_name}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {new Date(request.start_date).toLocaleDateString("de-DE")}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {new Date(request.end_date).toLocaleDateString("de-DE")}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {request.working_days}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs ${
+                              request.status === "approved"
+                                ? "bg-green-100 text-green-800"
+                                : request.status === "rejected"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-yellow-100 text-yellow-800"
+                            }`}
+                          >
+                            {statusLabels[request.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            {request.status === "pending" && !isAdmin && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleReject(request.id)}
-                                disabled={rejectMutation.isPending}
+                                onClick={() => handleDelete(request.id)}
+                                disabled={deleteMutation.isPending}
                               >
-                                Ablehnen
+                                Löschen
                               </Button>
-                            </>
-                          )}
-                          {isAdmin && request.status !== "pending" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => adminDeleteMutation.mutateAsync(request.id)}
-                              disabled={adminDeleteMutation.isPending}
-                            >
-                              Löschen
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                            )}
+                            {isAdmin && request.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApprove(request.id)}
+                                  disabled={approveMutation.isPending}
+                                >
+                                  Genehmigen
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleReject(request.id)}
+                                  disabled={rejectMutation.isPending}
+                                >
+                                  Ablehnen
+                                </Button>
+                              </>
+                            )}
+                            {isAdmin && request.status !== "pending" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => adminDeleteMutation.mutateAsync(request.id)}
+                                disabled={adminDeleteMutation.isPending}
+                              >
+                                Löschen
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <p className="text-center text-gray-500">
               Keine Urlaubsanträge für {year} vorhanden.

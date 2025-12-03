@@ -37,12 +37,12 @@ export const DashboardPage = () => {
   );
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex max-w-4xl flex-col gap-4 sm:gap-6 px-3 sm:px-4 py-4 sm:py-8">
       <div>
-        <h1 className="text-2xl font-semibold text-brand-gray">
+        <h1 className="text-xl sm:text-2xl font-semibold text-brand-gray">
           Willkommen zurück{user ? `, ${user.name}` : ""}!
         </h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-xs sm:text-sm text-gray-600">
           Dies ist die neue Tick-Guard-Oberfläche. Funktionen werden
           schrittweise migriert.
         </p>
@@ -50,15 +50,16 @@ export const DashboardPage = () => {
 
       {activeAnnouncements.length > 0 && (
         <Card>
-          <CardContent className="space-y-4 py-6">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base text-brand-gray">
+          <CardContent className="space-y-3 sm:space-y-4 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <CardTitle className="text-sm sm:text-base text-brand-gray">
                 Aktuelle Ankündigungen
               </CardTitle>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => navigate("/app/announcements")}
+                className="w-full sm:w-auto"
               >
                 Alle anzeigen
               </Button>
@@ -108,11 +109,11 @@ export const DashboardPage = () => {
       <Card>
         <CardContent className="space-y-4 py-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base text-brand-gray">
+            <CardTitle className="text-sm sm:text-base text-brand-gray">
               Monatsstatistik Stundenzettel
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <label htmlFor="stats-month" className="text-sm text-gray-600">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label htmlFor="stats-month" className="text-xs sm:text-sm text-gray-600">
                 Monat auswählen
               </label>
               <Input
@@ -120,6 +121,7 @@ export const DashboardPage = () => {
                 type="month"
                 value={month}
                 onChange={(event) => setMonth(event.target.value)}
+                className="w-full sm:w-auto"
               />
             </div>
           </div>
@@ -133,21 +135,21 @@ export const DashboardPage = () => {
             </Alert>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 text-xs sm:text-sm">
               <p className="text-brand-gray">
                 Eigene Platzierung (Arbeitsstunden):
               </p>
-              <p className="mt-1 text-2xl font-semibold text-brand-primary">
+              <p className="mt-1 text-xl sm:text-2xl font-semibold text-brand-primary">
                 {rankData?.rank ? `Platz ${rankData.rank}` : "Noch keine Daten"}
               </p>
               <p className="text-xs text-gray-500">
                 Gesamt: {rankData?.total_users ?? "–"} Mitarbeitende
               </p>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 text-xs sm:text-sm">
               <p className="text-brand-gray">Datenbasis:</p>
-              <p className="mt-1 text-2xl font-semibold text-brand-primary">
+              <p className="mt-1 text-xl sm:text-2xl font-semibold text-brand-primary">
                 {topStats.length}
               </p>
               <p className="text-xs text-gray-500">
@@ -156,7 +158,36 @@ export const DashboardPage = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-gray-200">
+          {/* Mobile: Card-Layout, Desktop: Tabelle */}
+          <div className="block sm:hidden space-y-2">
+            {statsLoading ? (
+              <div className="text-center py-6 text-gray-500">Lade Statistik…</div>
+            ) : topStats.length > 0 ? (
+              topStats.map((stat, index) => (
+                <div
+                  key={stat.user_id}
+                  className="rounded-lg border border-gray-200 bg-white p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-600">
+                        #{index + 1}
+                      </span>
+                      <span className="text-sm text-gray-700">{stat.user_name}</span>
+                    </div>
+                    <span className="text-sm font-semibold text-brand-gray">
+                      {stat.total_hours.toFixed(2).replace(".", ",")} h
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                Für den ausgewählten Monat liegen noch keine Daten vor.
+              </div>
+            )}
+          </div>
+          <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-100 text-left text-xs uppercase tracking-wide text-gray-600">
                 <tr>

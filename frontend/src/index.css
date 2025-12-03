@@ -4,12 +4,84 @@
 
 :root {
   color-scheme: light;
+  /* Safe Area für iOS Notch */
+  --safe-area-inset-top: env(safe-area-inset-top);
+  --safe-area-inset-right: env(safe-area-inset-right);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom);
+  --safe-area-inset-left: env(safe-area-inset-left);
 }
 
 body {
   @apply min-h-screen bg-gray-100 font-sans text-slate-900 antialiased;
+  /* Verhindert Text-Zoom bei Doppel-Tap auf iOS */
+  -webkit-text-size-adjust: 100%;
+  /* Smooth Scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 #root {
   @apply min-h-screen;
+}
+
+/* Safe Area Padding für iOS */
+.pb-safe {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+.pt-safe {
+  padding-top: var(--safe-area-inset-top);
+}
+
+/* Touch-Optimierungen */
+* {
+  /* Verhindert Text-Selektion bei Doppel-Tap (außer bei Inputs) */
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select,
+button {
+  /* Mindestgröße für Touch-Targets (iOS: 44x44px) */
+  min-height: 44px;
+  /* Verhindert Zoom bei Focus auf iOS */
+  font-size: 16px;
+}
+
+@media (min-width: 640px) {
+  input,
+  textarea,
+  select,
+  button {
+    min-height: 40px;
+  }
+}
+
+/* Scrollbar für mobile Geräte */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Verbesserte Focus-States für Touch */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #e90118;
+  outline-offset: 2px;
 }

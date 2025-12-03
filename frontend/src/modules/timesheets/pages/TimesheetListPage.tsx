@@ -38,18 +38,18 @@ export const TimesheetListPage = () => {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:gap-6 px-3 sm:px-4 py-4 sm:py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-brand-gray">
+          <h1 className="text-xl sm:text-2xl font-semibold text-brand-gray">
             Stundenzettel
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-xs sm:text-sm text-gray-600">
             Übersicht Ihrer Wochen-Stundenzettel. Funktionen werden während der
             Migration erweitert.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link to="/app/timesheets/new">Neuer Stundenzettel</Link>
         </Button>
       </div>
@@ -63,7 +63,55 @@ export const TimesheetListPage = () => {
         </Alert>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      {/* Mobile: Card-Layout, Desktop: Tabelle */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          <div className="text-center py-6 text-gray-500">Lade Stundenzettel…</div>
+        ) : data && data.length > 0 ? (
+          data.map((timesheet) => (
+            <div
+              key={timesheet.id}
+              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <p className="font-semibold text-brand-gray">
+                    {getIsoWeekNumber(timesheet.week_start)}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {new Date(timesheet.week_start).toLocaleDateString("de-DE")}{" "}
+                    – {new Date(timesheet.week_end).toLocaleDateString("de-DE")}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-gray-600">
+                  {statusLabels[timesheet.status] ?? timesheet.status}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-none">
+                  <Link to={`/app/timesheets/${timesheet.id}`}>
+                    Anzeigen
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDelete(timesheet.id)}
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 sm:flex-none"
+                >
+                  Löschen
+                </Button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-6 text-gray-500">
+            Noch keine Stundenzettel vorhanden.
+          </div>
+        )}
+      </div>
+      <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
             <tr>
