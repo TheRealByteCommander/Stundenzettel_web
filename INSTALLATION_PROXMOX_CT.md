@@ -3,9 +3,9 @@
 Diese Anleitung beschreibt Schritt für Schritt, wie du das System vollständig lokal in zwei Proxmox-Containern (CT) mit Ubuntu 22.04 (Minimal) installierst und weltweit via DDNS erreichst. Zielbild:
 
 ```
-Internet → DDNS → CT-Frontend 192.168.178.150 (Nginx + React Build + TLS)
+Internet → DDNS → CT-Frontend 192.168.178.156 (Nginx + React Build + TLS)
                          ↘︎ interne Bridge (LAN/VPN)
-                           CT-Backend 192.168.178.151 (FastAPI + MongoDB + Storage)
+                           CT-Backend 192.168.178.157 (FastAPI + MongoDB + Storage)
                                      ↘︎ GMKTec evo x2 192.168.178.155 (Ollama, Port 11434)
 ```
 
@@ -24,8 +24,8 @@ Internet → DDNS → CT-Frontend 192.168.178.150 (Nginx + React Build + TLS)
 
 | Rolle                | Hostname        | IP-Adresse       |
 |----------------------|-----------------|------------------|
-| Frontend-CT          | `tick-frontend` | `192.168.178.150` |
-| Backend-CT           | `tick-backend`  | `192.168.178.151` |
+| Frontend-CT          | `tick-frontend` | `192.168.178.156` |
+| Backend-CT           | `tick-backend`  | `192.168.178.157` |
 | GMKTec evo x2/Ollama | `gmktec`        | `192.168.178.155` |
 
 > Verwende identische IPs oder passe die folgenden Befehle entsprechend an.
@@ -36,29 +36,29 @@ Internet → DDNS → CT-Frontend 192.168.178.150 (Nginx + React Build + TLS)
 
 Die Skripte aus dem Repository automatisieren sämtliche Schritte (Pakete, Konfiguration, Dienste). Sie können direkt auf den jeweiligen Containern ausgeführt werden. Bei Bedarf Variablen wie `DDNS_DOMAIN`, `FRONTEND_IP`, `BACKEND_IP`, `OLLAMA_IP`, `CORS_ORIGINS`, `CERTBOT_EMAIL` anpassen.
 
-**Backend-Container (`192.168.178.151`)**
+**Backend-Container (`192.168.178.157`)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
- | sudo FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 \
-   DDNS_DOMAIN=192.168.178.150 CORS_ORIGINS=http://192.168.178.150 \
+ | sudo FRONTEND_IP=192.168.178.156 BACKEND_IP=192.168.178.157 OLLAMA_IP=192.168.178.155 \
+   DDNS_DOMAIN=192.168.178.156 CORS_ORIGINS=http://192.168.178.156 \
    LOCAL_RECEIPTS_PATH=/var/tick-guard/receipts bash
 ```
 
-**Frontend-Container (`192.168.178.150`)**
+**Frontend-Container (`192.168.178.156`)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo FRONTEND_IP=192.168.178.150 PUBLIC_HOST=192.168.178.150 \
-   BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
+ | sudo FRONTEND_IP=192.168.178.156 PUBLIC_HOST=192.168.178.156 \
+   BACKEND_HOST=192.168.178.157 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
 ```
 
-Für die automatische Ausstellung eines TLS-Zertifikats via Let’s Encrypt:
+Für die automatische Ausstellung eines TLS-Zertifikats via Let's Encrypt:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo PUBLIC_HOST=mein.host.tld FRONTEND_IP=192.168.178.150 \
-   BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 BACKEND_SCHEME=http \
+ | sudo PUBLIC_HOST=mein.host.tld FRONTEND_IP=192.168.178.156 \
+   BACKEND_HOST=192.168.178.157 BACKEND_PORT=8000 BACKEND_SCHEME=http \
    RUN_CERTBOT=true CERTBOT_EMAIL=admin@mein.host.tld bash
 ```
 
@@ -78,7 +78,7 @@ Die folgenden Abschnitte beschreiben die manuellen Schritte im Detail und dienen
 | CPUs                    | 4 vCPU                            |
 | RAM                     | 6–8 GB                            |
 | Storage                 | 40 GB (SSD), Backup-geeignet      |
-| Netzwerk                | Bridge (z. B. `vmbr0`), statische IP `192.168.178.151/24` |
+| Netzwerk                | Bridge (z. B. `vmbr0`), statische IP `192.168.178.157/24` |
 | Nesting                 | aktivieren (für Python venv)      |
 | Unprivileged            | ✅                                |
 
@@ -91,7 +91,7 @@ Die folgenden Abschnitte beschreiben die manuellen Schritte im Detail und dienen
 | CPUs                    | 2 vCPU                            |
 | RAM                     | 2 GB                              |
 | Storage                 | 15 GB                             |
-| Netzwerk                | Gleiche Bridge, statische IP `192.168.178.150/24` |
+| Netzwerk                | Gleiche Bridge, statische IP `192.168.178.156/24` |
 | Nesting                 | optional                          |
 | Unprivileged            | ✅                                |
 
@@ -117,7 +117,7 @@ ufw allow OpenSSH
 ufw enable
 ```
 
-Frontend-CT: später `ufw allow 443/tcp`. Backend-CT: nur Frontend-IP zulassen, z. B. `ufw allow from 192.168.178.150 to any port 8000 proto tcp`.
+Frontend-CT: später `ufw allow 443/tcp`. Backend-CT: nur Frontend-IP zulassen, z. B. `ufw allow from 192.168.178.156 to any port 8000 proto tcp`.
 
 ---
 
@@ -178,7 +178,7 @@ VAPID_CLAIM_EMAIL=admin@meinedomain.de
 EOF
 ```
 
-> IPs verwenden: Frontend `192.168.178.150`, Backend `192.168.178.151`, GMKTec `192.168.178.155`. VAPID-Keys nach Bedarf generieren.
+> IPs verwenden: Frontend `192.168.178.156`, Backend `192.168.178.157`, GMKTec `192.168.178.155`. VAPID-Keys nach Bedarf generieren.
 
 ### 4.5 Systemuser & Rechte
 
@@ -278,7 +278,7 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://192.168.178.151:8000/api/; # Backend-Container-IP
+        proxy_pass http://192.168.178.157:8000/api/; # Backend-Container-IP
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -309,9 +309,9 @@ systemctl reload nginx
 
 ## 7. Netzwerk & Sicherheit
 
-1. **Router**: Port 443 → Frontend-CT `192.168.178.150` (oder per vorgelagertem Proxy).
+1. **Router**: Port 443 → Frontend-CT `192.168.178.156` (oder per vorgelagertem Proxy).
 2. **WireGuard**: Für Admin/SFTP/SSH Zugänge einrichten (optional).
-3. **GMKTec Firewall**: `ufw allow from 192.168.178.151 to any port 11434 proto tcp`.
+3. **GMKTec Firewall**: `ufw allow from 192.168.178.157 to any port 11434 proto tcp`.
 4. **Fail2ban/CrowdSec** auf Frontend-CT aktivieren (`jail.local` für Nginx).
 5. **Backups**:
    - `mongodump` per Systemd-Timer oder Cron.

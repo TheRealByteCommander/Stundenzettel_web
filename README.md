@@ -169,14 +169,14 @@ Diese Anwendung ist für einen vollständig lokalen Betrieb auf Proxmox ausgeleg
 
 ### ⚙️ Vollautomatische Installation auf Proxmox-CTs
 
-Für die Referenz-IPs `192.168.178.150` (Frontend), `192.168.178.151` (Backend) und `192.168.178.155` (GMKTec/Ollama) stehen zwei Skripte zur Verfügung. Die Skripte können direkt aus dem Repository geladen und gestartet werden; erforderliche Parameter werden über Umgebungsvariablen gesetzt.
+Für die Referenz-IPs `192.168.178.156` (Frontend), `192.168.178.157` (Backend) und `192.168.178.155` (GMKTec/Ollama) stehen zwei Skripte zur Verfügung. Die Skripte können direkt aus dem Repository geladen und gestartet werden; erforderliche Parameter werden über Umgebungsvariablen gesetzt.
 
 **Backend-CT (FastAPI + MongoDB)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
- | sudo FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 \
-   DDNS_DOMAIN=192.168.178.150 CORS_ORIGINS=http://192.168.178.150 bash
+ | sudo FRONTEND_IP=192.168.178.156 BACKEND_IP=192.168.178.157 OLLAMA_IP=192.168.178.155 \
+   DDNS_DOMAIN=192.168.178.156 CORS_ORIGINS=http://192.168.178.156 bash
 ```
 
 Optional lassen sich weitere Variablen wie `SECRET_KEY`, `LOCAL_RECEIPTS_PATH` oder `REPO_BRANCH` mitgeben. `DDNS_DOMAIN` kann vorerst auf der Frontend-IP bleiben; DNS-basierter Zugriff kann später ergänzt werden.
@@ -185,19 +185,19 @@ Optional lassen sich weitere Variablen wie `SECRET_KEY`, `LOCAL_RECEIPTS_PATH` o
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo FRONTEND_IP=192.168.178.150 PUBLIC_HOST=192.168.178.150 \
-   BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
+ | sudo FRONTEND_IP=192.168.178.156 PUBLIC_HOST=192.168.178.156 \
+   BACKEND_HOST=192.168.178.157 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
 ```
 
 Sobald ein gültiges Zertifikat per Let’s Encrypt ausgestellt werden soll (z. B. nach späterer DNS-Anbindung), den Aufruf ergänzen:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo PUBLIC_HOST=mein.host.tld BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 \
+ | sudo PUBLIC_HOST=mein.host.tld BACKEND_HOST=192.168.178.157 BACKEND_PORT=8000 \
    BACKEND_SCHEME=http RUN_CERTBOT=true CERTBOT_EMAIL=admin@mein.host.tld bash
 ```
 
-> Hinweis: Standardmäßig nutzt das Frontend die relative `/api`-Route über Nginx. Nur wenn du den Backend-Port direkt exponieren willst, übergib zusätzlich `PUBLIC_BACKEND_URL=http://192.168.178.151:8000`.
+> Hinweis: Standardmäßig nutzt das Frontend die relative `/api`-Route über Nginx. Nur wenn du den Backend-Port direkt exponieren willst, übergib zusätzlich `PUBLIC_BACKEND_URL=http://192.168.178.157:8000`.
 
 Die Skripte legen alle benötigten Pakete, Konfigurationen und systemd-Dienste automatisch an. Details und manuelle Alternativen sind in `INSTALLATION_PROXMOX_CT.md` beschrieben.
 
@@ -314,7 +314,7 @@ OLLAMA_MODEL_ACCOUNTING=llama3.1
 OLLAMA_TIMEOUT=300
 OLLAMA_MAX_RETRIES=3
 ```
-> Beispiel-IP-Plan: Frontend-CT `192.168.178.150`, Backend-CT `192.168.178.151`, GMKTec `192.168.178.155`. Passe die Werte bei eigenem Netz an.
+> Beispiel-IP-Plan: Frontend-CT `192.168.178.156`, Backend-CT `192.168.178.157`, GMKTec `192.168.178.155`. Passe die Werte bei eigenem Netz an.
 
 Siehe **[backend/LLM_INTEGRATION.md](backend/LLM_INTEGRATION.md)** für Details.
 

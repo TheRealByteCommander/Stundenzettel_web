@@ -3115,7 +3115,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # CORS-Konfiguration aus Umgebungsvariablen
 CORS_ORIGINS = os.getenv(
     "CORS_ORIGINS",
-    "https://app.byte-commander.de,http://localhost:3000,http://localhost:8000,http://192.168.178.150,http://192.168.178.151"
+    "https://app.byte-commander.de,http://localhost:3000,http://localhost:8000,http://192.168.178.156,http://192.168.178.157"
 ).split(",")
 CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS if origin.strip()]
 

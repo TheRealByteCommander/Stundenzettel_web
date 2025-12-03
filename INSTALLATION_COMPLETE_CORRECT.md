@@ -64,22 +64,22 @@ Alle Komponenten bleiben innerhalb des lokalen Netzwerks, lediglich Port `443` d
 
 ## ⚙️ Automatisierte Installation (Empfohlen)
 
-Wer die komplette Einrichtung ohne manuelle Zwischenschritte durchführen möchte, kann die Shell-Skripte aus `scripts/` direkt auf den Containern ausführen. Standardmäßig wird von folgender Topologie ausgegangen: Frontend-CT `192.168.178.150`, Backend-CT `192.168.178.151`, GMKTec/Ollama `192.168.178.155`. Abweichende Werte lassen sich per Umgebungsvariablen setzen.
+Wer die komplette Einrichtung ohne manuelle Zwischenschritte durchführen möchte, kann die Shell-Skripte aus `scripts/` direkt auf den Containern ausführen. Standardmäßig wird von folgender Topologie ausgegangen: Frontend-CT `192.168.178.156`, Backend-CT `192.168.178.157`, GMKTec/Ollama `192.168.178.155`. Abweichende Werte lassen sich per Umgebungsvariablen setzen.
 
 **Backend-CT**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_backend_ct.sh \
- | sudo FRONTEND_IP=192.168.178.150 BACKEND_IP=192.168.178.151 OLLAMA_IP=192.168.178.155 \
-   DDNS_DOMAIN=192.168.178.150 CORS_ORIGINS=http://192.168.178.150 bash
+ | sudo FRONTEND_IP=192.168.178.156 BACKEND_IP=192.168.178.157 OLLAMA_IP=192.168.178.155 \
+   DDNS_DOMAIN=192.168.178.156 CORS_ORIGINS=http://192.168.178.156 bash
 ```
 
 **Frontend-CT**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TheRealByteCommander/Stundenzettel_web/main/scripts/install_frontend_ct.sh \
- | sudo FRONTEND_IP=192.168.178.150 PUBLIC_HOST=192.168.178.150 \
-   BACKEND_HOST=192.168.178.151 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
+ | sudo FRONTEND_IP=192.168.178.156 PUBLIC_HOST=192.168.178.156 \
+   BACKEND_HOST=192.168.178.157 BACKEND_PORT=8000 BACKEND_SCHEME=http bash
 ```
 
 Für eine automatische Let’s-Encrypt-Integration `RUN_CERTBOT=true` sowie `CERTBOT_EMAIL=<adresse>` ergänzen (nur sinnvoll, wenn später ein Domainname hinterlegt ist). Die nachfolgenden Abschnitte beschreiben weiterhin sämtliche Arbeitsschritte, falls einzelne Komponenten manuell angepasst werden sollen.
@@ -142,7 +142,7 @@ OLLAMA_MAX_RETRIES=3
 CORS_ORIGINS=https://ddns-beispiel.meinedomain.de,https://frontend.local
 ```
 
-> Referenz-IP-Plan: Frontend-CT `192.168.178.150`, Backend-CT `192.168.178.151`, GMKTec `192.168.178.155`. `CORS_ORIGINS` auf deine Domains/IPs anpassen.
+> Referenz-IP-Plan: Frontend-CT `192.168.178.156`, Backend-CT `192.168.178.157`, GMKTec `192.168.178.155`. `CORS_ORIGINS` auf deine Domains/IPs anpassen.
 
 #### Systemd-Service
 
@@ -230,7 +230,7 @@ server {
 
     # API-Proxy ins interne Backend (Container 2)
     location /api/ {
-        proxy_pass http://192.168.178.151:8000/api/;
+        proxy_pass http://192.168.178.157:8000/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -266,7 +266,7 @@ ollama pull llama3.2
 Firewall anpassen:
 
 ```bash
-sudo ufw allow from 192.168.178.151 to any port 11434 proto tcp
+sudo ufw allow from 192.168.178.157 to any port 11434 proto tcp
 ```
 
 Test vom Backend-Container:

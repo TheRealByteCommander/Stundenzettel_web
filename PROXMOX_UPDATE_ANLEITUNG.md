@@ -12,7 +12,7 @@ Diese Anleitung zeigt, wie Sie die Backend- und Frontend-Container auf Proxmox m
 
 ```bash
 # 1. SSH in den Backend-Container
-ssh root@192.168.178.151  # Ihre Backend-IP
+ssh root@192.168.178.157  # Ihre Backend-IP
 
 # 2. In das Projekt-Verzeichnis wechseln
 cd /opt/tick-guard/Stundenzettel_web
@@ -36,7 +36,7 @@ Das Script führt automatisch aus:
 
 ```bash
 # 1. SSH in den Frontend-Container
-ssh root@192.168.178.150  # Ihre Frontend-IP
+ssh root@192.168.178.156  # Ihre Frontend-IP
 
 # 2. In das Projekt-Verzeichnis wechseln
 cd /opt/tick-guard/Stundenzettel_web
@@ -66,7 +66,7 @@ Das Script führt automatisch aus:
 
 ```bash
 # 1. SSH in den Backend-Container
-ssh root@192.168.178.151
+ssh root@192.168.178.157
 
 # 2. In das Backend-Verzeichnis wechseln
 cd /opt/tick-guard/Stundenzettel_web/backend
@@ -90,7 +90,7 @@ sudo systemctl status tick-guard-backend
 
 ```bash
 # 1. SSH in den Frontend-Container
-ssh root@192.168.178.150
+ssh root@192.168.178.156
 
 # 2. In das Frontend-Verzeichnis wechseln
 cd /opt/tick-guard/Stundenzettel_web/frontend
@@ -253,14 +253,14 @@ git stash pop
 ### Backend-Update (Schnell)
 
 ```bash
-ssh root@192.168.178.151
+ssh root@192.168.178.157
 cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_backend.sh
 ```
 
 ### Frontend-Update (Schnell)
 
 ```bash
-ssh root@192.168.178.150
+ssh root@192.168.178.156
 cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_frontend.sh
 ```
 
@@ -268,10 +268,10 @@ cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_frontend.sh
 
 ```bash
 # Backend
-ssh root@192.168.178.151 "cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_backend.sh"
+ssh root@192.168.178.157 "cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_backend.sh"
 
 # Frontend
-ssh root@192.168.178.150 "cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_frontend.sh"
+ssh root@192.168.178.156 "cd /opt/tick-guard/Stundenzettel_web/scripts && sudo ./update_frontend.sh"
 ```
 
 ---

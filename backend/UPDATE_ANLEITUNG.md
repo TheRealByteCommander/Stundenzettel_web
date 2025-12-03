@@ -41,7 +41,7 @@ docker compose -f docker-compose.agents.yml restart agents
 
 ```bash
 # 1. SSH in den Backend-Container
-ssh root@192.168.178.151  # Ihre Backend-IP
+ssh root@192.168.178.157  # Ihre Backend-IP
 
 # 2. In das Projekt-Verzeichnis wechseln
 cd /opt/stundenzettel_web/backend

@@ -38,7 +38,7 @@ Vite benötigt Node ≥ 20.19 oder ≥ 22.12 (Hinweis wird aktuell auf Node 20.1
 Die folgenden Variablen werden per `.env` (nicht versioniert) erwartet:
 
 ```
-VITE_API_BASE_URL=http://192.168.178.151:8000/api
+VITE_API_BASE_URL=http://192.168.178.157:8000/api
 VITE_DEFAULT_ADMIN_EMAIL=admin@schmitz-intralogistik.de
 VITE_DEFAULT_ADMIN_PASSWORD=admin123
 ```
