@@ -71,8 +71,11 @@ export const AccountingPage = () => {
       {error && (
         <Alert variant="destructive">
           Statistiken konnten nicht geladen werden:{" "}
-          {(error.response?.data as { detail?: string } | undefined)?.detail ??
-            error.message}
+          {error instanceof Error
+            ? error.message
+            : typeof error === "object" && error !== null && "message" in error
+              ? String(error.message)
+              : "Unbekannter Fehler"}
         </Alert>
       )}
 

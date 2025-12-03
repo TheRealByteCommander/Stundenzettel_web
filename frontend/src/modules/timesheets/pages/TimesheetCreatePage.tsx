@@ -396,7 +396,7 @@ export const TimesheetCreatePage = () => {
                   const dateB = new Date(b.date).getTime();
                   return dateA - dateB;
                 })
-                .map((entry, index) => {
+                .map((entry) => {
                 const workHours = calculateWorkHours(entry);
                 const entryDate = new Date(entry.date);
                 const dayOfWeek = entryDate.getDay();

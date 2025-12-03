@@ -5,7 +5,6 @@ import {
   fetchAnnouncements,
   updateAnnouncement,
   uploadAnnouncementImage,
-  type Announcement,
   type AnnouncementCreate,
   type AnnouncementUpdate,
 } from "../../../services/api/announcements";

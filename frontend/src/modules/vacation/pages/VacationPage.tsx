@@ -43,7 +43,7 @@ export const VacationPage = () => {
   const deleteMutation = useDeleteVacationRequestMutation();
   const approveMutation = useApproveVacationRequestMutation();
   const rejectMutation = useRejectVacationRequestMutation();
-  const updateBalanceMutation = useUpdateVacationBalanceMutation();
+  // const updateBalanceMutation = useUpdateVacationBalanceMutation();
   const adminDeleteMutation = useAdminDeleteVacationRequestMutation();
 
   const [message, setMessage] = useState<string | null>(null);

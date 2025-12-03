@@ -131,8 +131,11 @@ export const AnnouncementsPage = () => {
       <div className="mx-auto max-w-4xl px-4 py-8">
         <Alert variant="destructive">
           Ankündigungen konnten nicht geladen werden:{" "}
-          {(error.response?.data as { detail?: string } | undefined)?.detail ??
-            error.message}
+          {error instanceof Error
+            ? error.message
+            : typeof error === "object" && error !== null && "message" in error
+              ? String(error.message)
+              : "Unbekannter Fehler"}
         </Alert>
       </div>
     );

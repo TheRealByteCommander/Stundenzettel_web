@@ -85,11 +85,11 @@ export const TimesheetReportingPage = () => {
   const { data: user } = useCurrentUserQuery();
   const isAdmin = user?.role === "admin" || user?.role === "accounting";
   const [month, setMonth] = useState(getCurrentMonth);
-  const [selectedUser, setSelectedUser] = useState<string>("");
+  const [selectedUser] = useState<string>("");
 
   const { data: allTimesheets, isLoading: timesheetsLoading } = useTimesheetsQuery();
   const { data: stats } = useMonthlyStatsQuery(month);
-  const { data: accountingTimesheets } = useAccountingTimesheetsQuery({
+  useAccountingTimesheetsQuery({
     month,
     userId: selectedUser || undefined,
   });

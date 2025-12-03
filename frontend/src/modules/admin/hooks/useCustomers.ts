@@ -4,8 +4,6 @@ import {
   createCustomer,
   updateCustomer,
   deleteCustomer,
-  type Customer,
-  type CustomerCreate,
   type CustomerUpdate,
 } from "../../../services/api/customers";
 
