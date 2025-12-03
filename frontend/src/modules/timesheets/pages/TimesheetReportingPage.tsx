@@ -18,6 +18,8 @@ import {
   exportTimesheetsToJSON,
   exportTimesheetsToExcel,
   exportToJSON,
+  exportToCSV,
+  exportToExcel,
 } from "../../../utils/export";
 import type { WeeklyTimesheet } from "../../../services/api/types";
 
@@ -37,7 +39,6 @@ const exportStatsToCSV = (stats: any[], month: string) => {
     Stundenzettel: stat.timesheets_count || 0,
   }));
   
-  const { exportToCSV } = require("../../../utils/export");
   exportToCSV(data, `timesheet-stats-${month}.csv`);
 };
 
@@ -114,7 +115,6 @@ export const TimesheetReportingPage = () => {
     } else if (format === "json") {
       exportToJSON(stats.stats, `${filename}.json`);
     } else if (format === "excel") {
-      const { exportToExcel } = require("../../../utils/export");
       const data = stats.stats.map((stat) => ({
         Mitarbeiter: stat.user_name,
         Gesamtstunden: stat.total_hours.toFixed(2),

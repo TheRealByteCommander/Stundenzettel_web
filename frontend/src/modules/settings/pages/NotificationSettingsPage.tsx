@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import {
@@ -11,21 +11,25 @@ import {
   useNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
 } from "../hooks/useNotificationPreferences";
+import type { NotificationPreferences, NotificationPreferencesUpdate } from "../../../services/api/notifications";
+import type { NotificationPreferences } from "../../../services/api/notifications";
 
 export const NotificationSettingsPage = () => {
   const { data: preferences, isLoading } = useNotificationPreferencesQuery();
   const updateMutation = useUpdateNotificationPreferencesMutation();
   
-  const [localPrefs, setLocalPrefs] = useState(preferences);
+  const [localPrefs, setLocalPrefs] = useState<NotificationPreferences | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Update local state when preferences load
-  if (preferences && !localPrefs) {
-    setLocalPrefs(preferences);
-  }
+  useEffect(() => {
+    if (preferences) {
+      setLocalPrefs(preferences);
+    }
+  }, [preferences]);
 
-  const handleToggle = (key: keyof typeof preferences) => {
+  const handleToggle = (key: keyof NotificationPreferences) => {
     if (!localPrefs) return;
     setLocalPrefs({
       ...localPrefs,
@@ -39,12 +43,26 @@ export const NotificationSettingsPage = () => {
     setMessage(null);
     setError(null);
 
-    const updates: Record<string, boolean> = {};
-    Object.keys(localPrefs).forEach((key) => {
-      if (key !== "user_id" && key !== "updated_at" && localPrefs[key as keyof typeof localPrefs] !== preferences[key as keyof typeof preferences]) {
-        updates[key] = localPrefs[key as keyof typeof localPrefs] as boolean;
-      }
-    });
+    const updates: Partial<NotificationPreferences> = {};
+    if (localPrefs.email_notifications !== preferences.email_notifications) {
+      updates.email_notifications = localPrefs.email_notifications;
+    }
+    if (localPrefs.push_notifications !== preferences.push_notifications) {
+      updates.push_notifications = localPrefs.push_notifications;
+    }
+    if (localPrefs.timesheet_reminders !== preferences.timesheet_reminders) {
+      updates.timesheet_reminders = localPrefs.timesheet_reminders;
+    }
+    if (localPrefs.vacation_reminders !== preferences.vacation_reminders) {
+      updates.vacation_reminders = localPrefs.vacation_reminders;
+    }
+    if (localPrefs.expense_reminders !== preferences.expense_reminders) {
+      updates.expense_reminders = localPrefs.expense_reminders;
+    }
+    if (localPrefs.admin_notifications !== undefined && preferences.admin_notifications !== undefined &&
+        localPrefs.admin_notifications !== preferences.admin_notifications) {
+      updates.admin_notifications = localPrefs.admin_notifications;
+    }
 
     if (Object.keys(updates).length === 0) {
       setMessage("Keine Änderungen vorgenommen");

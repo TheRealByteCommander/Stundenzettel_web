@@ -1507,6 +1507,59 @@ async def delete_user(user_id: str, current_user: User = Depends(get_admin_user)
     
     return {"message": "User and associated timesheets deleted successfully"}
 
+# Notification Preferences endpoints
+@api_router.get("/user/notification-preferences", response_model=NotificationPreferences)
+async def get_notification_preferences(current_user: User = Depends(get_current_user)):
+    """Get notification preferences for current user"""
+    prefs = await db.notification_preferences.find_one({"user_id": current_user.id})
+    if not prefs:
+        # Create default preferences
+        default_prefs = NotificationPreferences(
+            user_id=current_user.id,
+            email_notifications=True,
+            push_notifications=True,
+            timesheet_reminders=True,
+            vacation_reminders=True,
+            expense_reminders=True,
+            admin_notifications=current_user.role in ["admin", "accounting"]
+        )
+        prefs_dict = default_prefs.model_dump()
+        prefs_dict["created_at"] = datetime.utcnow()
+        await db.notification_preferences.insert_one(prefs_dict)
+        return default_prefs
+    prefs.pop("_id", None)
+    return NotificationPreferences(**prefs)
+
+@api_router.put("/user/notification-preferences", response_model=NotificationPreferences)
+async def update_notification_preferences(
+    prefs_update: NotificationPreferencesUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Update notification preferences for current user"""
+    existing = await db.notification_preferences.find_one({"user_id": current_user.id})
+    update_data = prefs_update.model_dump(exclude_unset=True)
+    update_data["updated_at"] = datetime.utcnow()
+    
+    if existing:
+        await db.notification_preferences.update_one(
+            {"user_id": current_user.id},
+            {"$set": update_data}
+        )
+    else:
+        prefs = NotificationPreferences(
+            user_id=current_user.id,
+            **{k: v for k, v in update_data.items() if v is not None},
+            **{k: True for k in ["email_notifications", "push_notifications", "timesheet_reminders", "vacation_reminders", "expense_reminders"] if k not in update_data},
+            admin_notifications=current_user.role in ["admin", "accounting"]
+        )
+        prefs_dict = prefs.model_dump()
+        prefs_dict["created_at"] = datetime.utcnow()
+        await db.notification_preferences.insert_one(prefs_dict)
+    
+    updated = await db.notification_preferences.find_one({"user_id": current_user.id})
+    updated.pop("_id", None)
+    return NotificationPreferences(**updated)
+
 @api_router.get("/vehicles", response_model=List[Vehicle])
 async def get_vehicles(current_user: User = Depends(get_admin_user)):
     vehicles = await db.vehicles.find().sort("name", 1).to_list(1000)
@@ -3173,7 +3226,8 @@ app.include_router(api_router)
 
 # Include migration router (if available)
 try:
-    from migration_api import migration_router
+    from migration_api import migration_router, setup_migration_router
+    setup_migration_router(get_admin_user)
     app.include_router(migration_router)
 except ImportError:
     logger.warning("migration_api not available - migration endpoints disabled")
