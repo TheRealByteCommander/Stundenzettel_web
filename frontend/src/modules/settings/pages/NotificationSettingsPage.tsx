@@ -70,7 +70,7 @@ export const NotificationSettingsPage = () => {
     }
 
     try {
-      await updateMutation.mutateAsync(updates);
+      await updateMutation.mutateAsync(updates as NotificationPreferencesUpdate);
       setMessage("Benachrichtigungseinstellungen erfolgreich aktualisiert");
     } catch (err) {
       const errorMessage =
