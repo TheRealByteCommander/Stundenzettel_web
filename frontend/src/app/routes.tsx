@@ -81,7 +81,6 @@ const CustomerManagementPage = lazy(() =>
     default: m.CustomerManagementPage,
   }))
 );
-);
 const VacationBalancePage = lazy(() =>
   import("../modules/admin/pages/VacationBalancePage").then((m) => ({
     default: m.VacationBalancePage,
