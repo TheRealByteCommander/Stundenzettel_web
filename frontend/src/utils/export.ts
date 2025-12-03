@@ -131,7 +131,7 @@ export const exportTimesheetsToCSV = (timesheets: WeeklyTimesheet[], filename: s
     ts.created_at || "",
   ]);
 
-  exportToCSV(rows.map((row, i) => {
+  exportToCSV(rows.map((row) => {
     const obj: Record<string, string> = {};
     headers.forEach((header, j) => {
       obj[header] = row[j];

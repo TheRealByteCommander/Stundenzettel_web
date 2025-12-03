@@ -21,14 +21,14 @@ import {
   exportToCSV,
   exportToExcel,
 } from "../../../utils/export";
-import type { WeeklyTimesheet } from "../../../services/api/types";
+import type { AccountingMonthlyStat } from "../../../services/api/admin";
 
 const getCurrentMonth = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const exportStatsToCSV = (stats: any[], month: string) => {
+const exportStatsToCSV = (stats: AccountingMonthlyStat[], month: string) => {
   const data = stats.map((stat) => ({
     Mitarbeiter: stat.user_name,
     Gesamtstunden: stat.total_hours.toFixed(2),
@@ -49,7 +49,7 @@ export const TimesheetReportingPage = () => {
   const [selectedUser] = useState<string>("");
 
   const { data: allTimesheets, isLoading: timesheetsLoading } = useTimesheetsQuery();
-  const { data: stats } = useMonthlyStatsQuery(month);
+  const { data: stats } = useAccountingMonthlyStatsQuery(month);
   useAccountingTimesheetsQuery({
     month,
     userId: selectedUser || undefined,
@@ -105,17 +105,17 @@ export const TimesheetReportingPage = () => {
   };
 
   const handleExportStats = (format: "csv" | "json" | "excel") => {
-    if (!stats || stats.stats.length === 0) {
+    if (!stats || stats.length === 0) {
       alert("Keine Statistiken zum Exportieren vorhanden.");
       return;
     }
     const filename = `timesheet-stats-${month}`;
     if (format === "csv") {
-      exportStatsToCSV(stats.stats, month);
+      exportStatsToCSV(stats, month);
     } else if (format === "json") {
-      exportToJSON(stats.stats, `${filename}.json`);
+      exportToJSON(stats, `${filename}.json`);
     } else if (format === "excel") {
-      const data = stats.stats.map((stat) => ({
+      const data = stats.map((stat) => ({
         Mitarbeiter: stat.user_name,
         Gesamtstunden: stat.total_hours.toFixed(2),
         "Stundenzettel-Stunden": stat.hours_on_timesheets.toFixed(2),
@@ -270,7 +270,7 @@ export const TimesheetReportingPage = () => {
         </CardContent>
       </Card>
 
-      {stats && stats.stats.length > 0 && (
+      {stats && stats.length > 0 && (
         <Card>
           <CardContent className="space-y-4 py-6">
             <CardTitle className="text-lg text-brand-gray">
@@ -286,7 +286,7 @@ export const TimesheetReportingPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {stats.stats.map((stat) => (
+                  {stats.map((stat) => (
                     <tr key={stat.user_id}>
                       <td className="px-4 py-3 text-gray-600">
                         {stat.user_name}

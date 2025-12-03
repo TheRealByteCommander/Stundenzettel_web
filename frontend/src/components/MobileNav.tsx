@@ -25,10 +25,6 @@ export const MobileNav = ({ user, onLogout, onPasswordChange }: MobileNavProps) 
     { label: "Ankündigungen", path: "/app/announcements" },
   ];
 
-  const settingsItems = [
-    { label: "Benachrichtigungen", path: "/app/settings/notifications", roles: ["user", "admin", "accounting"] },
-  ];
-
   const adminItems = [
     { label: "Prüfung", path: "/app/timesheets/admin/review", roles: ["admin", "accounting"] },
     { label: "Reporting", path: "/app/timesheets/reporting", roles: ["admin", "accounting"] },

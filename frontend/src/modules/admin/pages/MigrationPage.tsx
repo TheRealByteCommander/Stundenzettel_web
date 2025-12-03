@@ -134,7 +134,7 @@ export const MigrationPage = () => {
                 <div>
                   <strong>Ergebnisse:</strong>
                   <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
-                    {JSON.stringify(status.results, null, 2)}
+                    {JSON.stringify(status.results as Record<string, unknown>, null, 2)}
                   </pre>
                 </div>
               )}

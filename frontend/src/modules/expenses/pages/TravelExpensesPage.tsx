@@ -13,6 +13,7 @@ import {
   useTravelExpensesQuery,
   useCreateTravelExpenseMutation,
   useDeleteTravelExpenseMutation,
+  useUpdateTravelExpenseMutation,
 } from "../hooks/useTravelExpenses";
 import { useCustomersQuery } from "../../timesheets/hooks/useCustomers";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
@@ -35,7 +36,6 @@ const emptyFormState: ExpenseFormState = {
 };
 
 export const TravelExpensesPage = () => {
-  const queryClient = useQueryClient();
   const { data: user } = useCurrentUserQuery();
   const isAdmin = user?.role === "admin" || user?.role === "accounting";
   const { data: expenses, isLoading } = useTravelExpensesQuery();
