@@ -51,6 +51,11 @@ const ExpenseReportDetailPage = lazy(() =>
     default: m.ExpenseReportDetailPage,
   }))
 );
+const TravelExpensesPage = lazy(() =>
+  import("../modules/expenses/pages/TravelExpensesPage").then((m) => ({
+    default: m.TravelExpensesPage,
+  }))
+);
 const VehicleManagementPage = lazy(() =>
   import("../modules/admin/pages/VehicleManagementPage").then((m) => ({
     default: m.VehicleManagementPage,
@@ -94,6 +99,21 @@ const AnnouncementsPage = lazy(() =>
 const VacationPage = lazy(() =>
   import("../modules/vacation/pages/VacationPage").then((m) => ({
     default: m.VacationPage,
+  }))
+);
+const HolidaysPage = lazy(() =>
+  import("../modules/vacation/pages/HolidaysPage").then((m) => ({
+    default: m.HolidaysPage,
+  }))
+);
+const NotificationSettingsPage = lazy(() =>
+  import("../modules/settings/pages/NotificationSettingsPage").then((m) => ({
+    default: m.NotificationSettingsPage,
+  }))
+);
+const MigrationPage = lazy(() =>
+  import("../modules/admin/pages/MigrationPage").then((m) => ({
+    default: m.MigrationPage,
   }))
 );
 
@@ -179,6 +199,14 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: "individual",
+            element: (
+              <LazySuspense>
+                <TravelExpensesPage />
+              </LazySuspense>
+            ),
+          },
+          {
             path: "reports/:id",
             element: (
               <LazySuspense>
@@ -247,6 +275,14 @@ const router = createBrowserRouter([
               </LazySuspense>
             ),
           },
+          {
+            path: "migration",
+            element: (
+              <LazySuspense>
+                <MigrationPage />
+              </LazySuspense>
+            ),
+          },
         ],
       },
       {
@@ -259,11 +295,37 @@ const router = createBrowserRouter([
       },
       {
         path: "vacation",
-        element: (
-          <LazySuspense>
-            <VacationPage />
-          </LazySuspense>
-        ),
+        children: [
+          {
+            index: true,
+            element: (
+              <LazySuspense>
+                <VacationPage />
+              </LazySuspense>
+            ),
+          },
+          {
+            path: "holidays",
+            element: (
+              <LazySuspense>
+                <HolidaysPage />
+              </LazySuspense>
+            ),
+          },
+        ],
+      },
+      {
+        path: "settings",
+        children: [
+          {
+            path: "notifications",
+            element: (
+              <LazySuspense>
+                <NotificationSettingsPage />
+              </LazySuspense>
+            ),
+          },
+        ],
       },
     ],
   },

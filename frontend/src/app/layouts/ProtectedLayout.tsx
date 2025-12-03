@@ -154,9 +154,25 @@ export const ProtectedLayout = () => {
                 >
                   Audit-Logs
                 </button>
+                <button
+                  className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
+                  onClick={() => navigate("/app/admin/migration")}
+                  aria-label="Zur Migration navigieren"
+                >
+                  Migration
+                </button>
               </>
             )}
           </nav>
+
+          {/* Settings Link */}
+          <button
+            className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
+            onClick={() => navigate("/app/settings/notifications")}
+            aria-label="Zu Benachrichtigungseinstellungen navigieren"
+          >
+            Einstellungen
+          </button>
 
           {/* Desktop User Info & Actions */}
           <div className="hidden lg:flex items-center gap-3 xl:gap-4 flex-shrink-0">

@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { Button } from "../../../components/ui/button";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import {
@@ -57,11 +58,18 @@ export const ExpensesOverviewPage = () => {
             Einstieg in Upload- und Prüfprozesse.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link to="/app/timesheets">
-            Stundenzettel öffnen
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/app/expenses/individual">
+              Einzelausgaben
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/app/timesheets">
+              Stundenzettel öffnen
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -79,75 +79,80 @@ async def run_migration_async(request: MigrationRequest):
         migration_status["progress"] = f"Fehler: {str(e)}"
         raise
 
-@migration_router.post("/start")
-async def start_migration(
-    request: MigrationRequest
-    # current_user: User = Depends(get_admin_user)  # TODO: Import get_admin_user aus server.py
-):
-    """
-    Startet Datenbank-Migration
+def setup_migration_router(get_admin_user_func):
+    """Setup migration router with admin dependency"""
+    global migration_router
     
-    WICHTIG: Source-DB wird nur gelesen, niemals verändert!
-    Nur für Admin-User zugänglich.
-    """
-    from migration_tool import DatabaseMigration
-    
-    global migration_status
-    
-    if migration_status["running"]:
-        raise HTTPException(status_code=400, detail="Migration läuft bereits")
-    
-    # Migration in Background-Task starten
-    asyncio.create_task(run_migration_async(request))
-    
-    return {
-        "message": "Migration gestartet",
-        "status": "running"
-    }
-
-@migration_router.get("/status")
-async def get_migration_status():
-    """Aktuellen Migration-Status abrufen"""
-    return migration_status
-
-@migration_router.post("/test-connection")
-async def test_source_connection(
-    source: SourceConfig
-    # current_user: User = Depends(get_admin_user)  # TODO: Import get_admin_user aus server.py
-):
-    """Teste Verbindung zur Source-Datenbank (read-only)"""
-    try:
-        source_config = source.dict(exclude_none=True)
-        target_config = {"mongo_url": "mongodb://localhost:27017", "db_name": "test"}
+    @migration_router.post("/start")
+    async def start_migration(
+        request: MigrationRequest,
+        current_user = Depends(get_admin_user_func)
+    ):
+        """
+        Startet Datenbank-Migration
         
-        migration = DatabaseMigration(source_config, target_config)
-        await migration.connect_source()
+        WICHTIG: Source-DB wird nur gelesen, niemals verändert!
+        Nur für Admin-User zugänglich.
+        """
+        from migration_tool import DatabaseMigration
         
-        # Test-Query ausführen
-        if source_config['type'] == 'mongo':
-            source_db = migration.source_client[source_config.get('database')]
-            # Versuche nur zu lesen
-            collections = source_db.list_collection_names()
-            
-        elif source_config['type'] == 'mysql':
-            cursor = migration.source_client.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            cursor.close()
+        global migration_status
         
-        # Verbindung schließen
-        if migration.source_client:
-            if source_config['type'] == 'mysql':
-                migration.source_client.close()
-            else:
-                migration.source_client.close()
+        if migration_status["running"]:
+            raise HTTPException(status_code=400, detail="Migration läuft bereits")
+        
+        # Migration in Background-Task starten
+        asyncio.create_task(run_migration_async(request))
         
         return {
-            "success": True,
-            "message": "Verbindung erfolgreich (read-only)"
+            "message": "Migration gestartet",
+            "status": "running"
         }
-        
-    except Exception as e:
-        logger.error(f"Connection test error: {e}")
-        raise HTTPException(status_code=400, detail=f"Verbindung fehlgeschlagen: {str(e)}")
-
+    
+    @migration_router.get("/status")
+    async def get_migration_status(
+        current_user = Depends(get_admin_user_func)
+    ):
+        """Aktuellen Migration-Status abrufen"""
+        return migration_status
+    
+    @migration_router.post("/test-connection")
+    async def test_source_connection(
+        source: SourceConfig,
+        current_user = Depends(get_admin_user_func)
+    ):
+        """Teste Verbindung zur Source-Datenbank (read-only)"""
+        try:
+            source_config = source.dict(exclude_none=True)
+            target_config = {"mongo_url": "mongodb://localhost:27017", "db_name": "test"}
+            
+            migration = DatabaseMigration(source_config, target_config)
+            await migration.connect_source()
+            
+            # Test-Query ausführen
+            if source_config['type'] == 'mongo':
+                source_db = migration.source_client[source_config.get('database')]
+                # Versuche nur zu lesen
+                collections = source_db.list_collection_names()
+                
+            elif source_config['type'] == 'mysql':
+                cursor = migration.source_client.cursor()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+                cursor.close()
+            
+            # Verbindung schließen
+            if migration.source_client:
+                if source_config['type'] == 'mysql':
+                    migration.source_client.close()
+                else:
+                    migration.source_client.close()
+            
+            return {
+                "success": True,
+                "message": "Verbindung erfolgreich (read-only)"
+            }
+            
+        except Exception as e:
+            logger.error(f"Connection test error: {e}")
+            raise HTTPException(status_code=400, detail=f"Verbindung fehlgeschlagen: {str(e)}")

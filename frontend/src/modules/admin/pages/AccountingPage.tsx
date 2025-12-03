@@ -12,6 +12,8 @@ import {
   useAccountingMonthlyStatsQuery,
   useDownloadAccountingReportMutation,
 } from "../hooks/useAdminSettings";
+import { exportToCSV, exportToJSON, exportToExcel } from "../../../utils/export";
+import { SimpleBarChart } from "../../../components/charts/SimpleBarChart";
 
 const getCurrentMonth = () => {
   const now = new Date();
@@ -58,13 +60,65 @@ export const AccountingPage = () => {
             value={month}
             onChange={(e) => setMonth(e.target.value)}
           />
-          <Button
-            variant="outline"
-            onClick={handleDownloadPDF}
-            disabled={downloadMutation.isPending}
-          >
-            {downloadMutation.isPending ? "Lade…" : "PDF exportieren"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={downloadMutation.isPending}
+              size="sm"
+            >
+              {downloadMutation.isPending ? "Lade…" : "PDF"}
+            </Button>
+            {stats && stats.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const data = stats.map((stat) => ({
+                      Mitarbeiter: stat.user_name,
+                      Gesamtstunden: stat.total_hours.toFixed(2),
+                      "Stundenzettel-Stunden": stat.hours_on_timesheets.toFixed(2),
+                      Reisestunden: stat.travel_hours.toFixed(2),
+                      Reisekilometer: stat.travel_kilometers.toFixed(2),
+                      Reisekosten: stat.travel_expenses.toFixed(2),
+                      Stundenzettel: stat.timesheets_count || 0,
+                    }));
+                    exportToCSV(data, `accounting-stats-${month}.csv`);
+                  }}
+                  size="sm"
+                >
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    exportToJSON(stats, `accounting-stats-${month}.json`);
+                  }}
+                  size="sm"
+                >
+                  JSON
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const data = stats.map((stat) => ({
+                      Mitarbeiter: stat.user_name,
+                      Gesamtstunden: stat.total_hours.toFixed(2),
+                      "Stundenzettel-Stunden": stat.hours_on_timesheets.toFixed(2),
+                      Reisestunden: stat.travel_hours.toFixed(2),
+                      Reisekilometer: stat.travel_kilometers.toFixed(2),
+                      Reisekosten: stat.travel_expenses.toFixed(2),
+                      Stundenzettel: stat.timesheets_count || 0,
+                    }));
+                    exportToExcel(data, `accounting-stats-${month}`, "Buchhaltung");
+                  }}
+                  size="sm"
+                >
+                  Excel
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -136,6 +190,40 @@ export const AccountingPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {stats && stats.length > 0 && (
+        <Card>
+          <CardContent className="space-y-4 py-6">
+            <CardTitle className="text-lg text-brand-gray">
+              Visualisierungen
+            </CardTitle>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <SimpleBarChart
+                  data={stats.map((stat) => ({
+                    label: stat.user_name,
+                    value: stat.total_hours,
+                    color: "#e90118",
+                  }))}
+                  title="Gesamtstunden pro Mitarbeiter"
+                  height={250}
+                />
+              </div>
+              <div>
+                <SimpleBarChart
+                  data={stats.map((stat) => ({
+                    label: stat.user_name,
+                    value: stat.travel_expenses,
+                    color: "#3b82f6",
+                  }))}
+                  title="Reisekosten pro Mitarbeiter (€)"
+                  height={250}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

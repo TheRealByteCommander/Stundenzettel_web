@@ -1,0 +1,691 @@
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Alert } from "../../../components/ui/alert";
+import { Button } from "../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardTitle,
+} from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
+import { Label } from "../../../components/ui/label";
+import {
+  useTravelExpensesQuery,
+  useCreateTravelExpenseMutation,
+  useDeleteTravelExpenseMutation,
+} from "../hooks/useTravelExpenses";
+import { useCustomersQuery } from "../../timesheets/hooks/useCustomers";
+import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
+import type { TravelExpense, TravelExpenseCreate } from "../../../services/api/types";
+
+interface ExpenseFormState {
+  date: string;
+  description: string;
+  kilometers: number;
+  expenses: number;
+  customer_project: string;
+}
+
+const emptyFormState: ExpenseFormState = {
+  date: new Date().toISOString().split("T")[0],
+  description: "",
+  kilometers: 0,
+  expenses: 0,
+  customer_project: "",
+};
+
+export const TravelExpensesPage = () => {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUserQuery();
+  const isAdmin = user?.role === "admin" || user?.role === "accounting";
+  const { data: expenses, isLoading } = useTravelExpensesQuery();
+  const { data: customers } = useCustomersQuery();
+  const createMutation = useCreateTravelExpenseMutation();
+  const deleteMutation = useDeleteTravelExpenseMutation();
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formState, setFormState] = useState<ExpenseFormState>(emptyFormState);
+  const [editState, setEditState] = useState<ExpenseFormState>(emptyFormState);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setError(null);
+
+    if (!formState.date || !formState.description) {
+      setError("Datum und Beschreibung sind erforderlich");
+      return;
+    }
+
+    try {
+      const payload: TravelExpenseCreate = {
+        date: formState.date,
+        description: formState.description,
+        kilometers: formState.kilometers || 0,
+        expenses: formState.expenses || 0,
+        customer_project: formState.customer_project || "",
+      };
+      await createMutation.mutateAsync(payload);
+      setFormState(emptyFormState);
+      setShowCreateForm(false);
+      setMessage("Reisekosten erfolgreich erstellt");
+    } catch (err) {
+      const errorMessage =
+        (err as { response?: { data?: { detail?: string } } }).response?.data
+          ?.detail ?? (err as { message?: string }).message ?? "Fehler beim Erstellen";
+      setError(errorMessage);
+    }
+  };
+
+  const handleEdit = (expense: TravelExpense) => {
+    setEditingId(expense.id);
+    setEditState({
+      date: expense.date,
+      description: expense.description,
+      kilometers: expense.kilometers,
+      expenses: expense.expenses,
+      customer_project: expense.customer_project,
+    });
+    setMessage(null);
+    setError(null);
+  };
+
+  const UpdateButton = ({ expenseId }: { expenseId: string }) => {
+    const updateMutation = useUpdateTravelExpenseMutation(expenseId);
+    
+    const handleUpdateClick = async () => {
+      setMessage(null);
+      setError(null);
+
+      if (!editState.date || !editState.description) {
+        setError("Datum und Beschreibung sind erforderlich");
+        return;
+      }
+
+      try {
+        await updateMutation.mutateAsync({
+          date: editState.date,
+          description: editState.description,
+          kilometers: editState.kilometers || 0,
+          expenses: editState.expenses || 0,
+          customer_project: editState.customer_project || "",
+        });
+        setEditingId(null);
+        setEditState(emptyFormState);
+        setMessage("Reisekosten erfolgreich aktualisiert");
+      } catch (err) {
+        const errorMessage =
+          (err as { response?: { data?: { detail?: string } } }).response?.data
+            ?.detail ?? (err as { message?: string }).message ?? "Fehler beim Aktualisieren";
+        setError(errorMessage);
+      }
+    };
+
+    return (
+      <Button
+        size="sm"
+        onClick={handleUpdateClick}
+        disabled={updateMutation.isPending}
+      >
+        {updateMutation.isPending ? "Speichere..." : "Speichern"}
+      </Button>
+    );
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Möchten Sie diese Reisekosten wirklich löschen?")) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(id);
+      setMessage("Reisekosten erfolgreich gelöscht");
+    } catch (err) {
+      const errorMessage =
+        (err as { response?: { data?: { detail?: string } } }).response?.data
+          ?.detail ?? (err as { message?: string }).message ?? "Fehler beim Löschen";
+      setError(errorMessage);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("de-DE");
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(amount);
+  };
+
+  return (
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:gap-6 px-3 sm:px-4 py-4 sm:py-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-brand-gray">
+            Reisekosten-Einzelausgaben
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-600">
+            Verwalten Sie einzelne Reisekosten außerhalb von Monatsberichten.
+          </p>
+        </div>
+        {!showCreateForm && (
+          <Button onClick={() => setShowCreateForm(true)} className="w-full sm:w-auto">
+            Neue Ausgabe
+          </Button>
+        )}
+      </div>
+
+      {message && <Alert variant="success">{message}</Alert>}
+      {error && <Alert variant="destructive">{error}</Alert>}
+
+      {showCreateForm && (
+        <Card>
+          <CardContent className="space-y-4 py-4 sm:py-6">
+            <CardTitle className="text-base sm:text-lg text-brand-gray">
+              Neue Reisekosten-Ausgabe
+            </CardTitle>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="create-date">Datum *</Label>
+                  <Input
+                    id="create-date"
+                    type="date"
+                    value={formState.date}
+                    onChange={(e) =>
+                      setFormState({ ...formState, date: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-customer">Kunde/Projekt</Label>
+                  <select
+                    id="create-customer"
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 min-h-[44px] sm:min-h-[40px]"
+                    value={formState.customer_project}
+                    onChange={(e) =>
+                      setFormState({ ...formState, customer_project: e.target.value })
+                    }
+                  >
+                    <option value="">Kein Kunde/Projekt</option>
+                    {customers?.map((customer) => (
+                      <option key={customer.id} value={customer.name}>
+                        {customer.name}
+                        {customer.project_name ? ` - ${customer.project_name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="create-description">Beschreibung *</Label>
+                  <Input
+                    id="create-description"
+                    value={formState.description}
+                    onChange={(e) =>
+                      setFormState({ ...formState, description: e.target.value })
+                    }
+                    placeholder="z.B. Fahrt nach Berlin"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-kilometers">Kilometer</Label>
+                  <Input
+                    id="create-kilometers"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={formState.kilometers || ""}
+                    onChange={(e) =>
+                      setFormState({
+                        ...formState,
+                        kilometers: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-expenses">Kosten (€)</Label>
+                  <Input
+                    id="create-expenses"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formState.expenses || ""}
+                    onChange={(e) =>
+                      setFormState({
+                        ...formState,
+                        expenses: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="flex-1"
+                >
+                  {createMutation.isPending ? "Erstelle..." : "Erstellen"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setFormState(emptyFormState);
+                    setError(null);
+                  }}
+                  className="flex-1"
+                >
+                  Abbrechen
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="space-y-3 sm:space-y-4 py-4 sm:py-6">
+          <CardTitle className="text-base sm:text-lg text-brand-gray">
+            Alle Reisekosten-Ausgaben
+          </CardTitle>
+
+          {isLoading ? (
+            <p className="text-center text-gray-500 py-6">Lade Daten…</p>
+          ) : expenses && expenses.length > 0 ? (
+            <>
+              {/* Mobile: Card-Layout */}
+              <div className="block sm:hidden space-y-3">
+                {expenses.map((expense) => {
+                  const isEditing = editingId === expense.id;
+                  return (
+                    <div
+                      key={expense.id}
+                      className="rounded-lg border border-gray-200 bg-white p-4"
+                    >
+                      {isEditing ? (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label className="text-sm">Datum *</Label>
+                            <Input
+                              type="date"
+                              value={editState.date}
+                              onChange={(e) =>
+                                setEditState({ ...editState, date: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Beschreibung *</Label>
+                            <Input
+                              value={editState.description}
+                              onChange={(e) =>
+                                setEditState({
+                                  ...editState,
+                                  description: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-2">
+                              <Label className="text-sm">Kilometer</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={editState.kilometers || ""}
+                                onChange={(e) =>
+                                  setEditState({
+                                    ...editState,
+                                    kilometers: Number(e.target.value) || 0,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Kosten (€)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={editState.expenses || ""}
+                                onChange={(e) =>
+                                  setEditState({
+                                    ...editState,
+                                    expenses: Number(e.target.value) || 0,
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Kunde/Projekt</Label>
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 min-h-[44px]"
+                              value={editState.customer_project}
+                              onChange={(e) =>
+                                setEditState({
+                                  ...editState,
+                                  customer_project: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="">Kein Kunde/Projekt</option>
+                              {customers?.map((customer) => (
+                                <option key={customer.id} value={customer.name}>
+                                  {customer.name}
+                                  {customer.project_name
+                                    ? ` - ${customer.project_name}`
+                                    : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex gap-2">
+                            <UpdateButton expenseId={expense.id} />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditState(emptyFormState);
+                              }}
+                              className="flex-1"
+                            >
+                              Abbrechen
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mb-3">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <p className="font-semibold text-brand-gray">
+                                  {expense.description}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  {formatDate(expense.date)}
+                                </p>
+                              </div>
+                              <span
+                                className={`rounded-full px-2 py-1 text-xs ${
+                                  expense.status === "approved"
+                                    ? "bg-green-100 text-green-700"
+                                    : expense.status === "sent"
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {expense.status === "approved"
+                                  ? "Genehmigt"
+                                  : expense.status === "sent"
+                                  ? "Gesendet"
+                                  : "Entwurf"}
+                              </span>
+                            </div>
+                            {expense.customer_project && (
+                              <p className="text-xs text-gray-600 mb-1">
+                                Kunde: {expense.customer_project}
+                              </p>
+                            )}
+                            <div className="text-sm text-gray-600 space-y-1">
+                              {expense.kilometers > 0 && (
+                                <p>
+                                  Kilometer: <strong>{expense.kilometers} km</strong>
+                                </p>
+                              )}
+                              {expense.expenses > 0 && (
+                                <p>
+                                  Kosten:{" "}
+                                  <strong className="text-brand-primary">
+                                    {formatCurrency(expense.expenses)}
+                                  </strong>
+                                </p>
+                              )}
+                            </div>
+                            {isAdmin && expense.user_name && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                Von: {expense.user_name}
+                              </p>
+                            )}
+                          </div>
+                          {expense.status === "draft" && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEdit(expense)}
+                                className="flex-1"
+                              >
+                                Bearbeiten
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDelete(expense.id)}
+                                disabled={deleteMutation.isPending}
+                                className="flex-1"
+                              >
+                                Löschen
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: Tabelle */}
+              <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3">Datum</th>
+                      <th className="px-4 py-3">Beschreibung</th>
+                      <th className="px-4 py-3">Kunde/Projekt</th>
+                      <th className="px-4 py-3">Kilometer</th>
+                      <th className="px-4 py-3">Kosten</th>
+                      <th className="px-4 py-3">Status</th>
+                      {isAdmin && <th className="px-4 py-3">Mitarbeiter</th>}
+                      <th className="px-4 py-3">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {expenses.map((expense) => {
+                      const isEditing = editingId === expense.id;
+                      return (
+                        <tr key={expense.id}>
+                          {isEditing ? (
+                            <>
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="date"
+                                  value={editState.date}
+                                  onChange={(e) =>
+                                    setEditState({ ...editState, date: e.target.value })
+                                  }
+                                  className="w-32"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input
+                                  value={editState.description}
+                                  onChange={(e) =>
+                                    setEditState({
+                                      ...editState,
+                                      description: e.target.value,
+                                    })
+                                  }
+                                  className="w-full"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                                  value={editState.customer_project}
+                                  onChange={(e) =>
+                                    setEditState({
+                                      ...editState,
+                                      customer_project: e.target.value,
+                                    })
+                                  }
+                                >
+                                  <option value="">-</option>
+                                  {customers?.map((customer) => (
+                                    <option key={customer.id} value={customer.name}>
+                                      {customer.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={editState.kilometers || ""}
+                                  onChange={(e) =>
+                                    setEditState({
+                                      ...editState,
+                                      kilometers: Number(e.target.value) || 0,
+                                    })
+                                  }
+                                  className="w-24"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={editState.expenses || ""}
+                                  onChange={(e) =>
+                                    setEditState({
+                                      ...editState,
+                                      expenses: Number(e.target.value) || 0,
+                                    })
+                                  }
+                                  className="w-24"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-600">
+                                {expense.status === "approved"
+                                  ? "Genehmigt"
+                                  : expense.status === "sent"
+                                  ? "Gesendet"
+                                  : "Entwurf"}
+                              </td>
+                              {isAdmin && (
+                                <td className="px-4 py-3 text-gray-600">
+                                  {expense.user_name}
+                                </td>
+                              )}
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2">
+                                  <UpdateButton expenseId={expense.id} />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingId(null);
+                                      setEditState(emptyFormState);
+                                    }}
+                                  >
+                                    Abbrechen
+                                  </Button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 text-gray-600">
+                                {formatDate(expense.date)}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-brand-gray">
+                                {expense.description}
+                              </td>
+                              <td className="px-4 py-3 text-gray-600">
+                                {expense.customer_project || "-"}
+                              </td>
+                              <td className="px-4 py-3 text-gray-600">
+                                {expense.kilometers > 0 ? `${expense.kilometers} km` : "-"}
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-brand-primary">
+                                {expense.expenses > 0 ? formatCurrency(expense.expenses) : "-"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`rounded-full px-2 py-1 text-xs ${
+                                    expense.status === "approved"
+                                      ? "bg-green-100 text-green-700"
+                                      : expense.status === "sent"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {expense.status === "approved"
+                                    ? "Genehmigt"
+                                    : expense.status === "sent"
+                                    ? "Gesendet"
+                                    : "Entwurf"}
+                                </span>
+                              </td>
+                              {isAdmin && (
+                                <td className="px-4 py-3 text-gray-600 text-xs">
+                                  {expense.user_name}
+                                </td>
+                              )}
+                              <td className="px-4 py-3">
+                                {expense.status === "draft" && (
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleEdit(expense)}
+                                    >
+                                      Bearbeiten
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleDelete(expense.id)}
+                                      disabled={deleteMutation.isPending}
+                                    >
+                                      Löschen
+                                    </Button>
+                                  </div>
+                                )}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-500 py-6">
+              Keine Reisekosten-Ausgaben gefunden.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+

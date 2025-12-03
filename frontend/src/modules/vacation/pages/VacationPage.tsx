@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import {
@@ -123,6 +124,9 @@ export const VacationPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild size="sm">
+            <Link to="/app/vacation/holidays">Feiertage anzeigen</Link>
+          </Button>
           <Label htmlFor="year-select" className="text-sm">Jahr:</Label>
           <Input
             id="year-select"

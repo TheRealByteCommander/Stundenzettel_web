@@ -13,6 +13,12 @@ import { useMonthlyStatsQuery } from "../hooks/useTimesheetStats";
 import { useAccountingTimesheetsQuery } from "../hooks/useAccountingTimesheets";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
 import { downloadTimesheetPDF } from "../../../services/api/timesheets";
+import {
+  exportTimesheetsToCSV,
+  exportTimesheetsToJSON,
+  exportTimesheetsToExcel,
+  exportToJSON,
+} from "../../../utils/export";
 import type { WeeklyTimesheet } from "../../../services/api/types";
 
 const getCurrentMonth = () => {
@@ -20,65 +26,19 @@ const getCurrentMonth = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const exportToCSV = (data: WeeklyTimesheet[], filename: string) => {
-  const headers = [
-    "ID",
-    "Mitarbeiter",
-    "Woche Start",
-    "Woche Ende",
-    "Status",
-    "Einträge",
-    "Erstellt am",
-  ];
-  
-  const rows = data.map((ts) => [
-    ts.id,
-    ts.user_name,
-    ts.week_start,
-    ts.week_end,
-    ts.status,
-    ts.entries.length.toString(),
-    ts.created_at || "",
-  ]);
-
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-  ].join("\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
 const exportStatsToCSV = (stats: any[], month: string) => {
-  const headers = ["Mitarbeiter", "Gesamtstunden", "Stundenzettel"];
-  const rows = stats.map((stat) => [
-    stat.user_name,
-    stat.total_hours.toFixed(2),
-    stat.timesheets_count || 0,
-  ]);
-
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-  ].join("\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", `timesheet-stats-${month}.csv`);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const data = stats.map((stat) => ({
+    Mitarbeiter: stat.user_name,
+    Gesamtstunden: stat.total_hours.toFixed(2),
+    "Stundenzettel-Stunden": stat.hours_on_timesheets.toFixed(2),
+    Reisestunden: stat.travel_hours.toFixed(2),
+    Reisekilometer: stat.travel_kilometers.toFixed(2),
+    Reisekosten: stat.travel_expenses.toFixed(2),
+    Stundenzettel: stat.timesheets_count || 0,
+  }));
+  
+  const { exportToCSV } = require("../../../utils/export");
+  exportToCSV(data, `timesheet-stats-${month}.csv`);
 };
 
 export const TimesheetReportingPage = () => {
@@ -128,20 +88,44 @@ export const TimesheetReportingPage = () => {
     }
   };
 
-  const handleExportAll = () => {
+  const handleExportAll = (format: "csv" | "json" | "excel") => {
     if (filteredTimesheets.length === 0) {
       alert("Keine Daten zum Exportieren vorhanden.");
       return;
     }
-    exportToCSV(filteredTimesheets, `timesheets-${month}.csv`);
+    const filename = `timesheets-${month}`;
+    if (format === "csv") {
+      exportTimesheetsToCSV(filteredTimesheets, `${filename}.csv`);
+    } else if (format === "json") {
+      exportTimesheetsToJSON(filteredTimesheets, filename);
+    } else if (format === "excel") {
+      exportTimesheetsToExcel(filteredTimesheets, filename);
+    }
   };
 
-  const handleExportStats = () => {
+  const handleExportStats = (format: "csv" | "json" | "excel") => {
     if (!stats || stats.stats.length === 0) {
       alert("Keine Statistiken zum Exportieren vorhanden.");
       return;
     }
-    exportStatsToCSV(stats.stats, month);
+    const filename = `timesheet-stats-${month}`;
+    if (format === "csv") {
+      exportStatsToCSV(stats.stats, month);
+    } else if (format === "json") {
+      exportToJSON(stats.stats, `${filename}.json`);
+    } else if (format === "excel") {
+      const { exportToExcel } = require("../../../utils/export");
+      const data = stats.stats.map((stat) => ({
+        Mitarbeiter: stat.user_name,
+        Gesamtstunden: stat.total_hours.toFixed(2),
+        "Stundenzettel-Stunden": stat.hours_on_timesheets.toFixed(2),
+        Reisestunden: stat.travel_hours.toFixed(2),
+        Reisekilometer: stat.travel_kilometers.toFixed(2),
+        Reisekosten: stat.travel_expenses.toFixed(2),
+        Stundenzettel: stat.timesheets_count || 0,
+      }));
+      exportToExcel(data, filename, "Statistiken");
+    }
   };
 
   if (!isAdmin) {
@@ -178,22 +162,44 @@ export const TimesheetReportingPage = () => {
 
       <Card>
         <CardContent className="space-y-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle className="text-lg text-brand-gray">
               Export-Funktionen
             </CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportAll}>
-                Alle als CSV exportieren
-              </Button>
-              <Button variant="outline" onClick={handleExportStats}>
-                Statistiken als CSV exportieren
-              </Button>
+            <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-gray-600">Stundenzettel:</Label>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => handleExportAll("csv")}>
+                    CSV
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleExportAll("json")}>
+                    JSON
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleExportAll("excel")}>
+                    Excel
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-gray-600">Statistiken:</Label>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => handleExportStats("csv")}>
+                    CSV
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleExportStats("json")}>
+                    JSON
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleExportStats("excel")}>
+                    Excel
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
           <p className="text-sm text-gray-600">
             Exportieren Sie alle Stundenzettel oder Statistiken für den
-            ausgewählten Monat als CSV-Datei.
+            ausgewählten Monat in verschiedenen Formaten (CSV, JSON, Excel).
           </p>
         </CardContent>
       </Card>

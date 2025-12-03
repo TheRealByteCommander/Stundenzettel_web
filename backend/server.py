@@ -189,6 +189,25 @@ COMPANY_INFO = {
 }
 
 # Models
+class NotificationPreferences(BaseModel):
+    """User notification preferences"""
+    user_id: str
+    email_notifications: bool = True
+    push_notifications: bool = True
+    timesheet_reminders: bool = True
+    vacation_reminders: bool = True
+    expense_reminders: bool = True
+    admin_notifications: bool = True  # For admin/accounting users
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NotificationPreferencesUpdate(BaseModel):
+    email_notifications: Optional[bool] = None
+    push_notifications: Optional[bool] = None
+    timesheet_reminders: Optional[bool] = None
+    vacation_reminders: Optional[bool] = None
+    expense_reminders: Optional[bool] = None
+    admin_notifications: Optional[bool] = None
+
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
@@ -3152,6 +3171,13 @@ async def get_audit_logs(
 # Include router
 app.include_router(api_router)
 
+# Include migration router (if available)
+try:
+    from migration_api import migration_router
+    app.include_router(migration_router)
+except ImportError:
+    logger.warning("migration_api not available - migration endpoints disabled")
+
 # Middleware-Reihenfolge ist wichtig: Security Headers zuletzt
 app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -4462,14 +4488,39 @@ async def get_vacation_requirements(
 @api_router.get("/vacation/holidays/{year}")
 async def get_holidays(year: int):
     """Get German and Saxon holidays for a year (programmweit verfügbar)"""
-    holidays_set = get_german_holidays(year)
-    # Sortiere und formatiere als Liste von Datumsstrings
-    holidays_list = sorted([date.strftime("%Y-%m-%d") for date in holidays_set])
-    return {
-        "year": year,
-        "holidays": holidays_list,
-        "count": len(holidays_list)
-    }
+    try:
+        import holidays
+        # Deutsche Feiertage (bundesweit)
+        de_holidays = holidays.Germany(years=year, prov=None)
+        # Sächsische Feiertage (Bundesland: SN = Sachsen)
+        sn_holidays = holidays.Germany(years=year, prov='SN')
+        # Kombiniere beide Dictionaries (date -> name)
+        all_holidays_dict = {**de_holidays, **sn_holidays}
+        
+        # Sortiere und formatiere als Liste von Objekten mit Datum und Name
+        holidays_list = [
+            {
+                "date": date.strftime("%Y-%m-%d"),
+                "name": name
+            }
+            for date, name in sorted(all_holidays_dict.items())
+        ]
+        
+        return {
+            "year": year,
+            "holidays": holidays_list,
+            "count": len(holidays_list)
+        }
+    except Exception as e:
+        logger.warning(f"Fehler beim Laden der Feiertage: {e}")
+        # Fallback: Nur Datumsstrings ohne Namen
+        holidays_set = get_german_holidays(year)
+        holidays_list = sorted([date.strftime("%Y-%m-%d") for date in holidays_set])
+        return {
+            "year": year,
+            "holidays": [{"date": d, "name": f"Feiertag {d}"} for d in holidays_list],
+            "count": len(holidays_list)
+        }
 
 @api_router.get("/vacation/check-holiday/{date}")
 async def check_holiday(date: str):
