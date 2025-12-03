@@ -16,7 +16,6 @@ import {
   useDeleteVacationRequestMutation,
   useApproveVacationRequestMutation,
   useRejectVacationRequestMutation,
-  useUpdateVacationBalanceMutation,
   useAdminDeleteVacationRequestMutation,
 } from "../hooks/useVacation";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";

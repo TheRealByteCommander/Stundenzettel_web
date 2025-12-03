@@ -74,7 +74,7 @@ export const AccountingPage = () => {
           {error instanceof Error
             ? error.message
             : typeof error === "object" && error !== null && "message" in error
-              ? String(error.message)
+              ? String((error as { message: unknown }).message)
               : "Unbekannter Fehler"}
         </Alert>
       )}
