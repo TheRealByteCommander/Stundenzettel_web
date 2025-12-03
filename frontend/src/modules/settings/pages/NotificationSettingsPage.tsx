@@ -12,7 +12,6 @@ import {
   useUpdateNotificationPreferencesMutation,
 } from "../hooks/useNotificationPreferences";
 import type { NotificationPreferences, NotificationPreferencesUpdate } from "../../../services/api/notifications";
-import type { NotificationPreferences } from "../../../services/api/notifications";
 
 export const NotificationSettingsPage = () => {
   const { data: preferences, isLoading } = useNotificationPreferencesQuery();
