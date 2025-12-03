@@ -130,11 +130,11 @@ export const MigrationPage = () => {
                   <strong>Fehler:</strong> {status.error}
                 </p>
               )}
-              {status.results && (
+              {status.results !== null && status.results !== undefined && (
                 <div>
                   <strong>Ergebnisse:</strong>
                   <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
-                    {String(JSON.stringify(status.results as Record<string, unknown>, null, 2))}
+                    {JSON.stringify(status.results as Record<string, unknown>, null, 2)}
                   </pre>
                 </div>
               )}
