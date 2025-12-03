@@ -115,7 +115,7 @@ export const TimesheetReportingPage = () => {
     } else if (format === "json") {
       exportToJSON(stats, `${filename}.json`);
     } else if (format === "excel") {
-      const data = stats.map((stat) => ({
+      const data = stats.map((stat: AccountingMonthlyStat) => ({
         Mitarbeiter: stat.user_name,
         Gesamtstunden: stat.total_hours.toFixed(2),
         "Stundenzettel-Stunden": stat.hours_on_timesheets.toFixed(2),
@@ -286,7 +286,7 @@ export const TimesheetReportingPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {stats.map((stat) => (
+                  {stats.map((stat: AccountingMonthlyStat) => (
                     <tr key={stat.user_id}>
                       <td className="px-4 py-3 text-gray-600">
                         {stat.user_name}
