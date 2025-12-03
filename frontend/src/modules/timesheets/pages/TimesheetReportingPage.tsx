@@ -9,8 +9,8 @@ import {
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { useTimesheetsQuery } from "../hooks/useTimesheets";
-import { useMonthlyStatsQuery } from "../hooks/useTimesheetStats";
 import { useAccountingTimesheetsQuery } from "../hooks/useAccountingTimesheets";
+import { useAccountingMonthlyStatsQuery } from "../../admin/hooks/useAdminSettings";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
 import { downloadTimesheetPDF } from "../../../services/api/timesheets";
 import {
