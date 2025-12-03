@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWA-Icons generieren</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #e90118;
+      margin-top: 0;
+    }
+    .preview {
+      display: flex;
+      gap: 20px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .preview-item {
+      text-align: center;
+      padding: 10px;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+    .preview-item img {
+      display: block;
+      margin: 0 auto 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #e90118;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #d00115;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    canvas {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 PWA-Icons generieren</h1>
+    
+    <div class="info">
+      <strong>Anleitung:</strong>
+      <ol>
+        <li>Klicke auf "Icons generieren"</li>
+        <li>Die Icons werden automatisch heruntergeladen</li>
+        <li>Platziere sie in <code>frontend/public/</code></li>
+      </ol>
+    </div>
+
+    <div class="preview" id="preview"></div>
+
+    <div>
+      <button onclick="generateIcons()">Icons generieren und herunterladen</button>
+      <button onclick="previewIcons()">Vorschau anzeigen</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    const sizes = [
+      { name: 'icon-192.png', size: 192 },
+      { name: 'icon-512.png', size: 512 },
+      { name: 'apple-touch-icon.png', size: 180 },
+    ];
+
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      canvas.width = size;
+      canvas.height = size;
+      
+      // Hintergrund
+      const radius = size * 0.15625; // 80/512
+      ctx.fillStyle = '#e90118';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fill();
+
+      // Tick
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = size * 0.1171875; // 60/512
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      const centerX = size / 2;
+      const centerY = size / 2;
+      
+      // Haupt-Tick
+      ctx.beginPath();
+      ctx.moveTo(centerX - size * 0.234375, centerY - size * 0.078125);
+      ctx.lineTo(centerX - size * 0.078125, centerY + size * 0.078125);
+      ctx.lineTo(centerX + size * 0.234375, centerY - size * 0.234375);
+      ctx.stroke();
+
+      // Untere Linien
+      ctx.lineWidth = size * 0.05859375; // 30/512
+      ctx.beginPath();
+      ctx.moveTo(centerX - size * 0.3515625, centerY + size * 0.15625);
+      ctx.lineTo(centerX + size * 0.3515625, centerY + size * 0.15625);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX - size * 0.3515625, centerY + size * 0.234375);
+      ctx.lineTo(centerX + size * 0.3515625, centerY + size * 0.234375);
+      ctx.stroke();
+    }
+
+    // Polyfill für roundRect (für ältere Browser)
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radius) {
+        this.beginPath();
+        this.moveTo(x + radius, y);
+        this.lineTo(x + width - radius, y);
+        this.quadraticCurveTo(x + width, y, x + width, y + radius);
+        this.lineTo(x + width, y + height - radius);
+        this.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        this.lineTo(x + radius, y + height);
+        this.quadraticCurveTo(x, y + height, x, y + height - radius);
+        this.lineTo(x, y + radius);
+        this.quadraticCurveTo(x, y, x + radius, y);
+        this.closePath();
+      };
+    }
+
+    function downloadCanvas(canvas, filename) {
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    }
+
+    function previewIcons() {
+      const preview = document.getElementById('preview');
+      preview.innerHTML = '';
+      
+      sizes.forEach(({ name, size }) => {
+        const canvas = document.createElement('canvas');
+        drawIcon(canvas, size);
+        
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+        item.innerHTML = `
+          <img src="${canvas.toDataURL()}" alt="${name}" width="${size}" height="${size}">
+          <div><strong>${name}</strong><br>${size}x${size}px</div>
+        `;
+        preview.appendChild(item);
+      });
+    }
+
+    function generateIcons() {
+      const canvas = document.getElementById('canvas');
+      
+      sizes.forEach(({ name, size }, index) => {
+        setTimeout(() => {
+          drawIcon(canvas, size);
+          downloadCanvas(canvas, name);
+        }, index * 200);
+      });
+
+      alert('Icons werden heruntergeladen! Bitte platziere sie in frontend/public/');
+    }
+
+    // Automatische Vorschau beim Laden
+    window.addEventListener('load', previewIcons);
+  </script>
+</body>
+</html>
+

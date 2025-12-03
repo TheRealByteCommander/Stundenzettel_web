@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Hintergrund -->
+  <rect width="512" height="512" fill="#e90118" rx="80"/>
+  
+  <!-- Tick Guard Logo - Stylisierter Tick/Checkmark -->
+  <g transform="translate(256, 256)">
+    <!-- Haupt-Tick -->
+    <path d="M -120 -40 L -40 40 L 120 -120" 
+          stroke="white" 
+          stroke-width="60" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          fill="none"/>
+    
+    <!-- Zusätzliche Linien für "Guard" -->
+    <line x1="-180" y1="80" x2="180" y2="80" 
+          stroke="white" 
+          stroke-width="30" 
+          stroke-linecap="round"/>
+    <line x1="-180" y1="120" x2="180" y2="120" 
+          stroke="white" 
+          stroke-width="30" 
+          stroke-linecap="round"/>
+  </g>
+</svg>
+
