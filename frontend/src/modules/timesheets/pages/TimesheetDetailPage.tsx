@@ -23,7 +23,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export const TimesheetDetailPage = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const {
     data,
@@ -69,7 +69,7 @@ export const TimesheetDetailPage = () => {
   }, [data]);
 
   useEffect(() => {
-    if (!data) {
+    if (!data || !data.entries) {
       return;
     }
     setVerificationNotes(data.signed_pdf_verification_notes ?? "");
