@@ -3850,12 +3850,78 @@ async def upload_receipt(
             "analysis": analysis.model_dump()
         })
         
-        # Automatische Zuordnung zu Report-Einträgen basierend auf Datum
+        # Prüfung: Monat und Zeiträume gegen Stundenzettel
+        report_month = report.get("month")  # Format: YYYY-MM
         report_entries = report.get("entries", [])
-        doc_date = analysis.extracted_data.get("date")
+        extracted_data = analysis.extracted_data
+        doc_date = extracted_data.get("date")
+        doc_date_from = extracted_data.get("date_from")  # Zeitraum Start
+        doc_date_to = extracted_data.get("date_to")  # Zeitraum Ende
         
-        if doc_date and report_entries:
-            # Finde passenden Eintrag basierend auf Datum
+        logic_issues = []
+        
+        # Prüfe Monatszugehörigkeit
+        if doc_date:
+            try:
+                from datetime import datetime
+                doc_date_obj = datetime.strptime(doc_date, "%Y-%m-%d")
+                doc_month = doc_date_obj.strftime("%Y-%m")
+                if doc_month != report_month:
+                    logic_issues.append(f"Beleg-Datum {doc_date} gehört nicht zum Report-Monat {report_month}")
+            except:
+                pass
+        
+        # Prüfe Zeitraum (für Hotels)
+        if doc_date_from and doc_date_to:
+            try:
+                from datetime import datetime
+                date_from_obj = datetime.strptime(doc_date_from, "%Y-%m-%d")
+                date_to_obj = datetime.strptime(doc_date_to, "%Y-%m-%d")
+                
+                # Prüfe Monatszugehörigkeit des Zeitraums
+                period_start_month = date_from_obj.strftime("%Y-%m")
+                period_end_month = date_to_obj.strftime("%Y-%m")
+                if period_start_month != report_month and period_end_month != report_month:
+                    logic_issues.append(f"Zeitraum {doc_date_from} bis {doc_date_to} gehört nicht zum Report-Monat {report_month}")
+                
+                # Prüfe Zeitraum gegen Stundenzettel-Einträge
+                matching_entries = []
+                for entry in report_entries:
+                    entry_date_str = entry.get("date")
+                    if not entry_date_str:
+                        continue
+                    try:
+                        entry_date_obj = datetime.strptime(entry_date_str, "%Y-%m-%d")
+                        # Prüfe ob Eintrag im Zeitraum liegt
+                        if date_from_obj <= entry_date_obj <= date_to_obj:
+                            matching_entries.append(entry)
+                    except:
+                        pass
+                
+                if not matching_entries:
+                    logic_issues.append(f"Zeitraum {doc_date_from} bis {doc_date_to} passt nicht zu den Stundenzettel-Einträgen")
+                else:
+                    # Prüfe ob alle Tage im Zeitraum auch Arbeitsstunden haben
+                    missing_days = []
+                    current_date = date_from_obj
+                    while current_date <= date_to_obj:
+                        date_str = current_date.strftime("%Y-%m-%d")
+                        found_entry = None
+                        for entry in matching_entries:
+                            if entry.get("date") == date_str:
+                                found_entry = entry
+                                break
+                        if not found_entry or found_entry.get("working_hours", 0.0) == 0.0:
+                            missing_days.append(date_str)
+                        current_date += timedelta(days=1)
+                    
+                    if missing_days:
+                        logic_issues.append(f"Für folgende Tage im Zeitraum {doc_date_from} bis {doc_date_to} sind keine Arbeitsstunden verzeichnet: {', '.join(missing_days)}")
+            except Exception as e:
+                logger.warning(f"Fehler bei Zeitraum-Prüfung: {e}")
+        
+        # Prüfe Einzeldatum gegen Stundenzettel (falls kein Zeitraum)
+        elif doc_date:
             matching_entry = None
             for entry in report_entries:
                 if entry.get("date") == doc_date:
@@ -3864,35 +3930,22 @@ async def upload_receipt(
             
             # Wenn kein exaktes Datum-Match, suche nach ähnlichem Datum (±1 Tag)
             if not matching_entry:
-                from datetime import datetime, timedelta
                 try:
+                    from datetime import datetime, timedelta
                     doc_date_obj = datetime.strptime(doc_date, "%Y-%m-%d")
                     for entry in report_entries:
-                        entry_date_obj = datetime.strptime(entry.get("date"), "%Y-%m-%d")
-                        if abs((doc_date_obj - entry_date_obj).days) <= 1:
-                            matching_entry = entry
-                            break
-                except:
-                    pass
-        
-        # Logik-Prüfung: Überlappende Hotelrechnungen, Datum-Abgleich mit Arbeitsstunden
-        logic_issues = []
-        if analysis.document_type == "hotel_receipt" and doc_date:
-            # Prüfe auf überlappende Hotelrechnungen
-            for existing_analysis in report_document_analyses[:-1]:  # Alle außer dem aktuellen
-                existing_analysis_obj = existing_analysis.get("analysis", {})
-                if existing_analysis_obj.get("document_type") == "hotel_receipt":
-                    existing_date = existing_analysis_obj.get("extracted_data", {}).get("date")
-                    if existing_date:
+                        entry_date_str = entry.get("date")
+                        if not entry_date_str:
+                            continue
                         try:
-                            from datetime import datetime
-                            doc_date_obj = datetime.strptime(doc_date, "%Y-%m-%d")
-                            existing_date_obj = datetime.strptime(existing_date, "%Y-%m-%d")
-                            # Prüfe auf Überlappung (±3 Tage = mögliche Überlappung)
-                            if abs((doc_date_obj - existing_date_obj).days) <= 3:
-                                logic_issues.append(f"Mögliche überlappende Hotelrechnung: {existing_date} und {doc_date}")
+                            entry_date_obj = datetime.strptime(entry_date_str, "%Y-%m-%d")
+                            if abs((doc_date_obj - entry_date_obj).days) <= 1:
+                                matching_entry = entry
+                                break
                         except:
                             pass
+                except:
+                    pass
             
             # Prüfe Datum-Abgleich mit Arbeitsstunden
             if matching_entry:
@@ -3900,7 +3953,42 @@ async def upload_receipt(
                 if working_hours == 0.0:
                     logic_issues.append(f"Für {doc_date} sind keine Arbeitsstunden im Stundenzettel verzeichnet")
             else:
-                logic_issues.append(f"Kein passender Reiseeintrag für Hotelrechnung am {doc_date} gefunden")
+                logic_issues.append(f"Kein passender Reiseeintrag für Beleg am {doc_date} gefunden")
+        
+        # Prüfe auf überlappende Hotelrechnungen
+        if analysis.document_type == "hotel_receipt":
+            for existing_analysis in report_document_analyses[:-1]:  # Alle außer dem aktuellen
+                existing_analysis_obj = existing_analysis.get("analysis", {})
+                if existing_analysis_obj.get("document_type") == "hotel_receipt":
+                    existing_data = existing_analysis_obj.get("extracted_data", {})
+                    existing_date_from = existing_data.get("date_from")
+                    existing_date_to = existing_data.get("date_to")
+                    existing_date = existing_data.get("date")
+                    
+                    if doc_date_from and doc_date_to and existing_date_from and existing_date_to:
+                        # Prüfe Zeitraum-Überlappung
+                        try:
+                            from datetime import datetime
+                            doc_from = datetime.strptime(doc_date_from, "%Y-%m-%d")
+                            doc_to = datetime.strptime(doc_date_to, "%Y-%m-%d")
+                            existing_from = datetime.strptime(existing_date_from, "%Y-%m-%d")
+                            existing_to = datetime.strptime(existing_date_to, "%Y-%m-%d")
+                            
+                            # Überlappung wenn: doc_from <= existing_to AND doc_to >= existing_from
+                            if doc_from <= existing_to and doc_to >= existing_from:
+                                logic_issues.append(f"Mögliche überlappende Hotelrechnung: {existing_date_from} bis {existing_date_to} überlappt mit {doc_date_from} bis {doc_date_to}")
+                        except:
+                            pass
+                    elif doc_date and existing_date:
+                        # Prüfe Einzeldatum-Überlappung (±3 Tage = mögliche Überlappung)
+                        try:
+                            from datetime import datetime
+                            doc_date_obj = datetime.strptime(doc_date, "%Y-%m-%d")
+                            existing_date_obj = datetime.strptime(existing_date, "%Y-%m-%d")
+                            if abs((doc_date_obj - existing_date_obj).days) <= 3:
+                                logic_issues.append(f"Mögliche überlappende Hotelrechnung: {existing_date} und {doc_date}")
+                        except:
+                            pass
         
         # Prüfe auf Fremdwährung - Nachweis erforderlich
         currency = analysis.extracted_data.get("currency", "EUR")

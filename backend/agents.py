@@ -6242,7 +6242,7 @@ Analysiere und extrahiere folgende Informationen:
 1. Dokumenttyp: hotel_receipt, restaurant_bill, toll_receipt, parking, fuel, train_ticket, other
 2. Sprache des Dokuments
 3. Betrag (Hauptbetrag)
-4. Datum
+4. Datum (Einzeldatum) ODER Zeitraum (von-bis) für Hotels/Unterkünfte
 5. Währung
 6. Steuernummer/USt-IdNr (falls vorhanden)
 7. Firmenanschrift/Kontaktdaten (falls vorhanden)
@@ -6250,8 +6250,10 @@ Analysiere und extrahiere folgende Informationen:
    - Steuernummer vorhanden?
    - Firmenanschrift vorhanden?
    - Betrag klar erkennbar?
-   - Datum vorhanden?
+   - Datum/Zeitraum vorhanden?
 9. Probleme/Unstimmigkeiten (z.B. unleserlich, unvollständig, verdächtig)
+
+WICHTIG: Für Hotels/Unterkünfte extrahiere den Zeitraum (check-in bis check-out) falls vorhanden.
 
 Antworte im JSON-Format mit folgenden Feldern:
 {{
@@ -6260,7 +6262,9 @@ Antworte im JSON-Format mit folgenden Feldern:
   "extracted_data": {{
     "amount": 0.0,
     "currency": "EUR",
-    "date": "YYYY-MM-DD",
+    "date": "YYYY-MM-DD",  // Einzeldatum (falls vorhanden)
+    "date_from": "YYYY-MM-DD",  // Startdatum für Zeiträume (z.B. Hotel check-in)
+    "date_to": "YYYY-MM-DD",  // Enddatum für Zeiträume (z.B. Hotel check-out)
     "tax_number": "...",
     "company_address": "..."
   }},
