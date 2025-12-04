@@ -357,6 +357,15 @@ class WeeklyTimesheetCreate(BaseModel):
     week_vehicle_id: Optional[str] = None
     entries: List[TimeEntry]
 
+class TravelExpenseReceipt(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    filename: str
+    local_path: str  # Pfad auf lokalem Bürorechner
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    file_size: int  # in Bytes
+    exchange_proof_path: Optional[str] = None  # Pfad zum Nachweis des Euro-Betrags (z.B. Kontoauszug) bei Fremdwährung
+    exchange_proof_filename: Optional[str] = None  # Dateiname des Nachweises
+
 class TravelExpense(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
@@ -383,15 +392,6 @@ class TravelExpenseUpdate(BaseModel):
     kilometers: Optional[float] = None
     expenses: Optional[float] = None
     customer_project: Optional[str] = None
-
-class TravelExpenseReceipt(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    filename: str
-    local_path: str  # Pfad auf lokalem Bürorechner
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
-    file_size: int  # in Bytes
-    exchange_proof_path: Optional[str] = None  # Pfad zum Nachweis des Euro-Betrags (z.B. Kontoauszug) bei Fremdwährung
-    exchange_proof_filename: Optional[str] = None  # Dateiname des Nachweises
 
 class TravelExpenseReportEntry(BaseModel):
     date: str  # YYYY-MM-DD
