@@ -119,6 +119,16 @@ export interface MonthlyRankResponse {
 
 export type TravelExpenseStatus = "draft" | "sent" | "approved";
 
+export interface TravelExpenseReceipt {
+  id: string;
+  filename: string;
+  local_path: string;
+  uploaded_at: string;
+  file_size: number;
+  exchange_proof_path?: string | null;
+  exchange_proof_filename?: string | null;
+}
+
 export interface TravelExpense {
   id: string;
   user_id: string;
@@ -128,6 +138,7 @@ export interface TravelExpense {
   kilometers: number;
   expenses: number;
   customer_project: string;
+  receipts?: TravelExpenseReceipt[];
   status: TravelExpenseStatus;
   created_at?: string;
 }

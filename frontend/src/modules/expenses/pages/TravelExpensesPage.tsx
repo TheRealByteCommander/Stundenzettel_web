@@ -13,10 +13,12 @@ import {
   useCreateTravelExpenseMutation,
   useDeleteTravelExpenseMutation,
   useUpdateTravelExpenseMutation,
+  useUploadTravelExpenseReceiptMutation,
+  useDeleteTravelExpenseReceiptMutation,
 } from "../hooks/useTravelExpenses";
 import { useCustomersQuery } from "../../timesheets/hooks/useCustomers";
 import { useCurrentUserQuery } from "../../auth/hooks/useCurrentUser";
-import type { TravelExpense, TravelExpenseCreate } from "../../../services/api/types";
+import type { TravelExpense, TravelExpenseCreate, TravelExpenseReceipt } from "../../../services/api/types";
 
 interface ExpenseFormState {
   date: string;
@@ -44,6 +46,8 @@ export const TravelExpensesPage = () => {
   const [editState, setEditState] = useState<ExpenseFormState>(emptyFormState);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +152,91 @@ export const TravelExpensesPage = () => {
     return new Date(dateString).toLocaleDateString("de-DE");
   };
 
+  const ReceiptUploadButton = ({ expense }: { expense: TravelExpense }) => {
+    const uploadMutation = useUploadTravelExpenseReceiptMutation(expense.id);
+    
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setReceiptMessage(null);
+        setReceiptError(null);
+        uploadMutation.mutate(file, {
+          onSuccess: () => {
+            setReceiptMessage("Beleg erfolgreich hochgeladen");
+          },
+          onError: (err) => {
+            const errorMessage =
+              (err as { response?: { data?: { detail?: string } } }).response?.data
+                ?.detail ?? (err as { message?: string }).message ?? "Fehler beim Hochladen";
+            setReceiptError(errorMessage);
+          },
+        });
+        e.target.value = "";
+      }
+    };
+
+    return (
+      <label className="block">
+        <input
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={handleFileChange}
+          disabled={uploadMutation.isPending}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full text-xs"
+          asChild
+          disabled={uploadMutation.isPending}
+        >
+          <span>{uploadMutation.isPending ? "Upload..." : "Beleg hochladen"}</span>
+        </Button>
+      </label>
+    );
+  };
+
+  const ReceiptItem = ({ expense, receipt, onDelete }: { expense: TravelExpense; receipt: TravelExpenseReceipt; onDelete: () => void }) => {
+    const deleteMutation = useDeleteTravelExpenseReceiptMutation(expense.id);
+    
+    const handleDelete = () => {
+      if (confirm("Beleg wirklich löschen?")) {
+        setReceiptMessage(null);
+        setReceiptError(null);
+        deleteMutation.mutate(receipt.id, {
+          onSuccess: () => {
+            setReceiptMessage("Beleg gelöscht");
+            onDelete();
+          },
+          onError: (err) => {
+            const errorMessage =
+              (err as { response?: { data?: { detail?: string } } }).response?.data
+                ?.detail ?? (err as { message?: string }).message ?? "Fehler beim Löschen";
+            setReceiptError(errorMessage);
+          },
+        });
+      }
+    };
+
+    return (
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>{receipt.filename}</span>
+        {expense.status === "draft" && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+          >
+            ×
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:gap-6 px-3 sm:px-4 py-4 sm:py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -168,6 +257,8 @@ export const TravelExpensesPage = () => {
 
       {message && <Alert variant="success">{message}</Alert>}
       {error && <Alert variant="destructive">{error}</Alert>}
+      {receiptMessage && <Alert variant="success">{receiptMessage}</Alert>}
+      {receiptError && <Alert variant="destructive">{receiptError}</Alert>}
 
       {showCreateForm && (
         <Card>

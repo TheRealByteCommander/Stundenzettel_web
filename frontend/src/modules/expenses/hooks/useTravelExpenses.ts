@@ -8,9 +8,11 @@ import {
   approveTravelExpense,
   createTravelExpense,
   deleteTravelExpense,
+  deleteTravelExpenseReceipt,
   fetchTravelExpenses,
   rejectTravelExpense,
   updateTravelExpense,
+  uploadTravelExpenseReceipt,
 } from "../../../services/api/travel-expenses";
 import type {
   TravelExpense,
@@ -70,6 +72,30 @@ export const useRejectTravelExpenseMutation = () => {
   const client = useQueryClient();
   return useMutation<void, AxiosError, string>({
     mutationFn: rejectTravelExpense,
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: travelExpensesQueryKey });
+    },
+  });
+};
+
+export const useUploadTravelExpenseReceiptMutation = (expenseId: string) => {
+  const client = useQueryClient();
+  return useMutation<
+    { message: string; receipt: { id: string; filename: string; local_path: string; uploaded_at: string; file_size: number } },
+    AxiosError,
+    File
+  >({
+    mutationFn: (file) => uploadTravelExpenseReceipt(expenseId, file),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: travelExpensesQueryKey });
+    },
+  });
+};
+
+export const useDeleteTravelExpenseReceiptMutation = (expenseId: string) => {
+  const client = useQueryClient();
+  return useMutation<{ message: string }, AxiosError, string>({
+    mutationFn: (receiptId) => deleteTravelExpenseReceipt(expenseId, receiptId),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: travelExpensesQueryKey });
     },

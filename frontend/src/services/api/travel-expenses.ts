@@ -3,6 +3,7 @@ import type {
   TravelExpense,
   TravelExpenseCreate,
   TravelExpenseUpdate,
+  TravelExpenseReceipt,
 } from "./types";
 
 export const fetchTravelExpenses = async (): Promise<TravelExpense[]> => {
@@ -41,5 +42,33 @@ export const approveTravelExpense = async (id: string): Promise<void> => {
 
 export const rejectTravelExpense = async (id: string): Promise<void> => {
   await apiClient.post(`/travel-expenses/${id}/reject`);
+};
+
+export const uploadTravelExpenseReceipt = async (
+  expenseId: string,
+  file: File
+): Promise<{ message: string; receipt: TravelExpenseReceipt }> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await apiClient.post<{ message: string; receipt: TravelExpenseReceipt }>(
+    `/travel-expenses/${expenseId}/upload-receipt`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return data;
+};
+
+export const deleteTravelExpenseReceipt = async (
+  expenseId: string,
+  receiptId: string
+): Promise<{ message: string }> => {
+  const { data } = await apiClient.delete<{ message: string }>(
+    `/travel-expenses/${expenseId}/receipts/${receiptId}`
+  );
+  return data;
 };
 

@@ -366,6 +366,7 @@ class TravelExpense(BaseModel):
     kilometers: float = 0.0  # Gefahrene Kilometer
     expenses: float = 0.0  # Reisekosten in Euro (Spesen, Bahntickets, etc.)
     customer_project: str = ""  # Optional: Kunde/Projekt
+    receipts: List[TravelExpenseReceipt] = []  # Hochgeladene PDF-Belege
     created_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "draft"  # draft, sent, approved
 
@@ -3386,6 +3387,178 @@ async def reject_travel_expense(expense_id: str, current_user: User = Depends(ge
     )
     
     return {"message": "Travel expense rejected successfully"}
+
+@limiter.limit("20/hour")  # Max 20 Belege-Uploads pro Stunde
+@api_router.post("/travel-expenses/{expense_id}/upload-receipt")
+async def upload_travel_expense_receipt(
+    request: Request,
+    expense_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload a receipt PDF for a travel expense - saves to local office computer only (not webserver)
+    DSGVO-Compliant: Encrypted storage, audit logging, retention management
+    """
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    expense = await db.travel_expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Travel expense not found")
+    
+    if not current_user.can_view_all_data() and expense["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    if expense.get("status") != "draft":
+        raise HTTPException(status_code=400, detail="Can only upload receipts to draft expenses")
+    
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+    
+    # DSGVO: Audit logging before upload
+    audit_logger.log_access(
+        action="upload",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id="",  # Will be set after creation
+        details={"filename": file.filename, "size": len(contents), "expense_id": expense_id}
+    )
+    
+    receipt_id = str(uuid.uuid4())
+    # Sanitize filename for security
+    safe_filename = re.sub(r'[^\w\-_\.]', '_', file.filename)
+    
+    # Erstelle eindeutigen Ordner pro Reisekosten: User_Datum_ExpenseID
+    user_name_safe = re.sub(r'[^\w\-_]', '_', expense.get("user_name", "Unknown"))
+    expense_date = expense.get("date", "unknown")
+    # Ordner-Name: User_Datum_ExpenseID (z.B. Max_Mustermann_2025-01-15_abc123)
+    expense_folder = f"{user_name_safe}_{expense_date}_{expense_id}"
+    expense_folder_path = Path(LOCAL_RECEIPTS_PATH) / "reisekosten_einzel" / expense_folder
+    
+    # Erstelle Ordner falls nicht vorhanden
+    expense_folder_path.mkdir(parents=True, exist_ok=True)
+    
+    # Speichere PDF im Ordner der Reisekosten
+    filename = f"{receipt_id}_{safe_filename}"
+    local_file_path = expense_folder_path / filename
+    
+    try:
+        # Save file to local storage (office computer only)
+        with open(local_file_path, 'wb') as f:
+            f.write(contents)
+        
+        # DSGVO Art. 32: Encrypt sensitive data
+        data_encryption.encrypt_file(local_file_path)
+        
+        # Verify file is encrypted (try to decrypt - should work)
+        try:
+            data_encryption.decrypt_file(local_file_path)
+        except Exception as e:
+            logging.error(f"File encryption verification failed: {e}")
+            local_file_path.unlink()  # Delete unencrypted file
+            raise HTTPException(status_code=500, detail="File encryption failed")
+        
+    except Exception as e:
+        if local_file_path.exists():
+            local_file_path.unlink()  # Clean up on error
+        raise HTTPException(status_code=500, detail=f"Failed to save file to local storage: {str(e)}")
+    
+    receipt = TravelExpenseReceipt(
+        id=receipt_id,
+        filename=file.filename,
+        local_path=str(local_file_path),
+        file_size=len(contents)
+    )
+    
+    expense_receipts = expense.get("receipts", [])
+    expense_receipts.append(receipt.model_dump())
+    
+    await db.travel_expenses.update_one(
+        {"id": expense_id},
+        {
+            "$set": {
+                "receipts": expense_receipts,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Update audit log with receipt_id
+    audit_logger.log_access(
+        action="upload_complete",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id=receipt_id,
+        details={"filename": file.filename, "expense_id": expense_id, "local_path": str(local_file_path)}
+    )
+    
+    return {
+        "message": "Receipt uploaded successfully",
+        "receipt": receipt
+    }
+
+@api_router.delete("/travel-expenses/{expense_id}/receipts/{receipt_id}")
+async def delete_travel_expense_receipt(
+    expense_id: str,
+    receipt_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a receipt from a travel expense"""
+    expense = await db.travel_expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Travel expense not found")
+    
+    if not current_user.can_view_all_data() and expense["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    if expense.get("status") != "draft":
+        raise HTTPException(status_code=400, detail="Can only delete receipts from draft expenses")
+    
+    receipts = expense.get("receipts", [])
+    receipt_to_delete = None
+    updated_receipts = []
+    
+    for receipt in receipts:
+        if receipt.get("id") == receipt_id:
+            receipt_to_delete = receipt
+        else:
+            updated_receipts.append(receipt)
+    
+    if not receipt_to_delete:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    
+    # Delete file from local storage
+    local_path = receipt_to_delete.get("local_path")
+    if local_path:
+        try:
+            file_path = Path(local_path)
+            if file_path.exists():
+                file_path.unlink()
+        except Exception as e:
+            logging.warning(f"Failed to delete receipt file: {e}")
+    
+    await db.travel_expenses.update_one(
+        {"id": expense_id},
+        {
+            "$set": {
+                "receipts": updated_receipts,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Audit log
+    audit_logger.log_access(
+        action="delete",
+        user_id=current_user.id,
+        resource_type="receipt",
+        resource_id=receipt_id,
+        details={"expense_id": expense_id, "filename": receipt_to_delete.get("filename")}
+    )
+    
+    return {"message": "Receipt deleted successfully"}
 
 # Announcements endpoints
 @api_router.get("/announcements", response_model=List[Announcement])
