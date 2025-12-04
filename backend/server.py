@@ -3302,14 +3302,18 @@ async def create_travel_expense(expense_create: TravelExpenseCreate, current_use
         description=expense_create.description,
         kilometers=expense_create.kilometers,
         expenses=expense_create.expenses,
-        customer_project=expense_create.customer_project
+        customer_project=expense_create.customer_project,
+        status="draft",  # Explicitly set status
+        receipts=[]  # Initialize empty receipts list
     )
     
     expense_dict = expense.model_dump()
     expense_dict["created_at"] = datetime.utcnow()
-    await db.travel_expenses.insert_one(expense_dict)
+    result = await db.travel_expenses.insert_one(expense_dict)
     
-    return expense
+    # Return the created expense with the correct id
+    expense_dict.pop("_id", None)
+    return TravelExpense(**expense_dict)
 
 @api_router.put("/travel-expenses/{expense_id}", response_model=TravelExpense)
 async def update_travel_expense(

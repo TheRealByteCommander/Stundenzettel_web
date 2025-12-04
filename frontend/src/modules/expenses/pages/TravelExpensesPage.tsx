@@ -67,10 +67,11 @@ export const TravelExpensesPage = () => {
         expenses: 0, // Nicht mehr vom User eingegeben
         customer_project: formState.customer_project || "",
       };
-      await createMutation.mutateAsync(payload);
+      const createdExpense = await createMutation.mutateAsync(payload);
       setFormState(emptyFormState);
       setShowCreateForm(false);
-      setMessage("Reisekosten erfolgreich erstellt");
+      setMessage(`Reisekosten erfolgreich erstellt. ID: ${createdExpense.id}`);
+      // Liste wird automatisch durch React Query aktualisiert
     } catch (err) {
       const errorMessage =
         (err as { response?: { data?: { detail?: string } } }).response?.data
