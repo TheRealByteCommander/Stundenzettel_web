@@ -452,6 +452,22 @@ export const TravelExpensesPage = () => {
                                 Kunde: {expense.customer_project}
                               </p>
                             )}
+                            {expense.receipts && expense.receipts.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs font-semibold text-gray-700">Belege:</p>
+                                {expense.receipts.map((receipt) => (
+                                  <ReceiptItem
+                                    key={receipt.id}
+                                    expense={expense}
+                                    receipt={receipt}
+                                    onDelete={() => {
+                                      setReceiptMessage(null);
+                                      setReceiptError(null);
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            )}
                             {isAdmin && expense.user_name && (
                               <p className="text-xs text-gray-500 mt-2">
                                 Von: {expense.user_name}
@@ -459,24 +475,27 @@ export const TravelExpensesPage = () => {
                             )}
                           </div>
                           {expense.status === "draft" && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEdit(expense)}
-                                className="flex-1"
-                              >
-                                Bearbeiten
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleDelete(expense.id)}
-                                disabled={deleteMutation.isPending}
-                                className="flex-1"
-                              >
-                                Löschen
-                              </Button>
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEdit(expense)}
+                                  className="flex-1"
+                                >
+                                  Bearbeiten
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleDelete(expense.id)}
+                                  disabled={deleteMutation.isPending}
+                                  className="flex-1"
+                                >
+                                  Löschen
+                                </Button>
+                              </div>
+                              <ReceiptUploadButton expense={expense} />
                             </div>
                           )}
                         </>
@@ -582,6 +601,11 @@ export const TravelExpensesPage = () => {
                               </td>
                               <td className="px-4 py-3 font-medium text-brand-gray">
                                 {expense.description}
+                                {expense.receipts && expense.receipts.length > 0 && (
+                                  <div className="mt-1 text-xs text-gray-500">
+                                    {expense.receipts.length} Beleg{expense.receipts.length !== 1 ? "e" : ""}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-gray-600">
                                 {expense.customer_project || "-"}
@@ -610,22 +634,25 @@ export const TravelExpensesPage = () => {
                               )}
                               <td className="px-4 py-3">
                                 {expense.status === "draft" && (
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleEdit(expense)}
-                                    >
-                                      Bearbeiten
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => handleDelete(expense.id)}
-                                      disabled={deleteMutation.isPending}
-                                    >
-                                      Löschen
-                                    </Button>
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEdit(expense)}
+                                      >
+                                        Bearbeiten
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleDelete(expense.id)}
+                                        disabled={deleteMutation.isPending}
+                                      >
+                                        Löschen
+                                      </Button>
+                                    </div>
+                                    <ReceiptUploadButton expense={expense} />
                                   </div>
                                 )}
                               </td>
