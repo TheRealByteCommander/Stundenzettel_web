@@ -562,7 +562,7 @@ export const TimesheetDetailPage = () => {
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
                       <Input
-                        value={entry.location}
+                        value={entry.location || ""}
                         onChange={(event) =>
                           handleEntryChange(index, "location", event.target.value)
                         }
