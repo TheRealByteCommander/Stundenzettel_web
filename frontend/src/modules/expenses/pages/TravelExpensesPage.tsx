@@ -148,13 +148,6 @@ export const TravelExpensesPage = () => {
     return new Date(dateString).toLocaleDateString("de-DE");
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("de-DE", {
-      style: "currency",
-      currency: "EUR",
-    }).format(amount);
-  };
-
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:gap-6 px-3 sm:px-4 py-4 sm:py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -216,47 +209,15 @@ export const TravelExpensesPage = () => {
                   </select>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="create-description">Beschreibung *</Label>
+                  <Label htmlFor="create-description">Kommentar *</Label>
                   <Input
                     id="create-description"
                     value={formState.description}
                     onChange={(e) =>
                       setFormState({ ...formState, description: e.target.value })
                     }
-                    placeholder="z.B. Fahrt nach Berlin"
+                    placeholder="z.B. Fahrt nach Berlin, Hotelübernachtung, etc."
                     required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-kilometers">Kilometer</Label>
-                  <Input
-                    id="create-kilometers"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formState.kilometers || ""}
-                    onChange={(e) =>
-                      setFormState({
-                        ...formState,
-                        kilometers: Number(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-expenses">Kosten (€)</Label>
-                  <Input
-                    id="create-expenses"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formState.expenses || ""}
-                    onChange={(e) =>
-                      setFormState({
-                        ...formState,
-                        expenses: Number(e.target.value) || 0,
-                      })
-                    }
                   />
                 </div>
               </div>
@@ -318,7 +279,7 @@ export const TravelExpensesPage = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-sm">Beschreibung *</Label>
+                            <Label className="text-sm">Kommentar *</Label>
                             <Input
                               value={editState.description}
                               onChange={(e) =>
@@ -328,38 +289,6 @@ export const TravelExpensesPage = () => {
                                 })
                               }
                             />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-2">
-                              <Label className="text-sm">Kilometer</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                value={editState.kilometers || ""}
-                                onChange={(e) =>
-                                  setEditState({
-                                    ...editState,
-                                    kilometers: Number(e.target.value) || 0,
-                                  })
-                                }
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm">Kosten (€)</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={editState.expenses || ""}
-                                onChange={(e) =>
-                                  setEditState({
-                                    ...editState,
-                                    expenses: Number(e.target.value) || 0,
-                                  })
-                                }
-                              />
-                            </div>
                           </div>
                           <div className="space-y-2">
                             <Label className="text-sm">Kunde/Projekt</Label>
@@ -432,21 +361,6 @@ export const TravelExpensesPage = () => {
                                 Kunde: {expense.customer_project}
                               </p>
                             )}
-                            <div className="text-sm text-gray-600 space-y-1">
-                              {expense.kilometers > 0 && (
-                                <p>
-                                  Kilometer: <strong>{expense.kilometers} km</strong>
-                                </p>
-                              )}
-                              {expense.expenses > 0 && (
-                                <p>
-                                  Kosten:{" "}
-                                  <strong className="text-brand-primary">
-                                    {formatCurrency(expense.expenses)}
-                                  </strong>
-                                </p>
-                              )}
-                            </div>
                             {isAdmin && expense.user_name && (
                               <p className="text-xs text-gray-500 mt-2">
                                 Von: {expense.user_name}
@@ -487,10 +401,8 @@ export const TravelExpensesPage = () => {
                   <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="px-4 py-3">Datum</th>
-                      <th className="px-4 py-3">Beschreibung</th>
+                      <th className="px-4 py-3">Kommentar</th>
                       <th className="px-4 py-3">Kunde/Projekt</th>
-                      <th className="px-4 py-3">Kilometer</th>
-                      <th className="px-4 py-3">Kosten</th>
                       <th className="px-4 py-3">Status</th>
                       {isAdmin && <th className="px-4 py-3">Mitarbeiter</th>}
                       <th className="px-4 py-3">Aktionen</th>
@@ -543,36 +455,6 @@ export const TravelExpensesPage = () => {
                                     </option>
                                   ))}
                                 </select>
-                              </td>
-                              <td className="px-4 py-3">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.1"
-                                  value={editState.kilometers || ""}
-                                  onChange={(e) =>
-                                    setEditState({
-                                      ...editState,
-                                      kilometers: Number(e.target.value) || 0,
-                                    })
-                                  }
-                                  className="w-24"
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={editState.expenses || ""}
-                                  onChange={(e) =>
-                                    setEditState({
-                                      ...editState,
-                                      expenses: Number(e.target.value) || 0,
-                                    })
-                                  }
-                                  className="w-24"
-                                />
                               </td>
                               <td className="px-4 py-3 text-gray-600">
                                 {expense.status === "approved"
