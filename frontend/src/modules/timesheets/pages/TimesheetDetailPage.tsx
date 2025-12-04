@@ -58,13 +58,18 @@ export const TimesheetDetailPage = () => {
   const canEdit = data?.status === "draft" && (currentUser?.id === data?.user_id || isAccounting);
 
   const totalHours = useMemo(() => {
-    if (!data) return 0;
+    if (!data || !data.entries) return 0;
     return data.entries.reduce((acc, entry) => {
-      const start = new Date(`1970-01-01T${entry.start_time}:00`);
-      const end = new Date(`1970-01-01T${entry.end_time}:00`);
-      const diff =
-        (end.getTime() - start.getTime()) / 1000 / 60 - entry.break_minutes;
-      return acc + Math.max(diff, 0) / 60;
+      if (!entry.start_time || !entry.end_time) return acc;
+      try {
+        const start = new Date(`1970-01-01T${entry.start_time}:00`);
+        const end = new Date(`1970-01-01T${entry.end_time}:00`);
+        const diff =
+          (end.getTime() - start.getTime()) / 1000 / 60 - (entry.break_minutes || 0);
+        return acc + Math.max(diff, 0) / 60;
+      } catch {
+        return acc;
+      }
     }, 0);
   }, [data]);
 
