@@ -455,7 +455,7 @@ export const TimesheetDetailPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(isEditing ? editingEntries : data.entries).map((entry, index) => (
+              {(isEditing ? editingEntries : (data.entries || [])).map((entry, index) => (
                 <tr key={`${entry.date}-${index}`}>
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
