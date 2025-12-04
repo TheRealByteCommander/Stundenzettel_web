@@ -2502,6 +2502,23 @@ async def get_timesheets(current_user: User = Depends(get_current_user)):
         sanitized.append(WeeklyTimesheet(**t))
     return sanitized
 
+@api_router.get("/timesheets/{timesheet_id}", response_model=WeeklyTimesheet)
+async def get_timesheet(
+    timesheet_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get a specific timesheet by ID"""
+    timesheet = await db.timesheets.find_one({"id": timesheet_id})
+    if not timesheet:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    
+    # Check permissions
+    if not current_user.can_view_all_data() and timesheet.get("user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    timesheet.pop("_id", None)
+    return WeeklyTimesheet(**timesheet)
+
 @api_router.put("/timesheets/{timesheet_id}", response_model=WeeklyTimesheet)
 async def update_timesheet(timesheet_id: str, timesheet_update: TimesheetUpdate, current_user: User = Depends(get_current_user)):
     # Find timesheet
