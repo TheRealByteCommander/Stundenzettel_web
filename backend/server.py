@@ -3389,11 +3389,15 @@ async def reject_travel_expense(expense_id: str, current_user: User = Depends(ge
 
 # Announcements endpoints
 @api_router.get("/announcements", response_model=List[Announcement])
-async def get_announcements(active_only: bool = False):
-    """Get all announcements (or only active ones)"""
+async def get_announcements(
+    active_only: bool = False,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all announcements (or only active ones) - requires authentication"""
     query = {"active": True} if active_only else {}
     announcements = []
     async for announcement in db.announcements.find(query).sort("created_at", -1):
+        announcement.pop("_id", None)
         announcements.append(Announcement(**announcement))
     return announcements
 
