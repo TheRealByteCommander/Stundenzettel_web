@@ -134,11 +134,31 @@ location /api/ {
     proxy_pass $BACKEND_SCHEME://$BACKEND_HOST:$BACKEND_PORT/api/;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_http_version 1.1;
     proxy_set_header Connection "";
     proxy_buffering off;
+    
+    # Timeouts für längere Requests
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+    
+    # Error Handling
+    proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+    proxy_next_upstream_tries 2;
+    proxy_next_upstream_timeout 10s;
+    
     limit_req zone=tick_guard_api burst=20 nodelay;
+}
+
+location /health {
+    proxy_pass $BACKEND_SCHEME://$BACKEND_HOST:$BACKEND_PORT/health;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    access_log off;
 }
 
 location / {
