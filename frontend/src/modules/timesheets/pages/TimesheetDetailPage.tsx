@@ -60,7 +60,7 @@ export const TimesheetDetailPage = () => {
   const totalHours = useMemo(() => {
     if (!data || !data.entries) return 0;
     return data.entries.reduce((acc, entry) => {
-      if (!entry.start_time || !entry.end_time) return acc;
+      if (!entry || !entry.start_time || !entry.end_time) return acc;
       try {
         const start = new Date(`1970-01-01T${entry.start_time}:00`);
         const end = new Date(`1970-01-01T${entry.end_time}:00`);
@@ -79,7 +79,9 @@ export const TimesheetDetailPage = () => {
     }
     setVerificationNotes(data.signed_pdf_verification_notes ?? "");
     setVerificationChecked(Boolean(data.signed_pdf_verified));
-    setEditingEntries([...data.entries]);
+    // Sicherstellen, dass entries ein Array ist und alle Einträge gültig sind
+    const validEntries = Array.isArray(data.entries) ? data.entries.filter(entry => entry != null) : [];
+    setEditingEntries(validEntries.length > 0 ? [...validEntries] : []);
   }, [data]);
 
   if (!id) {
@@ -220,8 +222,9 @@ export const TimesheetDetailPage = () => {
   };
 
   const handleCancelEdit = () => {
-    if (!data) return;
-    setEditingEntries([...data.entries]);
+    if (!data || !data.entries) return;
+    const validEntries = Array.isArray(data.entries) ? data.entries.filter(entry => entry != null) : [];
+    setEditingEntries(validEntries.length > 0 ? [...validEntries] : []);
     setIsEditing(false);
     setFormError(null);
   };
@@ -460,48 +463,51 @@ export const TimesheetDetailPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(isEditing ? editingEntries : (data.entries || [])).map((entry, index) => (
+              {(isEditing ? (editingEntries || []) : (data?.entries || [])).map((entry, index) => {
+                // Sicherstellen, dass entry gültig ist
+                if (!entry || !entry.date) return null;
+                return (
                 <tr key={`${entry.date}-${index}`}>
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
                       <Input
                         type="date"
-                        value={entry.date}
+                        value={entry.date || ""}
                         onChange={(event) =>
                           handleEntryChange(index, "date", event.target.value)
                         }
                         className="w-full"
                       />
                     ) : (
-                      new Date(entry.date).toLocaleDateString("de-DE")
+                      entry.date ? new Date(entry.date).toLocaleDateString("de-DE") : ""
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
                       <Input
                         type="time"
-                        value={entry.start_time}
+                        value={entry.start_time || ""}
                         onChange={(event) =>
                           handleEntryChange(index, "start_time", event.target.value)
                         }
                         className="w-full"
                       />
                     ) : (
-                      entry.start_time
+                      entry.start_time || ""
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
                       <Input
                         type="time"
-                        value={entry.end_time}
+                        value={entry.end_time || ""}
                         onChange={(event) =>
                           handleEntryChange(index, "end_time", event.target.value)
                         }
                         className="w-full"
                       />
                     ) : (
-                      entry.end_time
+                      entry.end_time || ""
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
@@ -509,27 +515,27 @@ export const TimesheetDetailPage = () => {
                       <Input
                         type="number"
                         min={0}
-                        value={entry.break_minutes}
+                        value={entry.break_minutes || 0}
                         onChange={(event) =>
                           handleEntryChange(index, "break_minutes", Number(event.target.value))
                         }
                         className="w-full"
                       />
                     ) : (
-                      `${entry.break_minutes} Min`
+                      `${entry.break_minutes || 0} Min`
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {isEditing ? (
                       <Input
-                        value={entry.tasks}
+                        value={entry.tasks || ""}
                         onChange={(event) =>
                           handleEntryChange(index, "tasks", event.target.value)
                         }
                         className="w-full"
                       />
                     ) : (
-                      entry.tasks
+                      entry.tasks || ""
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
