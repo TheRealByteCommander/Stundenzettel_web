@@ -21,16 +21,12 @@ import type { TravelExpense, TravelExpenseCreate } from "../../../services/api/t
 interface ExpenseFormState {
   date: string;
   description: string;
-  kilometers: number;
-  expenses: number;
   customer_project: string;
 }
 
 const emptyFormState: ExpenseFormState = {
   date: new Date().toISOString().split("T")[0],
   description: "",
-  kilometers: 0,
-  expenses: 0,
   customer_project: "",
 };
 
@@ -63,8 +59,8 @@ export const TravelExpensesPage = () => {
       const payload: TravelExpenseCreate = {
         date: formState.date,
         description: formState.description,
-        kilometers: formState.kilometers || 0,
-        expenses: formState.expenses || 0,
+        kilometers: 0, // Nicht mehr vom User eingegeben
+        expenses: 0, // Nicht mehr vom User eingegeben
         customer_project: formState.customer_project || "",
       };
       await createMutation.mutateAsync(payload);
@@ -84,8 +80,6 @@ export const TravelExpensesPage = () => {
     setEditState({
       date: expense.date,
       description: expense.description,
-      kilometers: expense.kilometers,
-      expenses: expense.expenses,
       customer_project: expense.customer_project,
     });
     setMessage(null);
@@ -108,8 +102,8 @@ export const TravelExpensesPage = () => {
         await updateMutation.mutateAsync({
           date: editState.date,
           description: editState.description,
-          kilometers: editState.kilometers || 0,
-          expenses: editState.expenses || 0,
+          kilometers: 0, // Nicht mehr vom User eingegeben
+          expenses: 0, // Nicht mehr vom User eingegeben
           customer_project: editState.customer_project || "",
         });
         setEditingId(null);
@@ -618,12 +612,6 @@ export const TravelExpensesPage = () => {
                               </td>
                               <td className="px-4 py-3 text-gray-600">
                                 {expense.customer_project || "-"}
-                              </td>
-                              <td className="px-4 py-3 text-gray-600">
-                                {expense.kilometers > 0 ? `${expense.kilometers} km` : "-"}
-                              </td>
-                              <td className="px-4 py-3 font-semibold text-brand-primary">
-                                {expense.expenses > 0 ? formatCurrency(expense.expenses) : "-"}
                               </td>
                               <td className="px-4 py-3">
                                 <span
