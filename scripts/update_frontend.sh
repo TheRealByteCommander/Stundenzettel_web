@@ -139,6 +139,12 @@ fi
 # Frontend builden
 if [[ "${SKIP_BUILD}" != "true" ]]; then
   log "Frontend wird gebaut..."
+  
+  # Alte Builds und Caches löschen für sauberen Build
+  log "Alte Build-Verzeichnisse und Caches werden gelöscht..."
+  rm -rf "$FRONTEND_DIR/build" "$FRONTEND_DIR/dist" "$FRONTEND_DIR/.vite" 2>/dev/null || true
+  rm -f "$FRONTEND_DIR/tsconfig.tsbuildinfo" 2>/dev/null || true
+  
   if ! npm run build; then
     abort "npm run build fehlgeschlagen"
   fi
