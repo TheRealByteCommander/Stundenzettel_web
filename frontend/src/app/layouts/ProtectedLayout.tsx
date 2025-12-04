@@ -67,12 +67,35 @@ export const ProtectedLayout = () => {
             >
               Stundenzettel
             </button>
-            <button
-              className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
-              onClick={() => navigate("/app/expenses")}
-            >
-              Reisekosten
-            </button>
+            <div className="relative group">
+              <button
+                className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
+                onClick={() => navigate("/app/expenses")}
+              >
+                Reisekosten
+              </button>
+              {/* Dropdown Menu */}
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-brand-gray hover:bg-gray-100 rounded-t-md"
+                  onClick={() => navigate("/app/expenses")}
+                >
+                  Übersicht
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-brand-gray hover:bg-gray-100"
+                  onClick={() => navigate("/app/expenses/individual")}
+                >
+                  Einzelausgaben
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-brand-gray hover:bg-gray-100 rounded-b-md"
+                  onClick={() => navigate("/app/expenses")}
+                >
+                  Berichte
+                </button>
+              </div>
+            </div>
             <button
               className="px-2 py-1.5 rounded-md text-brand-gray hover:text-brand-primary hover:bg-gray-100 transition-colors"
               onClick={() => navigate("/app/vacation")}

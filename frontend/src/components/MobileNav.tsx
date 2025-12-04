@@ -21,6 +21,7 @@ export const MobileNav = ({ user, onLogout, onPasswordChange }: MobileNavProps) 
     { label: "Dashboard", path: "/app" },
     { label: "Stundenzettel", path: "/app/timesheets" },
     { label: "Reisekosten", path: "/app/expenses" },
+    { label: "Einzelausgaben", path: "/app/expenses/individual" },
     { label: "Urlaub", path: "/app/vacation" },
     { label: "Ankündigungen", path: "/app/announcements" },
   ];
