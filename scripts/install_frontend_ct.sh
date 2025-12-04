@@ -100,13 +100,13 @@ npm install --legacy-peer-deps
 ENV_FILE="$FRONTEND_DIR/.env.production"
 if [[ -n "${PUBLIC_BACKEND_URL:-}" ]]; then
   log ".env.production schreiben ($ENV_FILE)…"
-  printf 'REACT_APP_BACKEND_URL=%s\n' "$PUBLIC_BACKEND_URL" > "$ENV_FILE"
+  printf 'VITE_API_BASE_URL=%s\n' "$PUBLIC_BACKEND_URL" > "$ENV_FILE"
 else
   if [[ -f "$ENV_FILE" ]]; then
     log ".env.production entfernen – verwende relative /api-Routen."
     rm -f "$ENV_FILE"
   else
-    log "Keine REACT_APP_BACKEND_URL gesetzt – verwende relative /api-Routen."
+    log "Keine PUBLIC_BACKEND_URL gesetzt – verwende relative /api-Routen (erfordert Nginx-Proxy)."
   fi
 fi
 

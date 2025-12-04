@@ -129,8 +129,10 @@ if [[ -f ".env.production" ]]; then
 else
   log ".env.production nicht gefunden - wird erstellt (falls PUBLIC_BACKEND_URL gesetzt)"
   if [[ -n "${PUBLIC_BACKEND_URL:-}" ]]; then
-    printf 'REACT_APP_BACKEND_URL=%s\n' "$PUBLIC_BACKEND_URL" > .env.production
-    log ".env.production erstellt mit REACT_APP_BACKEND_URL=$PUBLIC_BACKEND_URL"
+    printf 'VITE_API_BASE_URL=%s\n' "$PUBLIC_BACKEND_URL" > .env.production
+    log ".env.production erstellt mit VITE_API_BASE_URL=$PUBLIC_BACKEND_URL"
+  else
+    log "Hinweis: Keine PUBLIC_BACKEND_URL gesetzt - Frontend verwendet relative /api-Routen (erfordert Nginx-Proxy)"
   fi
 fi
 
