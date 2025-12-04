@@ -14,6 +14,10 @@ import uuid
 # MongoDB Client
 from motor.motor_asyncio import AsyncIOMotorClient
 
+# Password hashing
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 # Projekt-Pfad hinzufügen
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -31,13 +35,17 @@ async def create_dummy_data():
     
     # 1. Users erstellen
     print("\n📝 Erstelle Users...")
+    
+    # Passwort-Hashes generieren (alle Passwörter: "test123")
+    default_password_hash = pwd_context.hash("test123")
+    
     users = [
         {
             "id": "user-admin-001",
             "email": "admin@tick-guard.de",
             "name": "Max Mustermann",
             "role": "admin",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5",  # "admin123"
+            "hashed_password": default_password_hash,
             "created_at": datetime.utcnow(),
         },
         {
@@ -45,7 +53,7 @@ async def create_dummy_data():
             "email": "buchhaltung@tick-guard.de",
             "name": "Anna Schmidt",
             "role": "accounting",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5",
+            "hashed_password": default_password_hash,
             "created_at": datetime.utcnow(),
         },
         {
@@ -53,7 +61,7 @@ async def create_dummy_data():
             "email": "mitarbeiter1@tick-guard.de",
             "name": "Peter Müller",
             "role": "user",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5",
+            "hashed_password": default_password_hash,
             "created_at": datetime.utcnow(),
         },
         {
@@ -61,7 +69,7 @@ async def create_dummy_data():
             "email": "mitarbeiter2@tick-guard.de",
             "name": "Lisa Weber",
             "role": "user",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5",
+            "hashed_password": default_password_hash,
             "created_at": datetime.utcnow(),
         },
         {
@@ -69,7 +77,7 @@ async def create_dummy_data():
             "email": "mitarbeiter3@tick-guard.de",
             "name": "Thomas Fischer",
             "role": "user",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5",
+            "hashed_password": default_password_hash,
             "created_at": datetime.utcnow(),
         },
     ]
