@@ -467,131 +467,132 @@ export const TimesheetDetailPage = () => {
                 // Sicherstellen, dass entry gültig ist
                 if (!entry || !entry.date) return null;
                 return (
-                <tr key={`${entry.date}-${index}`}>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <Input
-                        type="date"
-                        value={entry.date || ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "date", event.target.value)
-                        }
-                        className="w-full"
-                      />
-                    ) : (
-                      entry.date ? new Date(entry.date).toLocaleDateString("de-DE") : ""
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <Input
-                        type="time"
-                        value={entry.start_time || ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "start_time", event.target.value)
-                        }
-                        className="w-full"
-                      />
-                    ) : (
-                      entry.start_time || ""
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <Input
-                        type="time"
-                        value={entry.end_time || ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "end_time", event.target.value)
-                        }
-                        className="w-full"
-                      />
-                    ) : (
-                      entry.end_time || ""
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        min={0}
-                        value={entry.break_minutes || 0}
-                        onChange={(event) =>
-                          handleEntryChange(index, "break_minutes", Number(event.target.value))
-                        }
-                        className="w-full"
-                      />
-                    ) : (
-                      `${entry.break_minutes || 0} Min`
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <Input
-                        value={entry.tasks || ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "tasks", event.target.value)
-                        }
-                        className="w-full"
-                      />
-                    ) : (
-                      entry.tasks || ""
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                        value={entry.customer_project || ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "customer_project", event.target.value)
-                        }
-                      >
-                        <option value="">-- Kunde auswählen --</option>
-                        {customers?.map((customer) => (
-                          <option key={customer.id} value={customer.name}>
-                            {customer.name}
-                            {customer.project_name ? ` - ${customer.project_name}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      entry.customer_project || "-"
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {isEditing ? (
-                      <Input
-                        value={entry.location || ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "location", event.target.value)
-                        }
-                        className="w-full"
-                      />
-                    ) : (
-                      entry.location || "-"
-                    )}
-                  </td>
-                  {isEditing && (
+                  <tr key={`${entry.date}-${index}`}>
                     <td className="px-4 py-3 text-gray-600">
-                      <select
-                        className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
-                        value={entry.vehicle_id ?? ""}
-                        onChange={(event) =>
-                          handleEntryChange(index, "vehicle_id", event.target.value || null)
-                        }
-                      >
-                        <option value="">— Kein Fahrzeug —</option>
-                        {vehicleOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      {isEditing ? (
+                        <Input
+                          type="date"
+                          value={entry.date || ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "date", event.target.value)
+                          }
+                          className="w-full"
+                        />
+                      ) : (
+                        entry.date ? new Date(entry.date).toLocaleDateString("de-DE") : ""
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-4 py-3 text-gray-600">
+                      {isEditing ? (
+                        <Input
+                          type="time"
+                          value={entry.start_time || ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "start_time", event.target.value)
+                          }
+                          className="w-full"
+                        />
+                      ) : (
+                        entry.start_time || ""
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {isEditing ? (
+                        <Input
+                          type="time"
+                          value={entry.end_time || ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "end_time", event.target.value)
+                          }
+                          className="w-full"
+                        />
+                      ) : (
+                        entry.end_time || ""
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {isEditing ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          value={entry.break_minutes || 0}
+                          onChange={(event) =>
+                            handleEntryChange(index, "break_minutes", Number(event.target.value))
+                          }
+                          className="w-full"
+                        />
+                      ) : (
+                        `${entry.break_minutes || 0} Min`
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {isEditing ? (
+                        <Input
+                          value={entry.tasks || ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "tasks", event.target.value)
+                          }
+                          className="w-full"
+                        />
+                      ) : (
+                        entry.tasks || ""
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {isEditing ? (
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          value={entry.customer_project || ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "customer_project", event.target.value)
+                          }
+                        >
+                          <option value="">-- Kunde auswählen --</option>
+                          {customers?.map((customer) => (
+                            <option key={customer.id} value={customer.name}>
+                              {customer.name}
+                              {customer.project_name ? ` - ${customer.project_name}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        entry.customer_project || "-"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {isEditing ? (
+                        <Input
+                          value={entry.location || ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "location", event.target.value)
+                          }
+                          className="w-full"
+                        />
+                      ) : (
+                        entry.location || "-"
+                      )}
+                    </td>
+                    {isEditing && (
+                      <td className="px-4 py-3 text-gray-600">
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                          value={entry.vehicle_id ?? ""}
+                          onChange={(event) =>
+                            handleEntryChange(index, "vehicle_id", event.target.value || null)
+                          }
+                        >
+                          <option value="">— Kein Fahrzeug —</option>
+                          {vehicleOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
