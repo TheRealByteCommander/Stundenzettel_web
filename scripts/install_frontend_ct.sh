@@ -163,6 +163,16 @@ location /health {
 
 location / {
     try_files \$uri /index.html;
+    # Cache-Control für HTML - keine Caching
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    add_header Pragma "no-cache";
+    add_header Expires "0";
+}
+
+# JS/CSS-Dateien mit Cache-Control
+location ~* \.(js|css|mjs)$ {
+    add_header Cache-Control "public, max-age=0, must-revalidate";
+    expires -1;
 }
 
 location /.well-known/acme-challenge/ {

@@ -1,5 +1,6 @@
 // Service Worker für PWA und Push-Benachrichtigungen
-const CACHE_NAME = "tick-guard-v1";
+// CACHE_NAME ändern bei jedem Build, um Cache-Invalidierung zu erzwingen
+const CACHE_NAME = "tick-guard-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -35,6 +36,7 @@ self.addEventListener("activate", (event) => {
 });
 
 // Fetch Event - Network first, fallback to cache
+// WICHTIG: JS/CSS-Dateien werden NICHT gecached, um immer die neueste Version zu laden
 self.addEventListener("fetch", (event) => {
   // Nur GET-Requests cachen
   if (event.request.method !== "GET") {
@@ -46,10 +48,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // JS/CSS-Dateien NICHT cachen - immer vom Netzwerk laden
+  const url = new URL(event.request.url);
+  const isAsset = url.pathname.match(/\.(js|css|mjs)$/i);
+  
+  if (isAsset) {
+    // Assets immer vom Netzwerk laden, kein Cache
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Nur erfolgreiche Responses cachen
+        // Nur erfolgreiche Responses cachen (nur für HTML, JSON, etc.)
         if (response.status === 200) {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
