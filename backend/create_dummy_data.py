@@ -114,7 +114,12 @@ async def create_dummy_data():
             await db.users.insert_one(user)
             print(f"  ✅ User erstellt: {user['name']} ({user['email']})")
         else:
-            print(f"  ⏭️  User existiert bereits: {user['email']}")
+            # Update existing user with new password hash
+            await db.users.update_one(
+                {"email": user["email"]},
+                {"$set": {"hashed_password": user["hashed_password"]}}
+            )
+            print(f"  🔄 User aktualisiert: {user['name']} ({user['email']}) - Passwort wurde aktualisiert")
     
     # 2. Vehicles erstellen
     print("\n🚗 Erstelle Fahrzeuge...")
