@@ -48,20 +48,22 @@ async def create_dummy_data():
     # 1. Users erstellen
     print("\n📝 Erstelle Users...")
     
-    # Passwort-Hashes generieren (alle Passwörter: "test123")
+    # Passwort-Hashes generieren (alle Passwörter: "test1234" - mindestens 8 Zeichen)
+    test_password = "test1234"  # Mindestens 8 Zeichen für Passwort-Validierung
     try:
         if USE_SERVER_HASH:
-            default_password_hash = get_password_hash("test123")
-            print("  ✅ Passwort-Hash erfolgreich generiert (via server.get_password_hash)")
+            default_password_hash = get_password_hash(test_password)
+            print(f"  ✅ Passwort-Hash erfolgreich generiert (via server.get_password_hash) - Passwort: {test_password}")
         else:
-            default_password_hash = pwd_context.hash("test123")
-            print("  ✅ Passwort-Hash erfolgreich generiert (via passlib)")
+            default_password_hash = pwd_context.hash(test_password)
+            print(f"  ✅ Passwort-Hash erfolgreich generiert (via passlib) - Passwort: {test_password}")
     except Exception as e:
-        # Fallback: vordefinierter pbkdf2_sha256 Hash für "test123"
+        # Fallback: vordefinierter pbkdf2_sha256 Hash für "test1234"
         # Dieser Hash wurde mit pbkdf2_sha256 generiert (260000 rounds)
-        default_password_hash = "pbkdf2_sha256$260000$test123$test123"
+        default_password_hash = "pbkdf2_sha256$260000$test1234$test1234"
         print(f"  ⚠️  Konnte keinen neuen Hash generieren, verwende Fallback: {e}")
         print(f"  ⚠️  Fallback-Hash wird verwendet - Login könnte fehlschlagen!")
+        print(f"  ⚠️  Passwort für alle User: {test_password}")
     
     users = [
         {
