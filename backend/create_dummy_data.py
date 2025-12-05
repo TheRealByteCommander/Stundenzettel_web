@@ -14,14 +14,13 @@ import uuid
 # MongoDB Client
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Password hashing - verwende die gleiche Methode wie im Backend
+# Password hashing - verwende die gleiche Methode wie im Backend (pbkdf2_sha256)
 import os
 os.environ.setdefault("PASSLIB_DISABLED_HASHES", "bcrypt")
 from passlib.context import CryptContext
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["pbkdf2_sha256"],
     deprecated="auto",
-    bcrypt__rounds=12,
 )
 
 # Projekt-Pfad hinzufügen
