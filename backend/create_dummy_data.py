@@ -18,9 +18,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Password hashing - verwende die gleiche Funktion wie im Backend
-# Importiere hash_password aus server.py
+# Importiere get_password_hash aus server.py
 try:
-    from server import hash_password
+    from server import get_password_hash
     USE_SERVER_HASH = True
 except ImportError:
     # Fallback falls Import nicht funktioniert
@@ -51,8 +51,8 @@ async def create_dummy_data():
     # Passwort-Hashes generieren (alle Passwörter: "test123")
     try:
         if USE_SERVER_HASH:
-            default_password_hash = hash_password("test123")
-            print("  ✅ Passwort-Hash erfolgreich generiert (via server.hash_password)")
+            default_password_hash = get_password_hash("test123")
+            print("  ✅ Passwort-Hash erfolgreich generiert (via server.get_password_hash)")
         else:
             default_password_hash = pwd_context.hash("test123")
             print("  ✅ Passwort-Hash erfolgreich generiert (via passlib)")
