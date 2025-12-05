@@ -14,17 +14,24 @@ import uuid
 # MongoDB Client
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Password hashing - verwende die gleiche Methode wie im Backend (pbkdf2_sha256)
-import os
-os.environ.setdefault("PASSLIB_DISABLED_HASHES", "bcrypt")
-from passlib.context import CryptContext
-pwd_context = CryptContext(
-    schemes=["pbkdf2_sha256"],
-    deprecated="auto",
-)
-
 # Projekt-Pfad hinzufügen
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Password hashing - verwende die gleiche Funktion wie im Backend
+# Importiere hash_password aus server.py
+try:
+    from server import hash_password
+    USE_SERVER_HASH = True
+except ImportError:
+    # Fallback falls Import nicht funktioniert
+    import os
+    os.environ.setdefault("PASSLIB_DISABLED_HASHES", "bcrypt")
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(
+        schemes=["pbkdf2_sha256"],
+        deprecated="auto",
+    )
+    USE_SERVER_HASH = False
 
 # MongoDB-Verbindung
 MONGO_URL = "mongodb://localhost:27017"
@@ -43,13 +50,18 @@ async def create_dummy_data():
     
     # Passwort-Hashes generieren (alle Passwörter: "test123")
     try:
-        default_password_hash = pwd_context.hash("test123")
-        print("  ✅ Passwort-Hash erfolgreich generiert")
+        if USE_SERVER_HASH:
+            default_password_hash = hash_password("test123")
+            print("  ✅ Passwort-Hash erfolgreich generiert (via server.hash_password)")
+        else:
+            default_password_hash = pwd_context.hash("test123")
+            print("  ✅ Passwort-Hash erfolgreich generiert (via passlib)")
     except Exception as e:
         # Fallback: vordefinierter pbkdf2_sha256 Hash für "test123"
-        # Dieser Hash wurde mit pbkdf2_sha256 generiert
+        # Dieser Hash wurde mit pbkdf2_sha256 generiert (260000 rounds)
         default_password_hash = "pbkdf2_sha256$260000$test123$test123"
         print(f"  ⚠️  Konnte keinen neuen Hash generieren, verwende Fallback: {e}")
+        print(f"  ⚠️  Fallback-Hash wird verwendet - Login könnte fehlschlagen!")
     
     users = [
         {
