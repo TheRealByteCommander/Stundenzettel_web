@@ -14,9 +14,15 @@ import uuid
 # MongoDB Client
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Password hashing
+# Password hashing - verwende die gleiche Methode wie im Backend
+import os
+os.environ.setdefault("PASSLIB_DISABLED_HASHES", "bcrypt")
 from passlib.context import CryptContext
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+)
 
 # Projekt-Pfad hinzufügen
 sys.path.insert(0, str(Path(__file__).parent))
